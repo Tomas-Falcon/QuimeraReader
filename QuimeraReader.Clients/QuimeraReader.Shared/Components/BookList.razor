@@ -1,0 +1,136 @@
+@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Services
+@inject IQuimeraApiClient ApiClient
+@namespace QuimeraReader.Shared.Components
+
+<div class="library-container">
+    @if (_isLoading && _books.Count == 0)
+    {
+        <div class="loading-state">
+            <p>Cargando biblioteca...</p>
+        </div>
+    }
+    else if (_books.Count == 0)
+    {
+        <div class="empty-state">
+            <p>No se encontraron libros.</p>
+        </div>
+    }
+    else
+    {
+        <div class="books-grid">
+            @foreach (var book in _books)
+            {
+                <BookCard Book="book" />
+            }
+        </div>
+        
+        @if (_hasMore)
+        {
+            <div class="load-more">
+                <button class="btn-load" @onclick="LoadMoreAsync" disabled="@_isLoading">
+                    @(_isLoading ? "Cargando..." : "Cargar más")
+                </button>
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .library-container {
+        padding: 20px;
+    }
+
+    .books-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 24px;
+        justify-content: center;
+    }
+
+    .loading-state, .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #888;
+    }
+
+    .load-more {
+        text-align: center;
+        margin-top: 30px;
+    }
+
+    .btn-load {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 20px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: background-color 0.2s;
+    }
+
+    .btn-load:hover:not(:disabled) {
+        background-color: #0056b3;
+    }
+
+    .btn-load:disabled {
+        background-color: #555;
+        cursor: not-allowed;
+    }
+</style>
+
+@code {
+    private List<Book> _books = new();
+    private int _currentPage = 1;
+    private bool _isLoading = false;
+    private bool _hasMore = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBooksAsync();
+    }
+
+    private async Task LoadBooksAsync()
+    {
+        if (_isLoading || !_hasMore) return;
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await ApiClient.GetBooksAsync(_currentPage, 20);
+            
+            if (result.Data.Length > 0)
+            {
+                _books.AddRange(result.Data);
+                _currentPage++;
+                
+                // Si trajimos menos del tamaño de página, ya no hay más
+                if (result.Data.Length < 20)
+                {
+                    _hasMore = false;
+                }
+            }
+            else
+            {
+                _hasMore = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cargando libros: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        await LoadBooksAsync();
+    }
+}
