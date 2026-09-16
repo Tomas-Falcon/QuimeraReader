@@ -40,6 +40,19 @@ public class EpubScannerService
         var settingsDict = await _dbContext.SystemSettings
             .ToDictionaryAsync(s => s.Key, s => s.Value);
 
+        string? extractedIsbn = null;
+        if (epubBook.Schema?.Package?.Metadata?.Identifiers != null)
+        {
+            var isbnIdentifier = epubBook.Schema.Package.Metadata.Identifiers
+                .FirstOrDefault(id => id.Scheme != null && id.Scheme.Equals("ISBN", StringComparison.OrdinalIgnoreCase));
+            
+            if (isbnIdentifier != null)
+            {
+                extractedIsbn = isbnIdentifier.Identifier;
+                book.Isbn = extractedIsbn;
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(book.Title) || !book.Authors.Any() || epubBook.CoverImage == null)
         {
             var query = !string.IsNullOrWhiteSpace(book.Title) ? book.Title : Path.GetFileNameWithoutExtension(sourceFilePath);
@@ -48,7 +61,7 @@ public class EpubScannerService
             BookMetadata? metadata = null;
             foreach (var provider in orderedProviders)
             {
-                metadata = await provider.GetMetadataAsync(query, isbn: null, settings: settingsDict);
+                metadata = await provider.GetMetadataAsync(query, isbn: extractedIsbn, settings: settingsDict);
                 if (metadata != null) break;
             }
 
