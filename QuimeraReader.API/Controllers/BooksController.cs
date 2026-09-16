@@ -48,6 +48,8 @@ public class BooksController : ControllerBase
             {
                 id = b.Id,
                 title = b.Title,
+                isbn = b.Isbn,
+                description = b.Description,
                 processing_status = b.ProcessingStatus == "SYNCED" ? "ALIGNED" : b.ProcessingStatus,
                 authors = b.Authors.Select(a => new { name = a.Author!.Name, file_as = a.Author!.FileAs, role = a.Role }).ToList(),
                 categories = b.Categories.Select(c => c.Category!.Name).ToList(),
@@ -65,6 +67,29 @@ public class BooksController : ControllerBase
             page = page,
             pageSize = pageSize,
             data = books
+        });
+    }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetBook(int id)
+    {
+        var book = await _dbContext.Books
+            .Include(b => b.Authors).ThenInclude(ba => ba.Author)
+            .Include(b => b.Categories).ThenInclude(bc => bc.Category)
+            .Include(b => b.Series)
+            .FirstOrDefaultAsync(b => b.Id == id);
+
+        if (book == null) return NotFound();
+
+        return Ok(new 
+        {
+            id = book.Id,
+            title = book.Title,
+            isbn = book.Isbn,
+            description = book.Description,
+            processing_status = book.ProcessingStatus == "SYNCED" ? "ALIGNED" : book.ProcessingStatus,
+            cover_url = !string.IsNullOrEmpty(book.CoverImagePath) ? $"/api/media/books/{book.Id}/cover" : null,
+            audio_url = !string.IsNullOrEmpty(book.AudioFilePath) ? $"/api/media/books/{book.Id}/audio" : null
         });
     }
 
