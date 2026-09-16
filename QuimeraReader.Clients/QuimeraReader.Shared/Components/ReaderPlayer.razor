@@ -1,0 +1,204 @@
+@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Services
+@using Microsoft.JSInterop
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@inject IQuimeraApiClient ApiClient
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+@namespace QuimeraReader.Shared.Components
+
+<div class="reader-container">
+    @if (_isLoading)
+    {
+        <p>Cargando libro y reproductor...</p>
+    }
+    else if (Book != null)
+    {
+        <div class="reader-header">
+            <h2>@Book.Title</h2>
+        </div>
+
+        <div class="text-container">
+            @if (_segments != null && _segments.Any())
+            {
+                <div class="sync-text">
+                    @for (int i = 0; i < _segments.Count; i++)
+                    {
+                        var segment = _segments[i];
+                        var index = i;
+                        var isActive = _currentTime >= segment.Start && _currentTime <= segment.End;
+                        <span class="segment @(isActive ? "active-segment" : "")" @onclick="() => SeekToSegmentAsync(segment.Start)">
+                            @segment.Text 
+                        </span>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="no-sync-map">
+                    <p>No hay mapa de sincronización disponible. Modo solo lectura EPUB.</p>
+                    <p><em>(El visor de EPUB completo se implementará aquí)</em></p>
+                </div>
+            }
+        </div>
+
+        <div class="player-controls">
+            <audio @ref="_audioElement" src="@Book.AudioUrl" controls class="native-audio" />
+        </div>
+    }
+</div>
+
+<style>
+    .reader-container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        max-width: 800px;
+        margin: 0 auto;
+        background: #1e1e1e;
+        color: #ddd;
+    }
+
+    .reader-header {
+        padding: 16px;
+        background: #2d2d2d;
+        text-align: center;
+        border-bottom: 1px solid #444;
+    }
+
+    .text-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+        font-size: 1.2rem;
+        line-height: 1.8;
+    }
+
+    .sync-text {
+        text-align: justify;
+    }
+
+    .segment {
+        cursor: pointer;
+        transition: background-color 0.2s, color 0.2s;
+        border-radius: 4px;
+    }
+
+    .segment:hover {
+        background-color: #333;
+    }
+
+    .active-segment {
+        background-color: #ffd54f;
+        color: #000;
+        font-weight: 500;
+        padding: 2px 0;
+    }
+
+    .player-controls {
+        padding: 16px;
+        background: #252525;
+        border-top: 1px solid #444;
+        display: flex;
+        justify-content: center;
+    }
+
+    .native-audio {
+        width: 100%;
+        max-width: 600px;
+    }
+    
+    .no-sync-map {
+        text-align: center;
+        color: #888;
+        margin-top: 40px;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public int BookId { get; set; }
+
+    public Book? Book { get; set; }
+    
+    private bool _isLoading = true;
+    private ElementReference _audioElement;
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<ReaderPlayer>? _dotNetRef;
+    private double _currentTime = 0;
+    private bool _isPlaying = false;
+    private List<SyncSegment> _segments = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Book = await ApiClient.GetBookAsync(BookId);
+        
+        var syncMapJson = await ApiClient.GetSyncMapAsync(BookId);
+        if (!string.IsNullOrEmpty(syncMapJson))
+        {
+            try
+            {
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                _segments = JsonSerializer.Deserialize<List<SyncSegment>>(syncMapJson, options) ?? new();
+            }
+            catch { /* Ignorar error de parseo por ahora */ }
+        }
+
+        _isLoading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Book != null)
+        {
+            _jsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/QuimeraReader.Shared/playerInterop.js");
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await _jsModule.InvokeVoidAsync("initializePlayer", _audioElement, _dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public void OnTimeUpdate(double time)
+    {
+        _currentTime = time;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnPlayStateChanged(bool isPlaying)
+    {
+        _isPlaying = isPlaying;
+        StateHasChanged();
+    }
+
+    private async Task SeekToSegmentAsync(double time)
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("seekAudio", _audioElement, time);
+            await _jsModule.InvokeVoidAsync("playAudio", _audioElement);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _dotNetRef?.Dispose();
+        if (_jsModule != null)
+        {
+            await _jsModule.DisposeAsync();
+        }
+    }
+
+    public class SyncSegment
+    {
+        [JsonPropertyName("start")]
+        public double Start { get; set; }
+        
+        [JsonPropertyName("end")]
+        public double End { get; set; }
+        
+        [JsonPropertyName("text")]
+        public string Text { get; set; } = string.Empty;
+    }
+}

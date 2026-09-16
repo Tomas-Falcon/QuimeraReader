@@ -11,6 +11,7 @@ public interface IQuimeraApiClient
 {
     Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50);
     Task<Book?> GetBookAsync(int id);
+    Task<string> GetSyncMapAsync(int id);
     Task<Dictionary<string, string>> GetSettingsAsync();
     Task SaveSettingAsync(SystemSetting setting);
 }
@@ -34,6 +35,18 @@ public class QuimeraApiClient : IQuimeraApiClient
     public async Task<Book?> GetBookAsync(int id)
     {
         return await _httpClient.GetFromJsonAsync<Book>($"api/Books/{id}");
+    }
+
+    public async Task<string> GetSyncMapAsync(int id)
+    {
+        try 
+        {
+            return await _httpClient.GetStringAsync($"api/Books/{id}/syncmap");
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 
     public async Task<Dictionary<string, string>> GetSettingsAsync()

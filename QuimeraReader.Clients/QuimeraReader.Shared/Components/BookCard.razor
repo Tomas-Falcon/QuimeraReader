@@ -1,7 +1,8 @@
 @using QuimeraReader.Shared.Models
+@inject NavigationManager NavManager
 @namespace QuimeraReader.Shared.Components
 
-<div class="book-card">
+<div class="book-card" @onclick="GoToRead">
     <div class="cover-container">
         @if (!string.IsNullOrEmpty(Book?.CoverUrl))
         {
@@ -85,4 +86,12 @@
 @code {
     [Parameter]
     public Book? Book { get; set; }
+
+    private void GoToRead()
+    {
+        if (Book != null)
+        {
+            NavManager.NavigateTo($"/read/{Book.Id}");
+        }
+    }
 }
