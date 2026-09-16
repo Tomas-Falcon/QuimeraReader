@@ -11,10 +11,28 @@ namespace QuimeraReader.API.Controllers;
 public class MediaController : ControllerBase
 {
     private readonly AppDbContext _dbContext;
+    private readonly MediaPackagerService _packagerService;
 
-    public MediaController(AppDbContext dbContext)
+    public MediaController(AppDbContext dbContext, MediaPackagerService packagerService)
     {
         _dbContext = dbContext;
+        _packagerService = packagerService;
+    }
+
+    [HttpGet("books/{id}/package")]
+    public async Task<IActionResult> GetPackage(int id, [FromQuery] string format)
+    {
+        var book = await _dbContext.Books.FindAsync(id);
+        if (book == null) return NotFound();
+
+        if (format == "audiobook" || format == "readaloud")
+        {
+            var zipStream = await _packagerService.CreateAudiobookPackageAsync(book);
+            return File(zipStream, "application/zip", $"{book.Title}.drb");
+        }
+        
+        // Si es ebook puro, devolvemos el epub tal cual
+        return PhysicalFile(book.EpubFilePath, "application/epub+zip", enableRangeProcessing: true);
     }
 
     [HttpGet("books/{id}/cover")]

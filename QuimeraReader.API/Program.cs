@@ -26,6 +26,7 @@ builder.Services.AddScoped<IMetadataProvider, OpenLibraryMetadataProvider>();
 builder.Services.AddSingleton<AudioAlignmentQueue>();
 builder.Services.AddScoped<EpubScannerService>();
 builder.Services.AddScoped<AudioAlignmentService>();
+builder.Services.AddScoped<MediaPackagerService>();
 
 // Registrar el Background Service
 builder.Services.AddHostedService<LibraryScanBackgroundService>();
