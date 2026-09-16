@@ -17,6 +17,25 @@
         </div>
     </div>
 
+    @if (_books.Count > 0 && string.IsNullOrWhiteSpace(_searchQuery))
+    {
+        var continueReading = _books.Where(b => b.LastReadAt.HasValue).OrderByDescending(b => b.LastReadAt).Take(4).ToList();
+        
+        if (continueReading.Any())
+        {
+            <div class="continue-reading mb-5">
+                <h4 class="mb-3">Seguir leyendo</h4>
+                <div class="books-grid">
+                    @foreach (var book in continueReading)
+                    {
+                        <BookCard Book="book" />
+                    }
+                </div>
+            </div>
+            <h4 class="mb-3">Agregados recientemente</h4>
+        }
+    }
+
     @if (_isLoading && _books.Count == 0)
     {
         <div class="loading-state text-center py-5">

@@ -17,6 +17,9 @@ public class Book
     
     // Reading Progress
     public DateTime? LastReadAt { get; set; }
+    public string? CurrentEpubCfi { get; set; }
+    public double? CurrentAudioPosition { get; set; }
+    public double? PercentageCompleted { get; set; }
 
     // Series/Sagas
     public int? SeriesId { get; set; }

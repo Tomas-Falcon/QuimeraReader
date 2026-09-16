@@ -48,7 +48,14 @@ else
             
             <div class="actions mt-4">
                 <button class="btn btn-lg btn-primary" @onclick="GoToRead">
-                    <i class="bi bi-play-fill"></i> Reproducir / Leer
+                    @if (_book.PercentageCompleted.HasValue && _book.PercentageCompleted.Value > 0)
+                    {
+                        <i class="bi bi-play-fill"></i> @($"Continuar ({Math.Round(_book.PercentageCompleted.Value)}%)")
+                    }
+                    else
+                    {
+                        <i class="bi bi-play-fill"></i> @("Reproducir / Leer")
+                    }
                 </button>
             </div>
         </div>

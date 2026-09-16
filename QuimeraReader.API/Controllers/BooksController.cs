@@ -48,19 +48,24 @@ public class BooksController : ControllerBase
             .Take(pageSize)
             .Select(b => new 
             {
-                id = b.Id,
-                title = b.Title,
-                isbn = b.Isbn,
-                description = b.Description,
-                average_rating = b.AverageRating,
-                processing_status = b.ProcessingStatus == "SYNCED" ? "ALIGNED" : b.ProcessingStatus,
-                authors = b.Authors.Select(a => new { name = a.Author!.Name, file_as = a.Author!.FileAs, role = a.Role }).ToList(),
-                categories = b.Categories.Select(c => c.Category!.Name).ToList(),
-                series = b.Series != null ? new { name = b.Series.Name, volume = b.SeriesVolume, universe = b.Series.Universe != null ? b.Series.Universe.Name : null } : null,
-                cover_url = !string.IsNullOrEmpty(b.CoverImagePath) ? $"/api/media/books/{b.Id}/cover" : null,
-                epub_url = !string.IsNullOrEmpty(b.EpubFilePath) ? $"/api/media/books/{b.Id}/epub" : null,
-                audio_url = !string.IsNullOrEmpty(b.AudioFilePath) ? $"/api/media/books/{b.Id}/audio" : null,
-                syncmap_url = b.ProcessingStatus == "SYNCED" ? $"/api/books/{b.Id}/syncmap" : null
+                Id = b.Id,
+                Title = b.Title,
+                Isbn = b.Isbn,
+                Description = b.Description,
+                AverageRating = b.AverageRating,
+                ProcessingStatus = b.ProcessingStatus == "SYNCED" ? "ALIGNED" : b.ProcessingStatus,
+                Authors = b.Authors.Select(a => a.Author!.Name).ToList(),
+                Categories = b.Categories.Select(c => c.Category!.Name).ToList(),
+                Series = b.Series != null ? b.Series.Name : null,
+                Universe = b.Series != null && b.Series.Universe != null ? b.Series.Universe.Name : null,
+                HasCover = !string.IsNullOrEmpty(b.CoverImagePath),
+                HasEpub = !string.IsNullOrEmpty(b.EpubFilePath),
+                HasAudio = !string.IsNullOrEmpty(b.AudioFilePath),
+                IsAligned = b.ProcessingStatus == "SYNCED",
+                LastReadAt = b.LastReadAt,
+                CurrentEpubCfi = b.CurrentEpubCfi,
+                CurrentAudioPosition = b.CurrentAudioPosition,
+                PercentageCompleted = b.PercentageCompleted
             })
             .ToListAsync();
 
@@ -86,13 +91,24 @@ public class BooksController : ControllerBase
 
         return Ok(new 
         {
-            id = book.Id,
-            title = book.Title,
-            isbn = book.Isbn,
-            description = book.Description,
-            processing_status = book.ProcessingStatus == "SYNCED" ? "ALIGNED" : book.ProcessingStatus,
-            cover_url = !string.IsNullOrEmpty(book.CoverImagePath) ? $"/api/media/books/{book.Id}/cover" : null,
-            audio_url = !string.IsNullOrEmpty(book.AudioFilePath) ? $"/api/media/books/{book.Id}/audio" : null
+            Id = book.Id,
+            Title = book.Title,
+            Isbn = book.Isbn,
+            Description = book.Description,
+            AverageRating = book.AverageRating,
+            ProcessingStatus = book.ProcessingStatus == "SYNCED" ? "ALIGNED" : book.ProcessingStatus,
+            Authors = book.Authors.Select(a => a.Author!.Name).ToList(),
+            Categories = book.Categories.Select(c => c.Category!.Name).ToList(),
+            Series = book.Series != null ? book.Series.Name : null,
+            Universe = book.Series != null && book.Series.Universe != null ? book.Series.Universe.Name : null,
+            HasCover = !string.IsNullOrEmpty(book.CoverImagePath),
+            HasEpub = !string.IsNullOrEmpty(book.EpubFilePath),
+            HasAudio = !string.IsNullOrEmpty(book.AudioFilePath),
+            IsAligned = book.ProcessingStatus == "SYNCED",
+            LastReadAt = book.LastReadAt,
+            CurrentEpubCfi = book.CurrentEpubCfi,
+            CurrentAudioPosition = book.CurrentAudioPosition,
+            PercentageCompleted = book.PercentageCompleted
         });
     }
 
@@ -150,13 +166,23 @@ public class BooksController : ControllerBase
         return Ok();
     }
 
+    public class UpdatePositionRequest
+    {
+        public string? CurrentEpubCfi { get; set; }
+        public double? CurrentAudioPosition { get; set; }
+        public double? PercentageCompleted { get; set; }
+    }
+
     [HttpPost("{bookId}/positions")]
-    public async Task<IActionResult> UpdatePosition(int bookId, [FromBody] object positionData)
+    public async Task<IActionResult> UpdatePosition(int bookId, [FromBody] UpdatePositionRequest request)
     {
         var book = await _dbContext.Books.FirstOrDefaultAsync(b => b.Id == bookId);
         if (book == null) return NotFound();
 
         book.LastReadAt = DateTime.UtcNow;
+        if (request.CurrentEpubCfi != null) book.CurrentEpubCfi = request.CurrentEpubCfi;
+        if (request.CurrentAudioPosition.HasValue) book.CurrentAudioPosition = request.CurrentAudioPosition;
+        if (request.PercentageCompleted.HasValue) book.PercentageCompleted = request.PercentageCompleted;
 
         if (!string.IsNullOrEmpty(book.AudioFilePath) && 
             (string.IsNullOrEmpty(book.ProcessingStatus) || 

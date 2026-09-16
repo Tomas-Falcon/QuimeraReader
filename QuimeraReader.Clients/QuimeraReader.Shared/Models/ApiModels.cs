@@ -18,6 +18,11 @@ public record Book
     public bool HasAudio { get; init; }
     public bool IsAligned { get; init; }
     
+    public DateTime? LastReadAt { get; init; }
+    public string? CurrentEpubCfi { get; init; }
+    public double? CurrentAudioPosition { get; init; }
+    public double? PercentageCompleted { get; init; }
+    
     // Virtual URLs para el frontend (generadas por MediaController)
     public string CoverUrl => $"/api/media/books/{Id}/cover";
     public string EpubUrl => $"/api/media/books/{Id}/epub";
