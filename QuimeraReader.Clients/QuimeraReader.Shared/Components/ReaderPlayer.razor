@@ -45,9 +45,9 @@
                         <!-- Epub.js will render the book here -->
                     </div>
                     <div class="epub-controls mt-3 d-flex justify-content-between align-items-center w-100">
-                        <button class="btn btn-outline-light rounded-circle" @onclick="PrevPage" style="width: 50px; height: 50px;"><i class="bi bi-chevron-left"></i></button>
+                        <button class="btn btn-outline-light rounded-circle prev-btn" @onclick="PrevPage" style="width: 50px; height: 50px;" aria-label="Previous Page"><i class="bi bi-chevron-left"></i></button>
                         <span class="text-muted small">Modo Lectura</span>
-                        <button class="btn btn-outline-light rounded-circle" @onclick="NextPage" style="width: 50px; height: 50px;"><i class="bi bi-chevron-right"></i></button>
+                        <button class="btn btn-outline-light rounded-circle next-btn" @onclick="NextPage" style="width: 50px; height: 50px;" aria-label="Next Page"><i class="bi bi-chevron-right"></i></button>
                     </div>
                 }
                 else if (_segments != null && _segments.Any())

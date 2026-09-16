@@ -48,7 +48,7 @@ public class MediaController : ControllerBase
         return PhysicalFile(book.CoverImagePath, mimeType);
     }
 
-    [HttpGet("books/{id}/epub")]
+    [HttpGet("books/{id}/file.epub")]
     public async Task<IActionResult> GetEpub(int id)
     {
         var book = await _dbContext.Books.FindAsync(id);
