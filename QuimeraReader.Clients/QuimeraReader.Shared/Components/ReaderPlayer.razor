@@ -113,13 +113,21 @@
         _isLoading = false;
     }
 
+    private bool _playerInitialized = false;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && Book != null)
+        if (!_playerInitialized && Book != null && !_isLoading)
         {
+            _playerInitialized = true;
             _jsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/QuimeraReader.Shared/playerInterop.js");
             _dotNetRef = DotNetObjectReference.Create(this);
             await _jsModule.InvokeVoidAsync("initializePlayer", _audioElement, _dotNetRef);
+
+            if (Book.CurrentAudioPosition.HasValue && Book.CurrentAudioPosition.Value > 0)
+            {
+                await _jsModule.InvokeVoidAsync("seekAudio", _audioElement, Book.CurrentAudioPosition.Value);
+            }
         }
     }
 
