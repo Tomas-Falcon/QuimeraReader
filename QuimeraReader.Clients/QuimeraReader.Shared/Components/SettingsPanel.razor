@@ -134,10 +134,15 @@
                             <div class="alert alert-info mb-4" style="border-radius: 8px;">
                                 <h5>Escanéo en progreso...</h5>
                                 <p class="mb-1 text-truncate">Procesando: @_scanStatus.CurrentFile</p>
-                                <div class="progress" style="height: 20px;">
+                                <div class="progress" style="height: 20px; position: relative;">
                                     <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: @progress%" aria-valuenow="@progress" aria-valuemin="0" aria-valuemax="100">
-                                        @_scanStatus.FilesProcessed / @_scanStatus.TotalFilesFound
                                     </div>
+                                    <div class="text-center w-100 position-absolute fw-bold" style="line-height: 20px; color: var(--text-inverse); z-index: 10;">
+                                        @_scanStatus.FilesProcessed / @_scanStatus.TotalFilesFound (@Math.Round(progress)%)
+                                    </div>
+                                </div>
+                                <div class="mt-2 text-end">
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="CancelScanAsync">Cancelar Escaneo</button>
                                 </div>
                             </div>
                         }
@@ -316,6 +321,21 @@
         {
             _isScanning = false;
             StateHasChanged();
+        }
+    }
+
+    private async Task CancelScanAsync()
+    {
+        try
+        {
+            await ApiClient.CancelScanAsync();
+            ShowMessage("Escaneo cancelado.", true);
+            if (_scanStatus != null) _scanStatus.IsScanning = false;
+            _isScanning = false;
+        }
+        catch (Exception ex)
+        {
+            ShowMessage("Error cancelando el escaneo: " + ex.Message, false);
         }
     }
 

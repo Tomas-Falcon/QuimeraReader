@@ -195,6 +195,19 @@ public class BooksController : ControllerBase
         return Ok(new { Message = "Escaneo programado." });
     }
 
+    [HttpPost("scan/cancel")]
+    public async Task<IActionResult> CancelScan()
+    {
+        _scanState.IsScanning = false;
+        var setting = await _dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "IncomingScanFolder");
+        if (setting != null)
+        {
+            setting.Value = ""; // Clear incoming scan folder to prevent background worker from picking it up again
+            await _dbContext.SaveChangesAsync();
+        }
+        return Ok(new { Message = "Escaneo cancelado." });
+    }
+
     [HttpPost("{bookId}/categories")]
     public async Task<IActionResult> AddCustomCategory(int bookId, [FromBody] string categoryName)
     {

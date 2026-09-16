@@ -557,6 +557,7 @@ code {
     /* Cards */
     .card {
         background: var(--bg-card);
+        color: var(--text-main);
         border: 1px solid var(--border-color);
         border-radius: 12px;
         padding: 24px;

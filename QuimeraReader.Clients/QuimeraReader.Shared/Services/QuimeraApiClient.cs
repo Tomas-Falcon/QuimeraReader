@@ -23,6 +23,7 @@ public interface IQuimeraApiClient
     Task<Dictionary<string, string>> GetSettingsAsync();
     Task SaveSettingAsync(SystemSetting setting);
     Task<string> TriggerScanAsync(object payload);
+    Task CancelScanAsync();
     Task DownloadWhisperModelAsync();
     Task<ScanStatus?> GetScanStatusAsync();
     Task UpdatePositionAsync(int bookId, string? epubCfi = null, double? audioPosition = null, double? percentage = null);
@@ -79,6 +80,12 @@ public class QuimeraApiClient : IQuimeraApiClient
         var response = await _httpClient.PostAsJsonAsync("api/Books/scan", payload);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
+    }
+
+    public async Task CancelScanAsync()
+    {
+        var response = await _httpClient.PostAsync("api/Books/scan/cancel", null);
+        response.EnsureSuccessStatusCode();
     }
 
     public async Task DownloadWhisperModelAsync()
