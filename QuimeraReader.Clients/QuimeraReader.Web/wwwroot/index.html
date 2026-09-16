@@ -41,6 +41,7 @@
                 const newTheme = currentTheme === 'light' ? 'dark' : 'light';
                 document.documentElement.setAttribute('data-theme', newTheme);
                 localStorage.setItem('theme', newTheme);
+                return newTheme;
             },
             initTheme: function () {
                 const savedTheme = localStorage.getItem('theme');
