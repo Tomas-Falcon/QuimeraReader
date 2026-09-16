@@ -11,108 +11,259 @@
 <div class="reader-container">
     @if (_isLoading)
     {
-        <p>Cargando libro y reproductor...</p>
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Preparando tu libro...</p>
+        </div>
     }
     else if (Book != null)
     {
-        <div class="reader-header">
-            <h2>@Book.Title</h2>
-        </div>
+        <!-- Background Blur -->
+        <div class="background-blur" style="background-image: url('@Book.CoverUrl');"></div>
+        <div class="background-overlay"></div>
 
-        <div class="text-container">
-            @if (_segments != null && _segments.Any())
-            {
-                <div class="sync-text">
-                    @for (int i = 0; i < _segments.Count; i++)
-                    {
-                        var segment = _segments[i];
-                        var index = i;
-                        var isActive = _currentTime >= segment.Start && _currentTime <= segment.End;
-                        <span class="segment @(isActive ? "active-segment" : "")" @onclick="() => SeekToSegmentAsync(segment.Start)">
-                            @segment.Text 
-                        </span>
-                    }
+        <!-- Main Content -->
+        <div class="reader-content">
+            <!-- Header -->
+            <div class="reader-header">
+                <button class="btn-back" @onclick="GoBack">
+                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    Volver
+                </button>
+                <div class="header-titles">
+                    <h2 class="book-title">@Book.Title</h2>
+                    <p class="book-author">Leyendo ahora</p>
                 </div>
-            }
-            else
-            {
-                <div class="no-sync-map">
-                    <p>No hay mapa de sincronización disponible. Modo solo lectura EPUB.</p>
-                    <p><em>(El visor de EPUB completo se implementará aquí)</em></p>
-                </div>
-            }
-        </div>
+                <div class="header-spacer"></div>
+            </div>
 
-        <div class="player-controls">
-            <audio @ref="_audioElement" src="@Book.AudioUrl" controls class="native-audio" />
+            <!-- Text Area -->
+            <div class="text-container" id="text-container">
+                @if (_segments != null && _segments.Any())
+                {
+                    <div class="sync-text">
+                        @for (int i = 0; i < _segments.Count; i++)
+                        {
+                            var segment = _segments[i];
+                            var index = i;
+                            var isActive = _currentTime >= segment.Start && _currentTime <= segment.End;
+                            <span class="segment @(isActive ? "active-segment" : "")" @onclick="() => SeekToSegmentAsync(segment.Start)">
+                                @segment.Text 
+                            </span>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="no-sync-map">
+                        <img src="@Book.CoverUrl" class="fallback-cover" />
+                        <h3>Modo Audiolibro Puro</h3>
+                        <p>No se encontraron transcripciones o mapas de sincronización para este título.</p>
+                    </div>
+                }
+            </div>
+
+            <!-- Native Player (Styled container) -->
+            <div class="player-controls">
+                <audio @ref="_audioElement" src="@Book.AudioUrl" controls class="native-audio" />
+            </div>
         </div>
     }
 </div>
 
 <style>
     .reader-container {
+        position: relative;
+        height: 100vh;
+        width: 100%;
+        overflow: hidden;
+        background-color: #000;
+        color: #fff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    .background-blur {
+        position: absolute;
+        top: -10%; left: -10%; right: -10%; bottom: -10%;
+        background-size: cover;
+        background-position: center;
+        filter: blur(60px);
+        opacity: 0.4;
+        z-index: 0;
+    }
+
+    .background-overlay {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: linear-gradient(to bottom, rgba(18,18,18,0.4) 0%, rgba(18,18,18,0.95) 80%, rgba(18,18,18,1) 100%);
+        z-index: 1;
+    }
+
+    .reader-content {
+        position: relative;
+        z-index: 2;
         display: flex;
         flex-direction: column;
-        height: 100vh;
-        max-width: 800px;
+        height: 100%;
+        max-width: 900px;
         margin: 0 auto;
-        background: #1e1e1e;
-        color: #ddd;
     }
 
+    /* Header */
     .reader-header {
-        padding: 16px;
-        background: #2d2d2d;
-        text-align: center;
-        border-bottom: 1px solid #444;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 24px;
+        background: transparent;
     }
 
+    .btn-back {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 20px;
+        cursor: pointer;
+        backdrop-filter: blur(10px);
+        transition: background 0.2s;
+    }
+
+    .btn-back:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .header-titles {
+        text-align: center;
+    }
+
+    .book-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin: 0;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+
+    .book-author {
+        font-size: 0.85rem;
+        color: #aaa;
+        margin: 4px 0 0 0;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .header-spacer {
+        width: 80px; /* Balances the back button */
+    }
+
+    /* Text Area */
     .text-container {
         flex: 1;
         overflow-y: auto;
-        padding: 24px;
-        font-size: 1.2rem;
-        line-height: 1.8;
+        padding: 40px;
+        font-size: 1.6rem;
+        line-height: 2;
+        scroll-behavior: smooth;
+    }
+
+    /* Ocultar barra de scroll para limpieza visual */
+    .text-container::-webkit-scrollbar {
+        width: 6px;
+    }
+    .text-container::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.1);
+        border-radius: 4px;
     }
 
     .sync-text {
-        text-align: justify;
+        text-align: left;
+        max-width: 700px;
+        margin: 0 auto;
+        color: #777; /* Texto inactivo apagado */
     }
 
     .segment {
         cursor: pointer;
-        transition: background-color 0.2s, color 0.2s;
-        border-radius: 4px;
+        transition: color 0.3s ease, font-size 0.3s ease;
+        padding-right: 4px;
     }
 
     .segment:hover {
-        background-color: #333;
+        color: #bbb;
     }
 
     .active-segment {
-        background-color: #ffd54f;
-        color: #000;
-        font-weight: 500;
-        padding: 2px 0;
+        color: #fff; /* Texto activo brillante */
+        font-weight: 600;
+        text-shadow: 0 0 20px rgba(255,255,255,0.3);
     }
 
+    /* Fallback Audiolibro */
+    .no-sync-map {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #aaa;
+        text-align: center;
+    }
+
+    .fallback-cover {
+        width: 200px;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        margin-bottom: 24px;
+    }
+
+    /* Player */
     .player-controls {
-        padding: 16px;
-        background: #252525;
-        border-top: 1px solid #444;
+        padding: 30px 40px;
+        background: transparent;
         display: flex;
         justify-content: center;
     }
 
     .native-audio {
         width: 100%;
-        max-width: 600px;
+        max-width: 800px;
+        height: 50px;
+        filter: invert(1) hue-rotate(180deg) grayscale(1) contrast(1.2); /* Truco CSS para que el player por defecto sea estilo oscuro en todos los navegadores */
+        opacity: 0.85;
+        transition: opacity 0.2s;
     }
     
-    .no-sync-map {
-        text-align: center;
+    .native-audio:hover {
+        opacity: 1;
+    }
+
+    .spinner {
+        border: 3px solid rgba(255,255,255,0.1);
+        border-radius: 50%;
+        border-top: 3px solid #fff;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px auto;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .loading-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
         color: #888;
-        margin-top: 40px;
     }
 </style>
 
@@ -120,7 +271,15 @@
     [Parameter]
     public int BookId { get; set; }
 
+    [Inject]
+    public NavigationManager NavManager { get; set; } = default!;
+
     public Book? Book { get; set; }
+    
+    private void GoBack()
+    {
+        NavManager.NavigateTo("/");
+    }
     
     private bool _isLoading = true;
     private ElementReference _audioElement;
@@ -158,11 +317,28 @@
         }
     }
 
+    private int _lastActiveIndex = -1;
+
     [JSInvokable]
-    public void OnTimeUpdate(double time)
+    public async Task OnTimeUpdate(double time)
     {
         _currentTime = time;
-        StateHasChanged();
+        
+        var currentIndex = _segments.FindIndex(s => time >= s.Start && time <= s.End);
+        if (currentIndex != -1 && currentIndex != _lastActiveIndex)
+        {
+            _lastActiveIndex = currentIndex;
+            StateHasChanged();
+            
+            if (_jsModule != null)
+            {
+                await _jsModule.InvokeVoidAsync("scrollToActiveSegment");
+            }
+        }
+        else
+        {
+            StateHasChanged();
+        }
     }
 
     [JSInvokable]

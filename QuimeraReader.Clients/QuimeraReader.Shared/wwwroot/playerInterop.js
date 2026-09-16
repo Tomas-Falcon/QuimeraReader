@@ -25,3 +25,10 @@ export function pauseAudio(audioElement) {
 export function seekAudio(audioElement, time) {
     if (audioElement) audioElement.currentTime = time;
 }
+
+export function scrollToActiveSegment() {
+    const activeEl = document.querySelector('.active-segment');
+    if (activeEl) {
+        activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
