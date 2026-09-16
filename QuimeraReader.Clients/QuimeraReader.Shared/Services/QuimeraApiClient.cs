@@ -15,6 +15,7 @@ public interface IQuimeraApiClient
     Task<Dictionary<string, string>> GetSettingsAsync();
     Task SaveSettingAsync(SystemSetting setting);
     Task<string> TriggerScanAsync(object payload);
+    Task DownloadWhisperModelAsync();
 }
 
 public class QuimeraApiClient : IQuimeraApiClient
@@ -67,5 +68,11 @@ public class QuimeraApiClient : IQuimeraApiClient
         var response = await _httpClient.PostAsJsonAsync("api/Books/scan", payload);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
+    }
+
+    public async Task DownloadWhisperModelAsync()
+    {
+        var response = await _httpClient.PostAsync("api/Settings/whisper/download", null);
+        response.EnsureSuccessStatusCode();
     }
 }

@@ -58,4 +58,29 @@ public class SettingsController : ControllerBase
         await _dbContext.SaveChangesAsync();
         return Ok();
     }
+    [HttpPost("whisper/download")]
+    public async Task<IActionResult> DownloadWhisperModel()
+    {
+        string modelUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin";
+        string targetPath = "ggml-base.bin";
+
+        if (System.IO.File.Exists(targetPath))
+        {
+            return Ok(new { Message = "El modelo ya está descargado." });
+        }
+
+        try
+        {
+            using var httpClient = new System.Net.Http.HttpClient();
+            using var stream = await httpClient.GetStreamAsync(modelUrl);
+            using var fileStream = new FileStream(targetPath, FileMode.CreateNew);
+            await stream.CopyToAsync(fileStream);
+
+            return Ok(new { Message = "Modelo descargado con éxito." });
+        }
+        catch (System.Exception ex)
+        {
+            return StatusCode(500, new { Message = "Error al descargar el modelo: " + ex.Message });
+        }
+    }
 }

@@ -65,26 +65,62 @@
             @if (ActiveTab == "apikeys")
             {
                 <div class="card">
-                    <h3>Credenciales e IA</h3>
-                    <p class="text-muted">Agrega tus claves de proveedor de metadatos y configura la IA para audiolibros.</p>
+                    <h3>Inteligencia Artificial y Transcripción (Whisper)</h3>
+                    <p class="text-muted">Configura cómo deseas ejecutar los modelos de Inteligencia Artificial.</p>
                     <hr />
 
                     <div class="form-group">
+                        <label>Modo de Ejecución de Whisper</label>
+                        <select class="form-control" @bind="_whisperMode">
+                            <option value="LocalServer">Plug & Play: Ejecutar Whisper localmente en este Servidor</option>
+                            <option value="ExternalApi">API Externa: Conectar a OpenAI o red local (Ollama / LLMStudio)</option>
+                        </select>
+                    </div>
+
+                    @if (_whisperMode == "LocalServer")
+                    {
+                        <div class="card-inner-box">
+                            <h4>Configuración Local (Whisper.net)</h4>
+                            <p class="help-text mb-3">Se descargarán los pesos del modelo directamente al contenedor. Depende del CPU/GPU del servidor.</p>
+                            
+                            <div class="form-group">
+                                <label>Ruta del Modelo Base (.bin)</label>
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="text" class="form-control" @bind="_whisperModelPath" placeholder="ggml-base.bin" style="flex:1;" />
+                                    <button class="btn-primary" @onclick="DownloadWhisperModelAsync" disabled="@_isDownloadingWhisper">
+                                        @(_isDownloadingWhisper ? "Descargando..." : "Descargar Modelo Ahora")
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="card-inner-box">
+                            <h4>Configuración API Externa</h4>
+                            <p class="help-text mb-3">Conecta QuimeraReader a OpenAI o a un modelo Whisper alojado en otro servidor (ej. Ollama).</p>
+                            
+                            <div class="form-group">
+                                <label>Endpoint URL (OpenAI API / Local Network)</label>
+                                <input type="text" class="form-control" @bind="_openAiEndpoint" placeholder="https://api.openai.com/v1/" />
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>API Key</label>
+                                <input type="password" class="form-control" @bind="_openAiKey" placeholder="sk-..." />
+                                <span class="help-text">Si usas un modelo en red local sin autenticación, puedes dejar esto vacío.</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+                
+                <div class="card mt-4">
+                    <h3>Metadatos y Portadas</h3>
+                    <hr />
+                    <div class="form-group">
                         <label>Google Books API Key (Opcional)</label>
                         <input type="password" class="form-control" @bind="_googleBooksKey" placeholder="AIza..." />
-                        <span class="help-text">Mejora significativamente la descarga de portadas en alta resolución. OpenLibrary se usa por defecto sin llave.</span>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Ruta del Modelo Whisper Local (.bin)</label>
-                        <input type="text" class="form-control" @bind="_whisperModelPath" placeholder="ggml-base.bin" />
-                        <span class="help-text">Ruta local (ej. ggml-base.bin) del modelo Whisper.net usado para la alineación.</span>
-                    </div>
-
-                    <div class="form-group">
-                        <label>OpenAI API Key (Opcional / Futuro)</label>
-                        <input type="password" class="form-control" @bind="_openAiKey" placeholder="sk-..." />
-                        <span class="help-text">Se usará en futuras actualizaciones para generar resúmenes automáticos.</span>
+                        <span class="help-text">Mejora la descarga de portadas en alta resolución. OpenLibrary se usa por defecto sin llave.</span>
                     </div>
                 </div>
             }
@@ -145,6 +181,9 @@
     private string _openAiKey = string.Empty;
     private string _googleBooksKey = string.Empty;
     private string _whisperModelPath = "ggml-base.bin";
+    private string _whisperMode = "LocalServer";
+    private string _openAiEndpoint = "https://api.openai.com/v1/";
+    private bool _isDownloadingWhisper = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -156,6 +195,8 @@
             if (settings.TryGetValue("OpenAIApiKey", out var openai)) _openAiKey = openai;
             if (settings.TryGetValue("GoogleBooksApiKey", out var gbooks)) _googleBooksKey = gbooks;
             if (settings.TryGetValue("WhisperModelPath", out var whisper)) _whisperModelPath = whisper;
+            if (settings.TryGetValue("WhisperMode", out var wMode)) _whisperMode = wMode;
+            if (settings.TryGetValue("OpenAIEndpoint", out var wEndpoint)) _openAiEndpoint = wEndpoint;
         }
         catch (Exception ex)
         {
@@ -180,6 +221,8 @@
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "OpenAIApiKey", Value = _openAiKey });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "GoogleBooksApiKey", Value = _googleBooksKey });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "WhisperModelPath", Value = _whisperModelPath });
+            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "WhisperMode", Value = _whisperMode });
+            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "OpenAIEndpoint", Value = _openAiEndpoint });
             
             ShowMessage("Ajustes guardados correctamente.", true);
         }
@@ -190,6 +233,28 @@
         finally
         {
             _isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DownloadWhisperModelAsync()
+    {
+        _isDownloadingWhisper = true;
+        _message = string.Empty;
+        StateHasChanged();
+        
+        try
+        {
+            await ApiClient.DownloadWhisperModelAsync();
+            ShowMessage("Modelo descargado con éxito.", true);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage("Error al descargar: " + ex.Message, false);
+        }
+        finally
+        {
+            _isDownloadingWhisper = false;
             StateHasChanged();
         }
     }
