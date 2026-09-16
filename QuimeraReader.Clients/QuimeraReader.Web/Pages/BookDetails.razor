@@ -1,4 +1,4 @@
-@page "/book/{id:int}"
+@page "/book/{Id:int}"
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @inject IQuimeraApiClient ApiClient
@@ -6,84 +6,130 @@
 
 <PageTitle>Detalles del Libro</PageTitle>
 
-<div class="mb-4">
-    <button class="btn btn-outline-secondary" @onclick="GoBack">
-        <i class="bi bi-arrow-left"></i> Volver a la Biblioteca
-    </button>
-</div>
-
 @if (_isLoading)
 {
-    <p>Cargando detalles...</p>
+    <div class="loading-state text-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-3">Cargando detalles...</p>
+    </div>
 }
 else if (_book == null)
 {
-    <p>Libro no encontrado.</p>
+    <div class="empty-state text-center py-5">
+        <i class="bi bi-exclamation-circle text-danger mb-3" style="font-size: 3rem;"></i>
+        <p>No se pudo encontrar el libro.</p>
+        <button class="btn btn-primary mt-3" @onclick="GoBack">Volver a la Biblioteca</button>
+    </div>
 }
 else
 {
-    <div class="book-details-layout d-flex flex-column flex-md-row gap-4">
-        <div class="cover-section" style="flex: 0 0 auto; width: 100%; max-width: 250px; margin: 0 auto;">
-            <img src="@_book.CoverUrl" alt="Portada" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);" />
-        </div>
-        
-        <div class="book-info-col" style="flex: 1;">
-            <h1>@_book.Title</h1>
-            <h4 class="text-muted mb-3">@string.Join(", ", _book.Authors)</h4>
-            
-            <div class="badges mb-4">
-                @if (_book.AverageRating.HasValue)
-                {
-                    <span class="badge bg-warning text-dark"><i class="bi bi-star-fill"></i> @_book.AverageRating</span>
-                }
-                @if (_book.HasEpub)
-                {
-                    <span class="badge bg-primary"><i class="bi bi-book"></i> Ebook</span>
-                }
-                @if (_book.HasAudio)
-                {
-                    <span class="badge bg-secondary"><i class="bi bi-headphones"></i> Audiobook</span>
-                }
-                @if (_book.IsAligned)
-                {
-                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Sincronizado</span>
-                }
+    <div class="book-details-hero">
+        <!-- Background Blur effect similar to Spotify/Reader -->
+        <div class="hero-bg" style="background-image: url('@_book.CoverUrl');"></div>
+        <div class="hero-overlay"></div>
+
+        <div class="container position-relative" style="z-index: 10; padding-top: 2rem; padding-bottom: 3rem;">
+            <div class="mb-4">
+                <button class="btn btn-link text-white text-decoration-none px-0" @onclick="GoBack" style="font-size: 1.1rem; opacity: 0.9;">
+                    <i class="bi bi-arrow-left me-2"></i> Volver a la Biblioteca
+                </button>
             </div>
 
-            @if (!string.IsNullOrWhiteSpace(_book.Description))
-            {
-                <p class="description lead" style="white-space: pre-wrap;">@_book.Description</p>
-            }
-            else
-            {
-                <p class="text-muted fst-italic">No hay sinopsis disponible para este libro.</p>
-            }
-            
-            <div class="actions mt-4">
-                @if (!_book.HasEpub && !_book.HasAudio)
-                {
-                    <button class="btn btn-lg btn-secondary" disabled>
-                        <i class="bi bi-slash-circle me-2"></i> Archivo no disponible
-                    </button>
-                    <p class="text-muted mt-2 small">Este libro no tiene un archivo asociado para leer o escuchar.</p>
-                }
-                else
-                {
-                    <button class="btn btn-lg btn-primary w-100 w-md-auto" @onclick="GoToRead">
-                        @if (_book.PercentageCompleted.HasValue && _book.PercentageCompleted.Value > 0)
+            <div class="d-flex flex-column flex-md-row gap-5 align-items-center align-items-md-start">
+                <!-- Cover -->
+                <div class="cover-section" style="flex: 0 0 auto; width: 100%; max-width: 300px;">
+                    <img src="@_book.CoverUrl" alt="Portada" class="img-fluid rounded shadow-lg" style="width: 100%;" />
+                </div>
+                
+                <!-- Metadata -->
+                <div class="info-section text-white mt-3 mt-md-0" style="flex: 1;">
+                    <h1 class="display-5 fw-bold mb-2">@_book.Title</h1>
+                    
+                    @if (_book.Authors.Any())
+                    {
+                        <h4 class="text-white-50 mb-4">@string.Join(", ", _book.Authors)</h4>
+                    }
+                    
+                    <div class="badges mb-4 d-flex gap-2 flex-wrap">
+                        @if (_book.HasEpub)
                         {
-                            <i class="bi bi-play-fill me-2"></i> @($"Continuar ({Math.Round(_book.PercentageCompleted.Value)}%)")
+                            <span class="badge bg-primary fs-6"><i class="bi bi-book"></i> Ebook</span>
+                        }
+                        @if (_book.HasAudio)
+                        {
+                            <span class="badge bg-success fs-6"><i class="bi bi-headphones"></i> Audiobook</span>
+                        }
+                        @if (_book.IsAligned)
+                        {
+                            <span class="badge bg-warning text-dark fs-6"><i class="bi bi-stars"></i> Sincronizado</span>
+                        }
+                    </div>
+                    
+                    @if (!string.IsNullOrWhiteSpace(_book.Description))
+                    {
+                        <div class="description-box p-4 rounded mb-4" style="background-color: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);">
+                            <p class="lead mb-0" style="white-space: pre-wrap; font-size: 1.1rem; line-height: 1.6;">@_book.Description</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-white-50 fst-italic mb-4">No hay sinopsis disponible para este libro.</p>
+                    }
+                    
+                    <div class="actions mt-4">
+                        @if (!_book.HasEpub && !_book.HasAudio)
+                        {
+                            <button class="btn btn-lg btn-secondary px-5 py-3 rounded-pill fw-bold" disabled>
+                                <i class="bi bi-slash-circle me-2"></i> Archivo no disponible
+                            </button>
+                            <p class="text-white-50 mt-2 small">Este libro no tiene un archivo asociado para leer o escuchar.</p>
                         }
                         else
                         {
-                            <i class="bi bi-play-fill me-2"></i> @("Reproducir / Leer")
+                            <button class="btn btn-lg btn-primary px-5 py-3 rounded-pill fw-bold shadow-sm" @onclick="GoToRead" style="transition: transform 0.2s;">
+                                @if (_book.PercentageCompleted.HasValue && _book.PercentageCompleted.Value > 0)
+                                {
+                                    <i class="bi bi-play-circle-fill me-2 fs-5"></i> @($"Continuar lectura ({Math.Round(_book.PercentageCompleted.Value)}%)")
+                                }
+                                else
+                                {
+                                    <i class="bi bi-play-circle-fill me-2 fs-5"></i> @("Empezar a leer")
+                                }
+                            </button>
                         }
-                    </button>
-                }
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 }
+
+<style>
+    .book-details-hero {
+        position: relative;
+        min-height: calc(100vh - 60px);
+        margin: -1.5rem; /* Negate the padding from article content to bleed to edges */
+        overflow: hidden;
+        background-color: #121212;
+    }
+    .hero-bg {
+        position: absolute;
+        top: -5%; left: -5%; right: -5%; bottom: -5%;
+        background-size: cover;
+        background-position: center;
+        filter: blur(40px) brightness(0.6);
+        z-index: 1;
+    }
+    .hero-overlay {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: linear-gradient(to bottom, rgba(18,18,18,0.2) 0%, rgba(18,18,18,0.9) 100%);
+        z-index: 2;
+    }
+    .btn-primary:hover {
+        transform: scale(1.05);
+    }
+</style>
 
 @code {
     [Parameter]
