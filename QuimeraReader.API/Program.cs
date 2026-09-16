@@ -11,9 +11,9 @@ using QuimeraReader.API.BackgroundServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configurar base de datos SQLite local
+var dbPath = Environment.GetEnvironmentVariable("QUIMERA_DB_PATH") ?? "quimerareader.db";
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=quimerareader.db"));
+    options.UseSqlite($"Data Source={dbPath}"));
 
 // Registrar HttpClient general
 builder.Services.AddHttpClient();
@@ -44,7 +44,11 @@ using (var scope = app.Services.CreateScope())
     dbContext.Database.EnsureCreated();
 }
 
+app.UseStaticFiles(); // Servir wwwroot (Blazor WebAssembly)
+
 app.UseAuthorization();
 app.MapControllers();
+
+app.MapFallbackToFile("index.html"); // SPA Fallback para enrutamiento Blazor
 
 app.Run();

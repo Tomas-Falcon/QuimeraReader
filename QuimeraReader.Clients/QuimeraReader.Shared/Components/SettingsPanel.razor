@@ -18,6 +18,18 @@
             <small class="help-text">Directorio en el servidor donde se escanearán los archivos EPUB y MP3/M4B.</small>
         </div>
 
+        <div class="form-group">
+            <label for="ingestionMode">Estrategia de Importación:</label>
+            <select id="ingestionMode" class="form-control" @bind="_ingestionMode">
+                <option value="Move">Mover archivos a la Biblioteca (/library)</option>
+                <option value="LeaveInPlace">Dejar en su lugar original (/media)</option>
+            </select>
+            <small class="help-text">
+                <strong>Mover:</strong> Libera espacio borrando el original de Descargas tras organizarlo.<br />
+                <strong>Dejar en su lugar:</strong> Mantiene el original intacto (útil para Torrents). Solo mueve metadatos a /library.
+            </small>
+        </div>
+
         <button class="btn-save" @onclick="SaveSettingsAsync" disabled="@_isSaving">
             @(_isSaving ? "Guardando..." : "Guardar Cambios")
         </button>
@@ -125,6 +137,7 @@
     private bool _isLoading = true;
     private bool _isSaving = false;
     private string _libraryRootPath = string.Empty;
+    private string _ingestionMode = "Move";
     private string _message = string.Empty;
     private bool _isSuccess = false;
 
@@ -141,6 +154,10 @@
             if (settings.TryGetValue("LibraryRootPath", out var path))
             {
                 _libraryRootPath = path;
+            }
+            if (settings.TryGetValue("IngestionMode", out var mode))
+            {
+                _ingestionMode = mode;
             }
         }
         catch (Exception ex)
@@ -161,13 +178,9 @@
 
         try
         {
-            var setting = new SystemSetting
-            {
-                Key = "LibraryRootPath",
-                Value = _libraryRootPath
-            };
-
-            await ApiClient.SaveSettingAsync(setting);
+            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "LibraryRootPath", Value = _libraryRootPath });
+            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "IngestionMode", Value = _ingestionMode });
+            
             ShowMessage("Configuración guardada exitosamente.", true);
         }
         catch (Exception ex)
