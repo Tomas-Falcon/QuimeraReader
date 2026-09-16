@@ -1,0 +1,189 @@
+@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Services
+@inject IQuimeraApiClient ApiClient
+@namespace QuimeraReader.Shared.Components
+
+<div class="settings-container">
+    <h2>Ajustes del Servidor</h2>
+
+    @if (_isLoading)
+    {
+        <p>Cargando configuraciones...</p>
+    }
+    else
+    {
+        <div class="form-group">
+            <label for="libraryPath">Ruta Raíz de la Biblioteca (Homelab):</label>
+            <input id="libraryPath" class="form-control" @bind="_libraryRootPath" placeholder="Ej: /mnt/media/audiobooks" />
+            <small class="help-text">Directorio en el servidor donde se escanearán los archivos EPUB y MP3/M4B.</small>
+        </div>
+
+        <button class="btn-save" @onclick="SaveSettingsAsync" disabled="@_isSaving">
+            @(_isSaving ? "Guardando..." : "Guardar Cambios")
+        </button>
+
+        @if (!string.IsNullOrEmpty(_message))
+        {
+            <div class="alert @(_isSuccess ? "alert-success" : "alert-error")">
+                @_message
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .settings-container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 24px;
+        background: #1e1e1e;
+        border-radius: 8px;
+        color: #eee;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    }
+
+    h2 {
+        margin-top: 0;
+        margin-bottom: 24px;
+        border-bottom: 1px solid #333;
+        padding-bottom: 12px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        border-radius: 4px;
+        border: 1px solid #444;
+        background: #2d2d2d;
+        color: #fff;
+        font-size: 1rem;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #007bff;
+    }
+
+    .help-text {
+        display: block;
+        margin-top: 6px;
+        color: #888;
+        font-size: 0.85rem;
+    }
+
+    .btn-save {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 1rem;
+        transition: background-color 0.2s;
+    }
+
+    .btn-save:hover:not(:disabled) {
+        background-color: #0056b3;
+    }
+
+    .btn-save:disabled {
+        background-color: #555;
+        cursor: not-allowed;
+    }
+
+    .alert {
+        margin-top: 20px;
+        padding: 12px;
+        border-radius: 4px;
+    }
+
+    .alert-success {
+        background-color: #1b5e20;
+        color: #c8e6c9;
+        border: 1px solid #2e7d32;
+    }
+
+    .alert-error {
+        background-color: #b71c1c;
+        color: #ffcdd2;
+        border: 1px solid #c62828;
+    }
+</style>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isSaving = false;
+    private string _libraryRootPath = string.Empty;
+    private string _message = string.Empty;
+    private bool _isSuccess = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSettingsAsync();
+    }
+
+    private async Task LoadSettingsAsync()
+    {
+        try
+        {
+            var settings = await ApiClient.GetSettingsAsync();
+            if (settings.TryGetValue("LibraryRootPath", out var path))
+            {
+                _libraryRootPath = path;
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"Error cargando configuraciones: {ex.Message}", false);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        _isSaving = true;
+        _message = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            var setting = new SystemSetting
+            {
+                Key = "LibraryRootPath",
+                Value = _libraryRootPath
+            };
+
+            await ApiClient.SaveSettingAsync(setting);
+            ShowMessage("Configuración guardada exitosamente.", true);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"Error al guardar: {ex.Message}", false);
+        }
+        finally
+        {
+            _isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowMessage(string message, bool isSuccess)
+    {
+        _message = message;
+        _isSuccess = isSuccess;
+    }
+}
