@@ -28,6 +28,25 @@
         <a href="." class="reload">Reload</a>
         <span class="dismiss">🗙</span>
     </div>
+    
+    <script>
+        // Theme Management
+        window.themeManager = {
+            init: function() {
+                const storedTheme = localStorage.getItem('theme') || 'dark';
+                document.documentElement.setAttribute('data-theme', storedTheme);
+            },
+            toggleTheme: function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                return newTheme;
+            }
+        };
+        // Initialize theme immediately to prevent flash
+        window.themeManager.init();
+    </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </body>
 
