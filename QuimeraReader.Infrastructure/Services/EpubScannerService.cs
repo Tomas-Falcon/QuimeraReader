@@ -34,7 +34,15 @@ public class EpubScannerService
         if (epubBook.AuthorList != null)
         {
             foreach (var authorName in epubBook.AuthorList)
-                book.Authors.Add(new BookAuthor { Author = new Author { Name = authorName, FileAs = authorName } });
+            {
+                var existingAuthor = await _dbContext.Authors.FirstOrDefaultAsync(a => a.Name == authorName);
+                if (existingAuthor == null)
+                {
+                    existingAuthor = new Author { Name = authorName, FileAs = authorName };
+                    _dbContext.Authors.Add(existingAuthor);
+                }
+                book.Authors.Add(new BookAuthor { Author = existingAuthor });
+            }
         }
 
         var settingsDict = await _dbContext.SystemSettings
@@ -85,7 +93,15 @@ public class EpubScannerService
                 if (!book.Authors.Any() && metadata.Authors != null && metadata.Authors.Any())
                 {
                     foreach (var auth in metadata.Authors)
-                        book.Authors.Add(new BookAuthor { Author = new Author { Name = auth, FileAs = auth } });
+                    {
+                        var existingAuthor = await _dbContext.Authors.FirstOrDefaultAsync(a => a.Name == auth);
+                        if (existingAuthor == null)
+                        {
+                            existingAuthor = new Author { Name = auth, FileAs = auth };
+                            _dbContext.Authors.Add(existingAuthor);
+                        }
+                        book.Authors.Add(new BookAuthor { Author = existingAuthor });
+                    }
                 }
 
                 if (metadata.Categories != null && metadata.Categories.Any())
@@ -256,7 +272,15 @@ public class EpubScannerService
             if (!book.Authors.Any() && metadata.Authors != null && metadata.Authors.Any())
             {
                 foreach (var auth in metadata.Authors)
-                    book.Authors.Add(new BookAuthor { Author = new Author { Name = auth, FileAs = auth } });
+                {
+                    var existingAuthor = await _dbContext.Authors.FirstOrDefaultAsync(a => a.Name == auth);
+                    if (existingAuthor == null)
+                    {
+                        existingAuthor = new Author { Name = auth, FileAs = auth };
+                        _dbContext.Authors.Add(existingAuthor);
+                    }
+                    book.Authors.Add(new BookAuthor { Author = existingAuthor });
+                }
             }
 
             if (metadata.Categories != null && metadata.Categories.Any())

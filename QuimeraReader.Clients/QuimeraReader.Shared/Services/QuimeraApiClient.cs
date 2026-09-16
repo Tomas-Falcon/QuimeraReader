@@ -32,6 +32,7 @@ public interface IQuimeraApiClient
     Task UpdatePositionAsync(int bookId, string? epubCfi = null, double? audioPosition = null, double? percentage = null);
     Task<List<Book>> GetRecommendationsAsync();
     Task RescanMetadataAsync();
+    Task MergeDuplicatesAsync();
 }
 
 public class QuimeraApiClient : IQuimeraApiClient
@@ -41,6 +42,12 @@ public class QuimeraApiClient : IQuimeraApiClient
     public QuimeraApiClient(HttpClient httpClient)
     {
         _httpClient = httpClient;
+    }
+
+    public async Task MergeDuplicatesAsync()
+    {
+        var response = await _httpClient.PostAsync("api/Books/maintenance/merge-duplicates", null);
+        response.EnsureSuccessStatusCode();
     }
 
     public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50)

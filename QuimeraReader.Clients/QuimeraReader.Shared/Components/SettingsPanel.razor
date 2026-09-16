@@ -170,6 +170,16 @@
 
                     <div class="tasks-panel mt-3">
                         <div class="task-info">
+                            <strong>Limpieza de Duplicados</strong>
+                            <span class="task-status idle">Fusionar autores y categorías repetidas</span>
+                        </div>
+                        <button class="btn-primary" @onclick="MergeDuplicatesAsync">
+                            Fusionar Duplicados
+                        </button>
+                    </div>
+
+                    <div class="tasks-panel mt-3">
+                        <div class="task-info">
                             <strong>Alineación de Audio a Texto (Whisper)</strong>
                             <span class="task-status idle">En pausa (0 en cola)</span>
                         </div>
@@ -359,6 +369,19 @@
         catch (Exception ex)
         {
             ShowMessage("Error al buscar metadatos: " + ex.Message, false);
+        }
+    }
+
+    private async Task MergeDuplicatesAsync()
+    {
+        try
+        {
+            await ApiClient.MergeDuplicatesAsync();
+            ShowMessage("Mantenimiento de duplicados completado exitosamente.", true);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage("Error al fusionar duplicados: " + ex.Message, false);
         }
     }
 

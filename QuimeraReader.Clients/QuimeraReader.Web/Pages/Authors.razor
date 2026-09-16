@@ -28,11 +28,13 @@
             @foreach (var author in authors)
             {
                 <div class="col">
-                    <div class="card h-100 shadow-sm border-0" style="background: var(--surface-main);">
-                        <div class="card-body text-center d-flex flex-column justify-content-center">
-                            <h5 class="card-title mb-0" style="color: var(--text-main);">@author.Name</h5>
+                    <a href="/?q=@Uri.EscapeDataString(author.Name)" class="text-decoration-none">
+                        <div class="card h-100 shadow-sm border-0" style="background: var(--surface-main); cursor: pointer;">
+                            <div class="card-body text-center d-flex flex-column justify-content-center">
+                                <h5 class="card-title mb-0" style="color: var(--text-main);">@author.Name</h5>
+                            </div>
                         </div>
-                    </div>
+                    </a>
                 </div>
             }
         </div>

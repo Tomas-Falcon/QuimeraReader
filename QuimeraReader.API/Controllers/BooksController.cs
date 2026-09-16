@@ -255,6 +255,57 @@ public class BooksController : ControllerBase
         return Ok(new { Message = "Búsqueda de metadatos programada." });
     }
 
+    [HttpPost("maintenance/merge-duplicates")]
+    public async Task<IActionResult> MergeDuplicates()
+    {
+        // Agrupar y borrar autores duplicados
+        var duplicateAuthors = await _dbContext.Authors
+            .GroupBy(a => a.Name)
+            .Where(g => g.Count() > 1)
+            .ToListAsync();
+            
+        int authorsMerged = 0;
+        foreach (var group in duplicateAuthors)
+        {
+            var ordered = group.OrderBy(a => a.Id).ToList();
+            var minId = ordered.First().Id;
+            var duplicates = ordered.Skip(1).ToList();
+            
+            foreach (var dup in duplicates)
+            {
+                var bookAuthors = await _dbContext.Set<QuimeraReader.Domain.Entities.BookAuthor>().Where(ba => ba.AuthorId == dup.Id).ToListAsync();
+                foreach (var ba in bookAuthors) ba.AuthorId = minId;
+                _dbContext.Authors.Remove(dup);
+                authorsMerged++;
+            }
+        }
+
+        // Agrupar y borrar categorías duplicadas
+        var duplicateCategories = await _dbContext.Categories
+            .GroupBy(c => c.Name)
+            .Where(g => g.Count() > 1)
+            .ToListAsync();
+            
+        int categoriesMerged = 0;
+        foreach (var group in duplicateCategories)
+        {
+            var ordered = group.OrderBy(c => c.Id).ToList();
+            var minId = ordered.First().Id;
+            var duplicates = ordered.Skip(1).ToList();
+            
+            foreach (var dup in duplicates)
+            {
+                var bookCategories = await _dbContext.Set<QuimeraReader.Domain.Entities.BookCategory>().Where(bc => bc.CategoryId == dup.Id).ToListAsync();
+                foreach (var bc in bookCategories) bc.CategoryId = minId;
+                _dbContext.Categories.Remove(dup);
+                categoriesMerged++;
+            }
+        }
+
+        await _dbContext.SaveChangesAsync();
+        return Ok(new { Message = $"Mantenimiento completado. Se fusionaron {authorsMerged} autores y {categoriesMerged} categorías duplicadas." });
+    }
+
     [HttpPost("{bookId}/categories")]
     public async Task<IActionResult> AddCustomCategory(int bookId, [FromBody] string categoryName)
     {

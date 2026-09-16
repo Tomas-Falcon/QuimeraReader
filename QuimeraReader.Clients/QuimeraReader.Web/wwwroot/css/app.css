@@ -819,7 +819,7 @@ main {
     }
 
     .nav-item a {
-        color: #d7d7d7;
+        color: var(--text-muted);
         border-radius: 4px;
         height: 3rem;
         display: flex;

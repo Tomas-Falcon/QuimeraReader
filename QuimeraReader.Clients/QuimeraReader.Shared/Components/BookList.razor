@@ -97,7 +97,12 @@
     {
         var filteredBooks = string.IsNullOrWhiteSpace(_searchQuery) 
             ? _books 
-            : _books.Where(b => b.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) || b.Authors.Any(a => a.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))).ToList();
+            : _books.Where(b => 
+                b.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) || 
+                b.Authors.Any(a => a.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)) ||
+                b.Categories.Any(c => c.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(b.Series) && b.Series.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))
+              ).ToList();
 
         <div class="books-grid">
             @foreach (var book in filteredBooks)
@@ -124,6 +129,9 @@
 @inject IJSRuntime JSRuntime
 
 @code {
+    [Parameter]
+    public string? QueryParam { get; set; }
+
     private ElementReference _loadMoreElement;
     private DotNetObjectReference<BookList>? _objRef;
     private List<Book> _books = new();
@@ -181,6 +189,14 @@
         await LoadBooksAsync();
         _recommendations = await fetchRecs;
         _ = PollNewBooksAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrWhiteSpace(QueryParam) && QueryParam != _searchQuery)
+        {
+            _searchQuery = QueryParam;
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

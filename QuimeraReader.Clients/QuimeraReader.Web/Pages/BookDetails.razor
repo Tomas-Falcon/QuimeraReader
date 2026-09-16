@@ -47,7 +47,22 @@ else
                     
                     @if (_book.Authors.Any())
                     {
-                        <h4 class="text-white-50 mb-4">@string.Join(", ", _book.Authors)</h4>
+                        <h4 class="text-white-50 mb-3">@string.Join(", ", _book.Authors)</h4>
+                    }
+
+                    @if (!string.IsNullOrEmpty(_book.Series))
+                    {
+                        <h5 class="text-warning mb-3"><i class="bi bi-collection"></i> Saga: @_book.Series</h5>
+                    }
+
+                    @if (_book.Categories.Any())
+                    {
+                        <div class="mb-4 d-flex gap-2 flex-wrap">
+                            @foreach(var cat in _book.Categories)
+                            {
+                                <span class="badge bg-secondary rounded-pill px-3 py-2">@cat</span>
+                            }
+                        </div>
                     }
                     
                     <div class="badges mb-4 d-flex gap-2 flex-wrap">
