@@ -57,6 +57,12 @@ public class EpubScannerService
                 if (string.IsNullOrWhiteSpace(book.Title) && !string.IsNullOrWhiteSpace(metadata.Title))
                     book.Title = metadata.Title;
 
+                if (string.IsNullOrWhiteSpace(book.Description) && !string.IsNullOrWhiteSpace(metadata.Synopsis))
+                    book.Description = metadata.Synopsis;
+
+                if (!book.AverageRating.HasValue && metadata.AverageRating.HasValue)
+                    book.AverageRating = metadata.AverageRating.Value;
+
                 if (!book.Authors.Any() && metadata.Authors != null && metadata.Authors.Any())
                 {
                     foreach (var auth in metadata.Authors)

@@ -11,6 +11,7 @@ public class BookMetadata
     public string? Synopsis { get; set; }
     public List<string> Categories { get; set; } = new();
     public string? SeriesName { get; set; }
+    public double? AverageRating { get; set; }
 }
 
 public interface IMetadataProvider

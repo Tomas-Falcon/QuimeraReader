@@ -43,7 +43,8 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
                 Authors = firstItem.Authors ?? new List<string>(),
                 CoverImageUri = firstItem.ImageLinks?.Thumbnail,
                 Categories = firstItem.Categories ?? new List<string>(),
-                Synopsis = firstItem.Description
+                Synopsis = firstItem.Description,
+                AverageRating = firstItem.AverageRating
             };
         }
         catch
@@ -60,6 +61,7 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
         public List<string>? Authors { get; set; }
         public List<string>? Categories { get; set; }
         public ImageLinks? ImageLinks { get; set; }
+        public double? AverageRating { get; set; }
     }
     internal class ImageLinks { public string? Thumbnail { get; set; } }
 }
