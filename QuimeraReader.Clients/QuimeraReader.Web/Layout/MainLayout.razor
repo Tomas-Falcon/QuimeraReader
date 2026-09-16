@@ -8,8 +8,15 @@
 
     <main>
         <div class="top-row px-4" style="justify-content: flex-end; display: flex; align-items: center; border-bottom: 1px solid var(--border-color); background-color: var(--bg-card);">
-            <button class="btn btn-outline-primary theme-toggle" @onclick="ToggleThemeAsync" style="border-radius: 20px;">
-                <span class="bi bi-moon-stars-fill" aria-hidden="true"></span> Alternar Tema
+            <button class="btn btn-outline-primary theme-toggle" @onclick="ToggleThemeAsync" style="border-radius: 20px; display: flex; align-items: center; gap: 6px;">
+                @if (isDarkTheme)
+                {
+                    <span class="bi bi-moon-fill" aria-hidden="true"></span> <span>Modo Oscuro</span>
+                }
+                else
+                {
+                    <span class="bi bi-sun-fill" aria-hidden="true"></span> <span>Modo Claro</span>
+                }
             </button>
         </div>
 
@@ -20,8 +27,25 @@
 </div>
 
 @code {
+    private bool isDarkTheme = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var theme = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "theme");
+            if (theme == "light")
+            {
+                isDarkTheme = false;
+                StateHasChanged();
+            }
+        }
+    }
+
     private async Task ToggleThemeAsync()
     {
-        await JSRuntime.InvokeVoidAsync("themeManager.toggleTheme");
+        var newTheme = await JSRuntime.InvokeAsync<string>("themeManager.toggleTheme");
+        isDarkTheme = (newTheme == "dark");
+        StateHasChanged();
     }
 }
