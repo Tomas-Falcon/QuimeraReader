@@ -1,4 +1,4 @@
-export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi) {
+﻿export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi) {
     var book = ePub(epubUrl);
     var rendition = book.renderTo(elementId, {
         width: "100%",
@@ -12,7 +12,42 @@ export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi) {
         dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi);
     });
 
-    // A�adir soporte para botones de navegaci�n desde Blazor o JS
+    // Soporte para gestos táctiles (Swipe) y Ratón (Drag)
+    let startX = 0;
+    let endX = 0;
+    let isDragging = false;
+
+    // Táctil
+    rendition.on("touchstart", event => {
+        startX = event.changedTouches[0].screenX;
+    });
+    rendition.on("touchend", event => {
+        endX = event.changedTouches[0].screenX;
+        handleSwipe();
+    });
+
+    // Ratón
+    rendition.on("mousedown", event => {
+        isDragging = true;
+        startX = event.screenX;
+    });
+    rendition.on("mouseup", event => {
+        if (!isDragging) return;
+        isDragging = false;
+        endX = event.screenX;
+        handleSwipe();
+    });
+    
+    function handleSwipe() {
+        if (endX < startX - 50) {
+            rendition.next();
+        }
+        if (endX > startX + 50) {
+            rendition.prev();
+        }
+    }
+
+    // Añadir soporte para botones de navegación desde Blazor o JS
     window.epubNext = () => rendition.next();
     window.epubPrev = () => rendition.prev();
 }
