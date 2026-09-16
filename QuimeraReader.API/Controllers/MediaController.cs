@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace QuimeraReader.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/media")]
 public class MediaController : ControllerBase
 {
     private readonly AppDbContext _dbContext;
