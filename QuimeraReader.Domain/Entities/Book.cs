@@ -25,6 +25,9 @@ public class Book
     public int? SeriesId { get; set; }
     public Series? Series { get; set; }
     public double? SeriesVolume { get; set; } // Puede ser 1.5, etc.
+
+    // Metadata Tracking
+    public bool IsMetadataComplete { get; set; } = false;
     
     // Relations
     public ICollection<BookAuthor> Authors { get; set; } = new List<BookAuthor>();

@@ -186,6 +186,18 @@ public class EpubScannerService
             book.CoverImagePath = coverPath;
         }
         
+        // Evaluar completitud de metadatos
+        bool hasTitle = !string.IsNullOrWhiteSpace(book.Title);
+        bool hasAuthor = book.Authors.Any();
+        bool hasSynopsis = !string.IsNullOrWhiteSpace(book.Description);
+        bool hasCover = !string.IsNullOrWhiteSpace(book.CoverImagePath) || epubBook.CoverImage != null;
+        
+        bool hasGoogleBooksKey = settingsDict.ContainsKey("GoogleBooksApiKey") && !string.IsNullOrWhiteSpace(settingsDict["GoogleBooksApiKey"]);
+        bool needsRating = hasGoogleBooksKey;
+        bool ratingSatisfied = !needsRating || book.AverageRating.HasValue;
+
+        book.IsMetadataComplete = hasTitle && hasAuthor && hasSynopsis && hasCover && ratingSatisfied;
+
         return book;
     }
 
