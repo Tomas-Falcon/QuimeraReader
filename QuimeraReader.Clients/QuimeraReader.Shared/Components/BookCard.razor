@@ -2,7 +2,7 @@
 @inject NavigationManager NavManager
 @namespace QuimeraReader.Shared.Components
 
-<div class="book-card" @onclick="GoToRead">
+<div class="book-card" @onclick="GoToDetails">
     <div class="cover-container">
         @if (!string.IsNullOrEmpty(Book?.CoverUrl))
         {
@@ -17,24 +17,22 @@
     </div>
     <div class="book-info">
         <h3 class="book-title" title="@Book?.Title">@Book?.Title</h3>
-        @if (!string.IsNullOrEmpty(Book?.Isbn))
+        @if (Book != null && Book.Authors.Any())
         {
-            <p class="book-isbn">ISBN: @Book.Isbn</p>
+            <p class="book-author text-muted" style="font-size: 0.9em; margin-bottom: 0;">@string.Join(", ", Book.Authors)</p>
         }
     </div>
 </div>
-
-
 
 @code {
     [Parameter]
     public Book? Book { get; set; }
 
-    private void GoToRead()
+    private void GoToDetails()
     {
         if (Book != null)
         {
-            NavManager.NavigateTo($"/read/{Book.Id}");
+            NavManager.NavigateTo($"/book/{Book.Id}");
         }
     }
 }

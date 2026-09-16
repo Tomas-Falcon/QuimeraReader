@@ -6,9 +6,17 @@ public record Book
     public string Title { get; init; } = string.Empty;
     public string Isbn { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
-    public string EpubFilePath { get; init; } = string.Empty;
-    public string AudioFilePath { get; init; } = string.Empty;
-    public string CoverImagePath { get; init; } = string.Empty;
+    public double? AverageRating { get; init; }
+    
+    public List<string> Authors { get; init; } = new();
+    public List<string> Categories { get; init; } = new();
+    public string? Series { get; init; }
+    public string? Universe { get; init; }
+    
+    public bool HasCover { get; init; }
+    public bool HasEpub { get; init; }
+    public bool HasAudio { get; init; }
+    public bool IsAligned { get; init; }
     
     // Virtual URLs para el frontend (generadas por MediaController)
     public string CoverUrl => $"/api/media/books/{Id}/cover";

@@ -52,6 +52,7 @@ public class BooksController : ControllerBase
                 title = b.Title,
                 isbn = b.Isbn,
                 description = b.Description,
+                average_rating = b.AverageRating,
                 processing_status = b.ProcessingStatus == "SYNCED" ? "ALIGNED" : b.ProcessingStatus,
                 authors = b.Authors.Select(a => new { name = a.Author!.Name, file_as = a.Author!.FileAs, role = a.Role }).ToList(),
                 categories = b.Categories.Select(c => c.Category!.Name).ToList(),

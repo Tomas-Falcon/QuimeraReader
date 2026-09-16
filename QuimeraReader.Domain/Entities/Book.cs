@@ -8,6 +8,7 @@ public class Book
     
     public string? Isbn { get; set; }
     public string? Description { get; set; }
+    public double? AverageRating { get; set; }
 
     // Local File Paths
     public string EpubFilePath { get; set; } = string.Empty;

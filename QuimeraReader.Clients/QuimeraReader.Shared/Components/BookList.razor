@@ -4,31 +4,60 @@
 @namespace QuimeraReader.Shared.Components
 
 <div class="library-container">
+    <div class="library-toolbar d-flex justify-content-between align-items-center mb-4">
+        <div class="search-box" style="flex: 0 0 300px;">
+            <input type="text" class="form-control" placeholder="Buscar libros, autores..." @bind="_searchQuery" @bind:event="oninput" />
+        </div>
+        <div class="filters d-flex gap-2">
+            <select class="form-select" style="width: auto;">
+                <option>Añadidos recientemente</option>
+                <option>Título (A-Z)</option>
+                <option>Autor (A-Z)</option>
+            </select>
+        </div>
+    </div>
+
     @if (_isLoading && _books.Count == 0)
     {
-        <div class="loading-state">
-            <p>Cargando biblioteca...</p>
+        <div class="loading-state text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="mt-3">Cargando biblioteca...</p>
         </div>
     }
-    else if (_books.Count == 0)
+    else if (_books.Count == 0 && string.IsNullOrWhiteSpace(_searchQuery))
     {
-        <div class="empty-state">
-            <p>No se encontraron libros.</p>
+        <div class="empty-state text-center py-5">
+            <i class="bi bi-bookshelf" style="font-size: 4rem; color: var(--text-muted);"></i>
+            <h3 class="mt-3">Tu biblioteca está vacía</h3>
+            <p class="text-muted">No se encontraron libros en la base de datos.</p>
+            <a href="settings" class="btn btn-primary mt-3"><i class="bi bi-search"></i> Escanear Biblioteca</a>
+        </div>
+    }
+    else if (_books.Count == 0 && !string.IsNullOrWhiteSpace(_searchQuery))
+    {
+        <div class="empty-state text-center py-5">
+            <p>No se encontraron resultados para "@_searchQuery".</p>
         </div>
     }
     else
     {
+        var filteredBooks = string.IsNullOrWhiteSpace(_searchQuery) 
+            ? _books 
+            : _books.Where(b => b.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) || b.Authors.Any(a => a.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))).ToList();
+
         <div class="books-grid">
-            @foreach (var book in _books)
+            @foreach (var book in filteredBooks)
             {
                 <BookCard Book="book" />
             }
         </div>
         
-        @if (_hasMore)
+        @if (_hasMore && string.IsNullOrWhiteSpace(_searchQuery))
         {
-            <div class="load-more">
-                <button class="btn-load" @onclick="LoadMoreAsync" disabled="@_isLoading">
+            <div class="load-more mt-4 text-center">
+                <button class="btn btn-outline-primary" @onclick="LoadMoreAsync" disabled="@_isLoading">
                     @(_isLoading ? "Cargando..." : "Cargar más")
                 </button>
             </div>
@@ -46,6 +75,7 @@
     private bool _isLoading = false;
     private bool _hasMore = true;
     private CancellationTokenSource _cts = new();
+    private string _searchQuery = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {

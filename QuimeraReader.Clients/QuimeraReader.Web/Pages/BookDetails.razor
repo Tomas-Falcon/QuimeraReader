@@ -1,0 +1,75 @@
+@page "/book/{id:int}"
+@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Services
+@inject IQuimeraApiClient ApiClient
+@inject NavigationManager NavManager
+
+<PageTitle>Detalles del Libro</PageTitle>
+
+@if (_isLoading)
+{
+    <p>Cargando detalles...</p>
+}
+else if (_book == null)
+{
+    <p>Libro no encontrado.</p>
+}
+else
+{
+    <div class="book-details-layout d-flex gap-4">
+        <div class="book-cover-col" style="flex: 0 0 250px;">
+            <img src="@_book.CoverUrl" alt="Portada" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);" />
+        </div>
+        
+        <div class="book-info-col" style="flex: 1;">
+            <h1>@_book.Title</h1>
+            <h4 class="text-muted mb-3">@string.Join(", ", _book.Authors)</h4>
+            
+            <div class="badges mb-4">
+                @if (_book.AverageRating.HasValue)
+                {
+                    <span class="badge bg-warning text-dark"><i class="bi bi-star-fill"></i> @_book.AverageRating</span>
+                }
+                @if (_book.HasEpub)
+                {
+                    <span class="badge bg-primary"><i class="bi bi-book"></i> Ebook</span>
+                }
+                @if (_book.HasAudio)
+                {
+                    <span class="badge bg-secondary"><i class="bi bi-headphones"></i> Audiobook</span>
+                }
+                @if (_book.IsAligned)
+                {
+                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Sincronizado</span>
+                }
+            </div>
+
+            <p class="description lead" style="white-space: pre-wrap;">@_book.Description</p>
+            
+            <div class="actions mt-4">
+                <button class="btn btn-lg btn-primary" @onclick="GoToRead">
+                    <i class="bi bi-play-fill"></i> Reproducir / Leer
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+    
+    private Book? _book;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _book = await ApiClient.GetBookAsync(Id);
+        _isLoading = false;
+    }
+    
+    private void GoToRead()
+    {
+        NavManager.NavigateTo($"/read/{Id}");
+    }
+}
