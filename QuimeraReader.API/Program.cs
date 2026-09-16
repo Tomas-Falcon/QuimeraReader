@@ -38,11 +38,11 @@ builder.Services.AddEndpointsApiExplorer();
 
 var app = builder.Build();
 
-// Asegurar que la BD se crea
+// Asegurar que la BD se migra correctamente en cada arranque
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    dbContext.Database.EnsureCreated();
+    dbContext.Database.Migrate();
 }
 
 // Configurar los Content Types para que la API pueda servir los archivos de Blazor WebAssembly sin dar Error 404
