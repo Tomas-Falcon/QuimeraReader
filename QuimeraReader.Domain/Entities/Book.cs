@@ -6,6 +6,9 @@ public class Book
     public string Title { get; set; } = string.Empty;
     public string? ProcessingStatus { get; set; } // mapped to frontend's processing_status (e.g., "SYNCED")
     
+    public string? Isbn { get; set; }
+    public string? Description { get; set; }
+
     // Local File Paths
     public string EpubFilePath { get; set; } = string.Empty;
     public string? AudioFilePath { get; set; }

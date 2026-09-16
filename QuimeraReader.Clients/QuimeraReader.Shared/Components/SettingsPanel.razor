@@ -65,20 +65,26 @@
             @if (ActiveTab == "apikeys")
             {
                 <div class="card">
-                    <h3>Credenciales de Inteligencia Artificial</h3>
-                    <p class="text-muted">Agrega tus claves de proveedor para transcripción (Whisper) y metadatos.</p>
+                    <h3>Credenciales e IA</h3>
+                    <p class="text-muted">Agrega tus claves de proveedor de metadatos y configura la IA para audiolibros.</p>
                     <hr />
-
-                    <div class="form-group">
-                        <label>OpenAI API Key (Whisper & ChatGPT)</label>
-                        <input type="password" class="form-control" @bind="_openAiKey" placeholder="sk-..." />
-                        <span class="help-text">Necesario para la alineación de audio y resúmenes automáticos.</span>
-                    </div>
 
                     <div class="form-group">
                         <label>Google Books API Key (Opcional)</label>
                         <input type="password" class="form-control" @bind="_googleBooksKey" placeholder="AIza..." />
-                        <span class="help-text">Mejora significativamente la descarga de portadas en alta resolución.</span>
+                        <span class="help-text">Mejora significativamente la descarga de portadas en alta resolución. OpenLibrary se usa por defecto sin llave.</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Ruta del Modelo Whisper Local (.bin)</label>
+                        <input type="text" class="form-control" @bind="_whisperModelPath" placeholder="ggml-base.bin" />
+                        <span class="help-text">Ruta local (ej. ggml-base.bin) del modelo Whisper.net usado para la alineación.</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label>OpenAI API Key (Opcional / Futuro)</label>
+                        <input type="password" class="form-control" @bind="_openAiKey" placeholder="sk-..." />
+                        <span class="help-text">Se usará en futuras actualizaciones para generar resúmenes automáticos.</span>
                     </div>
                 </div>
             }
@@ -123,208 +129,7 @@
     </div>
 </div>
 
-<style>
-    .settings-page {
-        display: flex;
-        gap: 32px;
-        max-width: 1100px;
-        margin: 40px auto;
-        color: #e0e0e0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
 
-    /* Sidebar Nav */
-    .settings-sidebar {
-        width: 260px;
-        flex-shrink: 0;
-    }
-
-    .nav-tabs {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .tab-item {
-        padding: 12px 16px;
-        border-radius: 8px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        font-size: 0.95rem;
-        font-weight: 500;
-        color: #999;
-        transition: all 0.2s;
-    }
-
-    .tab-item:hover {
-        background-color: #1c1c1e;
-        color: #ddd;
-    }
-
-    .tab-item.active {
-        background-color: #2c2c2e;
-        color: #fff;
-    }
-
-    /* Content Area */
-    .settings-content {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 24px;
-    }
-
-    .settings-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid #2c2c2e;
-        padding-bottom: 16px;
-    }
-
-    .settings-header h2 {
-        margin: 0;
-        font-size: 1.6rem;
-        font-weight: 600;
-        color: #fff;
-    }
-
-    /* Cards */
-    .card {
-        background: #18181b;
-        border: 1px solid #27272a;
-        border-radius: 12px;
-        padding: 24px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-
-    .card h3 {
-        margin: 0 0 8px 0;
-        font-size: 1.2rem;
-        color: #fff;
-    }
-
-    .text-muted {
-        color: #a1a1aa;
-        font-size: 0.9rem;
-        margin: 0 0 16px 0;
-    }
-
-    hr {
-        border: none;
-        border-top: 1px solid #27272a;
-        margin: 0 0 24px 0;
-    }
-
-    /* Forms */
-    .form-group {
-        margin-bottom: 24px;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .form-group label {
-        font-size: 0.9rem;
-        font-weight: 500;
-        margin-bottom: 8px;
-        color: #e4e4e7;
-    }
-
-    .form-control {
-        background-color: #09090b;
-        border: 1px solid #27272a;
-        color: #fff;
-        padding: 10px 14px;
-        border-radius: 6px;
-        font-size: 0.95rem;
-        transition: border-color 0.2s;
-    }
-
-    .form-control:focus {
-        outline: none;
-        border-color: #3b82f6;
-    }
-
-    .help-text {
-        font-size: 0.8rem;
-        color: #71717a;
-        margin-top: 6px;
-    }
-
-    /* Tasks Panel */
-    .tasks-panel {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: #09090b;
-        padding: 16px;
-        border-radius: 8px;
-        border: 1px solid #27272a;
-    }
-
-    .task-info {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .task-status {
-        font-size: 0.8rem;
-        font-weight: 600;
-    }
-
-    .task-status.running { color: #3b82f6; }
-    .task-status.idle { color: #71717a; }
-
-    /* Buttons */
-    .bottom-actions {
-        display: flex;
-        justify-content: flex-end;
-        padding-top: 16px;
-    }
-
-    button {
-        border: none;
-        padding: 10px 20px;
-        border-radius: 6px;
-        font-weight: 600;
-        font-size: 0.95rem;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    button:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-    }
-
-    .btn-primary { background: #3b82f6; color: white; }
-    .btn-primary:hover:not(:disabled) { background: #2563eb; }
-
-    .btn-secondary { background: #27272a; color: white; border: 1px solid #3f3f46; }
-    .btn-secondary:hover:not(:disabled) { background: #3f3f46; }
-
-    .btn-success { background: #10b981; color: white; padding: 12px 28px; }
-    .btn-success:hover:not(:disabled) { background: #059669; }
-
-    /* Toast Message */
-    .toast-message {
-        padding: 8px 16px;
-        border-radius: 6px;
-        font-size: 0.9rem;
-        font-weight: 500;
-    }
-
-    .toast-message.success { background: rgba(16, 185, 129, 0.2); color: #10b981; }
-    .toast-message.error { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-    
-    .mt-3 { margin-top: 16px; }
-</style>
 
 @code {
     private bool _isLoading = true;
@@ -339,6 +144,7 @@
     private string _ingestionMode = "Move";
     private string _openAiKey = string.Empty;
     private string _googleBooksKey = string.Empty;
+    private string _whisperModelPath = "ggml-base.bin";
 
     protected override async Task OnInitializedAsync()
     {
@@ -347,8 +153,9 @@
             var settings = await ApiClient.GetSettingsAsync();
             if (settings.TryGetValue("LibraryRootPath", out var path)) _libraryRootPath = path;
             if (settings.TryGetValue("IngestionMode", out var mode)) _ingestionMode = mode;
-            if (settings.TryGetValue("OpenAI_ApiKey", out var openai)) _openAiKey = openai;
-            if (settings.TryGetValue("GoogleBooks_ApiKey", out var gbooks)) _googleBooksKey = gbooks;
+            if (settings.TryGetValue("OpenAIApiKey", out var openai)) _openAiKey = openai;
+            if (settings.TryGetValue("GoogleBooksApiKey", out var gbooks)) _googleBooksKey = gbooks;
+            if (settings.TryGetValue("WhisperModelPath", out var whisper)) _whisperModelPath = whisper;
         }
         catch (Exception ex)
         {
@@ -370,8 +177,9 @@
         {
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "LibraryRootPath", Value = _libraryRootPath });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "IngestionMode", Value = _ingestionMode });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "OpenAI_ApiKey", Value = _openAiKey });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "GoogleBooks_ApiKey", Value = _googleBooksKey });
+            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "OpenAIApiKey", Value = _openAiKey });
+            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "GoogleBooksApiKey", Value = _googleBooksKey });
+            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "WhisperModelPath", Value = _whisperModelPath });
             
             ShowMessage("Ajustes guardados correctamente.", true);
         }

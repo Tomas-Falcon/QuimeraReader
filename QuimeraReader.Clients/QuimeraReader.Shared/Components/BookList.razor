@@ -36,61 +36,7 @@
     }
 </div>
 
-<style>
-    .library-container {
-        padding: 40px 20px;
-        background-color: #121212;
-        min-height: 100vh;
-        color: #e0e0e0;
-    }
 
-    .books-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 32px;
-        justify-content: center;
-        max-width: 1400px;
-        margin: 0 auto;
-    }
-
-    .loading-state, .empty-state {
-        text-align: center;
-        padding: 80px 20px;
-        color: #888;
-        font-size: 1.2rem;
-        font-weight: 500;
-    }
-
-    .load-more {
-        text-align: center;
-        margin-top: 50px;
-    }
-
-    .btn-load {
-        background-color: #2c2c2e;
-        color: #fff;
-        border: 1px solid #3a3a3c;
-        padding: 12px 32px;
-        border-radius: 24px;
-        cursor: pointer;
-        font-weight: 600;
-        font-size: 1rem;
-        transition: all 0.2s ease;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-
-    .btn-load:hover:not(:disabled) {
-        background-color: #3a3a3c;
-        transform: translateY(-2px);
-    }
-
-    .btn-load:disabled {
-        background-color: #1c1c1e;
-        color: #555;
-        cursor: not-allowed;
-        transform: none;
-    }
-</style>
 
 @code {
     private List<Book> _books = new();
