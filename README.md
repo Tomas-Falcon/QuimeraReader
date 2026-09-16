@@ -1,115 +1,85 @@
-# QuimeraReader 📖🎧
+# QuimeraReader
 
-**QuimeraReader** es un backend ligero y moderno desarrollado en **.NET 10 (ASP.NET Core)** bajo los principios de Clean Architecture. Su propósito principal es actuar como un servidor personal (Homelab) para gestionar bibliotecas masivas de libros electrónicos (EPUB) y audiolibros, integrando funciones innovadoras de sincronización mediante Inteligencia Artificial.
+QuimeraReader is a comprehensive, self-hosted platform (Homelab) designed for managing massive ebook (EPUB) and audiobook libraries. It features artificial intelligence synchronization and provides a seamless read-along experience across web and mobile platforms.
 
-## ✨ Características Principales
+## Architecture Overview
 
-- **Alineación de Audio a Texto (Read-Along):** Utiliza `Whisper.net` para generar mapas de sincronización (SyncMaps) locales, permitiendo una experiencia fluida entre leer y escuchar.
-- **Scraping de Metadatos:** Integración automática con **Google Books** y **Open Library** para enriquecer tu biblioteca con portadas, autores y sinopsis.
-- **Optimizaciones para Homelabs:** Diseñado para manejar miles de libros con paginación (`Infinite Scroll`), *Lazy Loading* de portadas y bajo consumo de memoria.
-- **Streaming Nativo de Media:** Endpoints optimizados para servir EPUBs y realizar *streaming* parcial de audiolibros (`206 Partial Content`), permitiendo saltar a cualquier minuto sin descargar el archivo completo.
-- **Procesamiento en Segundo Plano:** Escaneo de carpetas y alineación de audio delegados a *Background Workers* para no bloquear la API.
+The project is built entirely on a 100% C# .NET ecosystem, eliminating the need for Node.js or JavaScript frameworks.
 
-## 🏗️ Arquitectura
+1. **QuimeraReader.API (Backend):** A .NET 10 ASP.NET Core REST API following Clean Architecture principles. It handles media streaming, background processing (Whisper.net audio alignment, metadata scraping), and serves the static WebAssembly frontend.
+2. **QuimeraReader.Clients (Frontend):** 
+   - **Shared UI:** A Razor class library (`QuimeraReader.Shared`) containing all UI components, logic, and HTTP client services.
+   - **Web:** A Blazor WebAssembly application (`QuimeraReader.Web`) that runs natively in the browser.
+   - **Mobile/Desktop:** A .NET MAUI Blazor Hybrid application (`QuimeraReader.Mobile`) for native deployment on Android, iOS, and Windows.
 
-El proyecto sigue una estructura limpia de separación de responsabilidades:
-- **`QuimeraReader.API`**: Controladores REST, Endpoints de Media y Background Services.
-- **`QuimeraReader.Application`**: Casos de uso e interfaces (CQRS preparado).
-- **`QuimeraReader.Domain`**: Entidades core del negocio (`Book`, `Author`, `SyncMap`).
-- **`QuimeraReader.Infrastructure`**: Implementación de base de datos (SQLite), colas y proveedores externos.
+## Key Features
 
-## 🚀 Instalación y Uso
+- **Audio-to-Text Synchronization (Read-Along):** Utilizes Whisper.net to generate local synchronization maps (SyncMaps), actively highlighting text as the audiobook plays.
+- **Metadata Scraping:** Automatic integration with Google Books and Open Library to fetch covers, authors, and descriptions.
+- **Homelab Optimization:** Designed for massive libraries with built-in pagination, lazy loading, and minimal memory footprint.
+- **Unified C# Codebase:** UI logic is written once in Razor components and shared across Web, Android, iOS, and Windows.
+- **Configurable Ingestion Strategies:** Choose between moving files to the library or keeping original files in place (ideal for active torrent seeding).
 
-1. Clona el repositorio:
+## Docker Deployment (Recommended)
+
+The recommended way to deploy QuimeraReader is via the provided multi-stage Docker configuration. The setup compiles both the API and the WebAssembly frontend into a single, unified container.
+
+### 1. Configure Volumes
+
+QuimeraReader requires a strict volume separation for optimal operation:
+- `/media`: The ingest directory where raw EPUBs and MP3/M4B files are dropped.
+- `/library`: The destination directory where QuimeraReader organizes processed media and extracted metadata.
+- `/config`: The directory for application data, including the SQLite database (`quimerareader.db`) and SyncMaps.
+
+### 2. Run via Docker Compose
+
+Create or modify the `docker-compose.yml` file to mount your local server directories:
+
+```yaml
+version: '3.8'
+
+services:
+  quimerareader:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: quimerareader
+    ports:
+      - "5000:5000"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+      - QUIMERA_DB_PATH=/config/quimerareader.db
+    volumes:
+      - /path/to/your/downloads:/media
+      - /path/to/your/library:/library
+      - /path/to/your/config:/config
+    restart: unless-stopped
+```
+
+Execute the deployment:
+```bash
+docker compose up -d --build
+```
+Access the unified Web interface at `http://<your-server-ip>:5000`.
+
+## Local Development Setup
+
+To build and run the project locally without Docker:
+
+1. **Clone the repository:**
    ```bash
    git clone https://github.com/Tomas-Falcon/QuimeraReader.git
+   cd QuimeraReader
    ```
-2. Restaura los paquetes y compila:
-   ```bash
-   dotnet build
-   ```
-3. Ejecuta la API:
+
+2. **Run the API (Backend & Web):**
    ```bash
    cd QuimeraReader.API
    dotnet run
    ```
-La API creará automáticamente la base de datos local SQLite (`quimerareader.db`) al iniciar.
+   The API will automatically create the local SQLite database.
 
-## 🔌 Compatibilidad Frontend
-QuimeraReader está diseñado para ser consumido por clientes compatibles con estándares de lectura (como los adaptados de *Storyteller*). Exponemos URLs directas y paginadas de los recursos multimedia y un `AuthController` *mockeado* para facilitar la integración rápida con aplicaciones React Native / Expo de terceros.
-
----
-
-## 🔎 Análisis Técnico de Componentes (Settings & Navegación)
-
-En preparación para agregar la pantalla de Administración (AdminSettings), a continuación se presenta un análisis de cómo interactúan las distintas capas de Backend y Frontend:
-
-### 1. Backend (Controladores y Base de Datos)
-QuimeraReader *no* utiliza MediatR/CQRS explícitamente en los controladores de API para evitar sobreingeniería innecesaria. En su lugar, inyecta directamente el `AppDbContext` para operaciones CRUD sencillas, como se ve en `SettingsController.cs`:
-
-```csharp
-[ApiController]
-[Route("api/[controller]")]
-public class SettingsController : ControllerBase
-{
-    private readonly AppDbContext _dbContext;
-
-    public SettingsController(AppDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> GetSettings()
-    {
-        var settings = await _dbContext.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
-        return Ok(settings);
-    }
-    // ... SaveSetting (POST) omitido para brevedad ...
-}
-```
-
-La tabla en SQLite (`SystemSettings`) está mapeada a un modelo muy sencillo de Clave-Valor en `QuimeraReader.Domain/Entities/SystemSetting.cs`:
-```csharp
-public class SystemSetting
-{
-    public string Key { get; set; } = string.Empty;
-    public string Value { get; set; } = string.Empty;
-}
-```
-Esto permite guardar *CUALQUIER* configuración futura sin tener que migrar la base de datos constantemente.
-
-### 2. Frontend (Capa de Red - RTK Query)
-Ambas interfaces (Móvil y Web) utilizan **Redux Toolkit Query** (`RTK Query`) para interactuar con la API de Quimera.
-
-**Web (`api.ts`):** 
-Usa un `fetchBaseQuery` apuntando al endpoint v2 o a nuestro backend. La configuración principal incluye auto-invalidación de caché mediante *Tags* (`tagTypes`).
-```typescript
-export const api = createApi({
-  reducerPath: "api",
-  baseQuery: fetchBaseQuery({ baseUrl: "/api/v2" }),
-  tagTypes: ["Books", "UserSettings", ...], // etc.
-  endpoints: (build) => ({ /* ... */ })
-});
-```
-
-**Mobile (`serverApi.ts`):** 
-Similar, pero maneja persistencia de tokens de seguridad y la URL base dinámica de nuestro QuimeraReader. Nosotros ya interceptamos `transformResponse` para traducir nuestra paginación (`{ total, page, data }`) a los datos que el state-manager espera.
-
-### 3. Frontend (Navegación e Inyección de Vistas)
-Si decidimos anclar una nueva pantalla de `AdminSettings`, estos son los enrutadores que utilizaremos:
-
-**React Native - Móvil (Expo Router):**
-Las vistas se declaran estáticamente en `app/(root)/_layout.tsx` dentro de un `<Stack>`:
-```tsx
-<Stack>
-  <Stack.Screen name="index" />
-  <Stack.Screen name="settings" options={{ title: "Settings" }} />
-  {/* Aquí anclaríamos: <Stack.Screen name="admin-settings" /> */}
-  <Stack.Screen name="book/[uuid]" />
-</Stack>
-```
-El nuevo panel podría vivir en `app/(root)/admin-settings.tsx`.
-
-**React - Web (Next.js App Router):**
-La web usa Next.js 14+ con App Router (`app/(v2)/layout.tsx`), que engloba toda la aplicación en `MantineProvider` y `StoreProvider`. Crear la vista de admin solo requerirá crear la carpeta `app/(v2)/(dashboard)/admin/page.tsx` para aprovechar el Layout principal.
+3. **Run the Mobile Application (MAUI):**
+   Open the `QuimeraReader.Clients.slnx` solution in Visual Studio or Rider, select the `QuimeraReader.Mobile` project, and run it on your preferred emulator (Android/iOS). Note: Ensure the API base URL in `MauiProgram.cs` points to your local network IP if testing on a physical device.
