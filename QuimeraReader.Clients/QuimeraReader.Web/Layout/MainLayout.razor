@@ -1,12 +1,27 @@
 @inherits LayoutComponentBase
+@inject IJSRuntime JSRuntime
+
 <div class="page">
     <div class="sidebar">
         <NavMenu />
     </div>
 
     <main>
-        <article class="content px-4">
+        <div class="top-row px-4" style="justify-content: flex-end; display: flex; align-items: center; border-bottom: 1px solid var(--border-color); background-color: var(--bg-card);">
+            <button class="btn btn-outline-primary theme-toggle" @onclick="ToggleThemeAsync" style="border-radius: 20px;">
+                <span class="bi bi-moon-stars-fill" aria-hidden="true"></span> Alternar Tema
+            </button>
+        </div>
+
+        <article class="content px-4 mt-3">
             @Body
         </article>
     </main>
 </div>
+
+@code {
+    private async Task ToggleThemeAsync()
+    {
+        await JSRuntime.InvokeVoidAsync("themeManager.toggleTheme");
+    }
+}
