@@ -3,171 +3,356 @@
 @inject IQuimeraApiClient ApiClient
 @namespace QuimeraReader.Shared.Components
 
-<div class="settings-container">
-    <h2>Ajustes del Servidor</h2>
+<div class="settings-page">
+    <div class="settings-sidebar">
+        <ul class="nav-tabs">
+            <li class="tab-item @(ActiveTab == "general" ? "active" : "")" @onclick='() => ActiveTab = "general"'>
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                General
+            </li>
+            <li class="tab-item @(ActiveTab == "apikeys" ? "active" : "")" @onclick='() => ActiveTab = "apikeys"'>
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+                Integraciones (API)
+            </li>
+            <li class="tab-item @(ActiveTab == "tasks" ? "active" : "")" @onclick='() => ActiveTab = "tasks"'>
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                Tareas y Escaneo
+            </li>
+        </ul>
+    </div>
 
-    @if (_isLoading)
-    {
-        <p>Cargando configuraciones...</p>
-    }
-    else
-    {
-        <div class="form-group">
-            <label for="libraryPath">Ruta Raíz de la Biblioteca (Homelab):</label>
-            <input id="libraryPath" class="form-control" @bind="_libraryRootPath" placeholder="Ej: /mnt/media/audiobooks" />
-            <small class="help-text">Directorio en el servidor donde se escanearán los archivos EPUB y MP3/M4B.</small>
+    <div class="settings-content">
+        <div class="settings-header">
+            <h2>Configuración del Servidor</h2>
+            @if (!string.IsNullOrEmpty(_message))
+            {
+                <div class="toast-message @(_isSuccess ? "success" : "error")">
+                    @_message
+                </div>
+            }
         </div>
 
-        <div class="form-group">
-            <label for="ingestionMode">Estrategia de Importación:</label>
-            <select id="ingestionMode" class="form-control" @bind="_ingestionMode">
-                <option value="Move">Mover archivos a la Biblioteca (/library)</option>
-                <option value="LeaveInPlace">Dejar en su lugar original (/media)</option>
-            </select>
-            <small class="help-text">
-                <strong>Mover:</strong> Libera espacio borrando el original de Descargas tras organizarlo.<br />
-                <strong>Dejar en su lugar:</strong> Mantiene el original intacto (útil para Torrents). Solo mueve metadatos a /library.
-            </small>
-        </div>
-
-        <div class="form-actions">
-            <button class="btn-save" @onclick="SaveSettingsAsync" disabled="@_isSaving">
-                @(_isSaving ? "Guardando..." : "Guardar Cambios")
-            </button>
-            <button class="btn-scan" @onclick="TriggerScanAsync" disabled="@_isScanning">
-                @(_isScanning ? "Iniciando escaneo..." : "Escanear Biblioteca Ahora")
-            </button>
-        </div>
-
-        @if (!string.IsNullOrEmpty(_message))
+        @if (_isLoading)
         {
-            <div class="message @(_isSuccess ? "success" : "error")">
-                @_message
+            <p>Cargando preferencias...</p>
+        }
+        else
+        {
+            @if (ActiveTab == "general")
+            {
+                <div class="card">
+                    <h3>Carpetas del Servidor</h3>
+                    <p class="text-muted">Define dónde buscará QuimeraReader los libros y cómo los importará.</p>
+                    <hr />
+
+                    <div class="form-group">
+                        <label>Directorio de Origen (Descargas/Media)</label>
+                        <input type="text" class="form-control" @bind="_libraryRootPath" placeholder="/media" />
+                        <span class="help-text">Ruta donde caen los EPUBs o MP3 sueltos (Volumen montado en Docker).</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Modo de Importación</label>
+                        <select class="form-control" @bind="_ingestionMode">
+                            <option value="Move">Mover y Organizar (Ahorra Espacio)</option>
+                            <option value="LeaveInPlace">Dejar en lugar original (Para Torrents)</option>
+                        </select>
+                        <span class="help-text">Si seleccionas mover, el archivo se pasará a /library y se ordenará por autor.</span>
+                    </div>
+                </div>
+            }
+
+            @if (ActiveTab == "apikeys")
+            {
+                <div class="card">
+                    <h3>Credenciales de Inteligencia Artificial</h3>
+                    <p class="text-muted">Agrega tus claves de proveedor para transcripción (Whisper) y metadatos.</p>
+                    <hr />
+
+                    <div class="form-group">
+                        <label>OpenAI API Key (Whisper & ChatGPT)</label>
+                        <input type="password" class="form-control" @bind="_openAiKey" placeholder="sk-..." />
+                        <span class="help-text">Necesario para la alineación de audio y resúmenes automáticos.</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Google Books API Key (Opcional)</label>
+                        <input type="password" class="form-control" @bind="_googleBooksKey" placeholder="AIza..." />
+                        <span class="help-text">Mejora significativamente la descarga de portadas en alta resolución.</span>
+                    </div>
+                </div>
+            }
+
+            @if (ActiveTab == "tasks")
+            {
+                <div class="card">
+                    <h3>Sincronización Manual</h3>
+                    <p class="text-muted">Fuerza a los Background Workers a escanear en busca de nuevos libros ahora mismo.</p>
+                    <hr />
+
+                    <div class="tasks-panel">
+                        <div class="task-info">
+                            <strong>Escáner de Directorio</strong>
+                            <span class="task-status @(_isScanning ? "running" : "idle")">
+                                @(_isScanning ? "Escaneando..." : "Inactivo")
+                            </span>
+                        </div>
+                        <button class="btn-primary" @onclick="TriggerScanAsync" disabled="@_isScanning">
+                            Escanear /media
+                        </button>
+                    </div>
+                    
+                    <div class="tasks-panel mt-3">
+                        <div class="task-info">
+                            <strong>Alineación de Audio a Texto (Whisper)</strong>
+                            <span class="task-status idle">En pausa (0 en cola)</span>
+                        </div>
+                        <button class="btn-secondary" disabled>
+                            Sincronizar Cola
+                        </button>
+                    </div>
+                </div>
+            }
+
+            <div class="bottom-actions">
+                <button class="btn-success" @onclick="SaveSettingsAsync" disabled="@_isSaving">
+                    @(_isSaving ? "Guardando..." : "Guardar Todos los Cambios")
+                </button>
             </div>
         }
-    }
+    </div>
 </div>
 
 <style>
-    .settings-container {
-        max-width: 600px;
-        margin: 0 auto;
-        padding: 24px;
-        background: #1e1e1e;
+    .settings-page {
+        display: flex;
+        gap: 32px;
+        max-width: 1100px;
+        margin: 40px auto;
+        color: #e0e0e0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Sidebar Nav */
+    .settings-sidebar {
+        width: 260px;
+        flex-shrink: 0;
+    }
+
+    .nav-tabs {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .tab-item {
+        padding: 12px 16px;
         border-radius: 8px;
-        color: #eee;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-    }
-
-    h2 {
-        margin-top: 0;
-        margin-bottom: 24px;
-        border-bottom: 1px solid #333;
-        padding-bottom: 12px;
-    }
-
-    .form-group {
-        margin-bottom: 20px;
-    }
-
-    label {
-        display: block;
-        margin-bottom: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 0.95rem;
         font-weight: 500;
+        color: #999;
+        transition: all 0.2s;
+    }
+
+    .tab-item:hover {
+        background-color: #1c1c1e;
+        color: #ddd;
+    }
+
+    .tab-item.active {
+        background-color: #2c2c2e;
+        color: #fff;
+    }
+
+    /* Content Area */
+    .settings-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+
+    .settings-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #2c2c2e;
+        padding-bottom: 16px;
+    }
+
+    .settings-header h2 {
+        margin: 0;
+        font-size: 1.6rem;
+        font-weight: 600;
+        color: #fff;
+    }
+
+    /* Cards */
+    .card {
+        background: #18181b;
+        border: 1px solid #27272a;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .card h3 {
+        margin: 0 0 8px 0;
+        font-size: 1.2rem;
+        color: #fff;
+    }
+
+    .text-muted {
+        color: #a1a1aa;
+        font-size: 0.9rem;
+        margin: 0 0 16px 0;
+    }
+
+    hr {
+        border: none;
+        border-top: 1px solid #27272a;
+        margin: 0 0 24px 0;
+    }
+
+    /* Forms */
+    .form-group {
+        margin-bottom: 24px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .form-group label {
+        font-size: 0.9rem;
+        font-weight: 500;
+        margin-bottom: 8px;
+        color: #e4e4e7;
     }
 
     .form-control {
-        width: 100%;
-        padding: 10px;
-        border-radius: 4px;
-        border: 1px solid #444;
-        background: #2d2d2d;
+        background-color: #09090b;
+        border: 1px solid #27272a;
         color: #fff;
-        font-size: 1rem;
+        padding: 10px 14px;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        transition: border-color 0.2s;
     }
 
     .form-control:focus {
         outline: none;
-        border-color: #007bff;
+        border-color: #3b82f6;
     }
 
     .help-text {
-        display: block;
+        font-size: 0.8rem;
+        color: #71717a;
         margin-top: 6px;
-        color: #888;
-        font-size: 0.85rem;
     }
 
-    .btn-save {
-        background-color: #007bff;
-        color: white;
+    /* Tasks Panel */
+    .tasks-panel {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #09090b;
+        padding: 16px;
+        border-radius: 8px;
+        border: 1px solid #27272a;
+    }
+
+    .task-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .task-status {
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .task-status.running { color: #3b82f6; }
+    .task-status.idle { color: #71717a; }
+
+    /* Buttons */
+    .bottom-actions {
+        display: flex;
+        justify-content: flex-end;
+        padding-top: 16px;
+    }
+
+    button {
         border: none;
-        padding: 10px 24px;
-        border-radius: 4px;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.95rem;
         cursor: pointer;
-        font-weight: bold;
-        font-size: 1rem;
-        transition: background-color 0.2s;
+        transition: all 0.2s;
     }
 
-    .btn-save:hover:not(:disabled) {
-        background-color: #0056b3;
-    }
-
-    .btn-save:disabled {
-        background-color: #555;
+    button:disabled {
+        opacity: 0.6;
         cursor: not-allowed;
     }
 
-    .alert {
-        margin-top: 20px;
-        padding: 12px;
-        border-radius: 4px;
+    .btn-primary { background: #3b82f6; color: white; }
+    .btn-primary:hover:not(:disabled) { background: #2563eb; }
+
+    .btn-secondary { background: #27272a; color: white; border: 1px solid #3f3f46; }
+    .btn-secondary:hover:not(:disabled) { background: #3f3f46; }
+
+    .btn-success { background: #10b981; color: white; padding: 12px 28px; }
+    .btn-success:hover:not(:disabled) { background: #059669; }
+
+    /* Toast Message */
+    .toast-message {
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 500;
     }
 
-    .alert-success {
-        background-color: #1b5e20;
-        color: #c8e6c9;
-        border: 1px solid #2e7d32;
-    }
-
-    .alert-error {
-        background-color: #b71c1c;
-        color: #ffcdd2;
-        border: 1px solid #c62828;
-    }
+    .toast-message.success { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+    .toast-message.error { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    
+    .mt-3 { margin-top: 16px; }
 </style>
 
 @code {
     private bool _isLoading = true;
     private bool _isSaving = false;
-    private string _libraryRootPath = string.Empty;
-    private string _ingestionMode = "Move";
     private string _message = string.Empty;
     private bool _isSuccess = false;
+    private bool _isScanning = false;
+
+    public string ActiveTab { get; set; } = "general";
+
+    private string _libraryRootPath = "/media";
+    private string _ingestionMode = "Move";
+    private string _openAiKey = string.Empty;
+    private string _googleBooksKey = string.Empty;
 
     protected override async Task OnInitializedAsync()
-    {
-        await LoadSettingsAsync();
-    }
-
-    private async Task LoadSettingsAsync()
     {
         try
         {
             var settings = await ApiClient.GetSettingsAsync();
-            if (settings.TryGetValue("LibraryRootPath", out var path))
-            {
-                _libraryRootPath = path;
-            }
-            if (settings.TryGetValue("IngestionMode", out var mode))
-            {
-                _ingestionMode = mode;
-            }
+            if (settings.TryGetValue("LibraryRootPath", out var path)) _libraryRootPath = path;
+            if (settings.TryGetValue("IngestionMode", out var mode)) _ingestionMode = mode;
+            if (settings.TryGetValue("OpenAI_ApiKey", out var openai)) _openAiKey = openai;
+            if (settings.TryGetValue("GoogleBooks_ApiKey", out var gbooks)) _googleBooksKey = gbooks;
         }
         catch (Exception ex)
         {
-            ShowMessage($"Error cargando configuraciones: {ex.Message}", false);
+            ShowMessage("Error cargando ajustes: " + ex.Message, false);
         }
         finally
         {
@@ -185,12 +370,14 @@
         {
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "LibraryRootPath", Value = _libraryRootPath });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "IngestionMode", Value = _ingestionMode });
+            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "OpenAI_ApiKey", Value = _openAiKey });
+            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "GoogleBooks_ApiKey", Value = _googleBooksKey });
             
-            ShowMessage("Configuración guardada exitosamente.", true);
+            ShowMessage("Ajustes guardados correctamente.", true);
         }
         catch (Exception ex)
         {
-            ShowMessage($"Error al guardar: {ex.Message}", false);
+            ShowMessage("Error al guardar: " + ex.Message, false);
         }
         finally
         {
@@ -198,8 +385,6 @@
             StateHasChanged();
         }
     }
-
-    private bool _isScanning = false;
 
     private async Task TriggerScanAsync()
     {
