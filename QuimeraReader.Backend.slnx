@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="QuimeraReader.API/QuimeraReader.API.csproj" />
+  <Project Path="QuimeraReader.Application/QuimeraReader.Application.csproj" />
+  <Project Path="QuimeraReader.Domain/QuimeraReader.Domain.csproj" />
+  <Project Path="QuimeraReader.Infrastructure/QuimeraReader.Infrastructure.csproj" />
+</Solution>
