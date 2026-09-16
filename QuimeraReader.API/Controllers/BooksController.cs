@@ -29,6 +29,18 @@ public class BooksController : ControllerBase
         _scanState = scanState;
     }
 
+    [HttpGet("categories")]
+    public async Task<ActionResult<IEnumerable<Category>>> GetCategories()
+    {
+        return await _dbContext.Categories.OrderBy(c => c.Name).ToListAsync();
+    }
+
+    [HttpGet("authors")]
+    public async Task<ActionResult<IEnumerable<Author>>> GetAuthors()
+    {
+        return await _dbContext.Authors.OrderBy(a => a.Name).ToListAsync();
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50)
     {
@@ -208,6 +220,46 @@ public class BooksController : ControllerBase
         return Ok(new { Message = "Escaneo cancelado." });
     }
 
+    [HttpPost("scan/metadata")]
+    public IActionResult RescanMetadata([FromServices] IServiceScopeFactory scopeFactory)
+    {
+        // Ejecutar en segundo plano
+        _ = Task.Run(async () =>
+        {
+            using var scope = scopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var scanner = scope.ServiceProvider.GetRequiredService<QuimeraReader.Infrastructure.Services.EpubScannerService>();
+
+            var ghostBooks = await dbContext.Books
+                .Where(b => !b.IsMetadataComplete || string.IsNullOrEmpty(b.CoverImagePath) || string.IsNullOrEmpty(b.Description))
+                .ToListAsync();
+
+            foreach (var book in ghostBooks)
+            {
+                if (!string.IsNullOrEmpty(book.EpubFilePath) && System.IO.File.Exists(book.EpubFilePath))
+                {
+                    try
+                    {
+                        var updatedBook = await scanner.ScanEpubAsync(book.EpubFilePath, "GoogleBooks");
+                        // Copiar propiedades actualizadas si estaban vacías
+                        if (string.IsNullOrEmpty(book.Description)) book.Description = updatedBook.Description;
+                        if (string.IsNullOrEmpty(book.CoverImagePath)) book.CoverImagePath = updatedBook.CoverImagePath;
+                        if (!book.IsMetadataComplete) book.IsMetadataComplete = updatedBook.IsMetadataComplete;
+                        
+                        // NOTA: No reemplazamos EpubFilePath para evitar conflictos si el escáner lo movió temporalmente,
+                        // aunque el escáner asume que es un archivo nuevo. Idealmente solo fetch data API.
+                        // Para evitar moverlo de nuevo, idealmente usaríamos un método de fetch dedicado.
+                        
+                        await dbContext.SaveChangesAsync();
+                    }
+                    catch { }
+                }
+            }
+        });
+        
+        return Ok(new { Message = "Búsqueda de metadatos programada." });
+    }
+
     [HttpPost("{bookId}/categories")]
     public async Task<IActionResult> AddCustomCategory(int bookId, [FromBody] string categoryName)
     {
@@ -242,16 +294,21 @@ public class BooksController : ControllerBase
         if (!file.FileName.EndsWith(".epub", StringComparison.OrdinalIgnoreCase))
             return BadRequest("Solo se permiten archivos .epub.");
 
+        string baseTemp = Path.GetTempFileName();
+        string tempPath = baseTemp + ".epub";
+        
         try
         {
-            var tempPath = Path.GetTempFileName() + ".epub";
             using (var stream = new FileStream(tempPath, FileMode.Create))
             {
                 await file.CopyToAsync(stream);
             }
 
             var scannerService = HttpContext.RequestServices.GetRequiredService<QuimeraReader.Infrastructure.Services.EpubScannerService>();
-            var book = await scannerService.ScanEpubAsync(tempPath, "GoogleBooks");
+            
+            // Pasar el nombre original para que lo use de fallback si no hay título en el metadata interno
+            var book = await scannerService.ScanEpubAsync(tempPath, "GoogleBooks", file.FileName);
+            
             _dbContext.Books.Add(book);
             await _dbContext.SaveChangesAsync();
 
@@ -259,7 +316,20 @@ public class BooksController : ControllerBase
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"Error en UploadEpub: {ex}");
             return StatusCode(500, $"Error interno: {ex.Message}");
+        }
+        finally
+        {
+            // Limpieza de archivos temporales
+            if (System.IO.File.Exists(baseTemp))
+            {
+                try { System.IO.File.Delete(baseTemp); } catch { }
+            }
+            if (System.IO.File.Exists(tempPath))
+            {
+                try { System.IO.File.Delete(tempPath); } catch { }
+            }
         }
     }
 

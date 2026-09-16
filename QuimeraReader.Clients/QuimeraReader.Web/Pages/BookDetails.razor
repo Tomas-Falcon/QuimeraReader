@@ -38,7 +38,7 @@ else
             <div class="d-flex flex-column flex-md-row gap-5 align-items-center align-items-md-start">
                 <!-- Cover -->
                 <div class="cover-section" style="flex: 0 0 auto; width: 100%; max-width: 300px;">
-                    <img src="@_book.CoverUrl" alt="Portada" class="img-fluid rounded shadow-lg" style="width: 100%;" />
+                    <img src="@_book.CoverUrl" alt="Portada" class="img-fluid rounded shadow-lg" style="width: 100%;" onerror="this.outerHTML='<div class=\'placeholder-cover shadow-lg rounded d-flex align-items-center justify-content-center\' style=\'width:100%;aspect-ratio:2/3;background:#2a2a2a;color:#888;\'><span>Sin Portada</span></div>'" />
                 </div>
                 
                 <!-- Metadata -->

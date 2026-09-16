@@ -26,7 +26,7 @@ public class EpubScannerService
         _queue = queue;
     }
 
-    public async Task<Book> ScanEpubAsync(string sourceFilePath, string preferredProviderName)
+    public async Task<Book> ScanEpubAsync(string sourceFilePath, string preferredProviderName, string? originalFileName = null)
     {
         EpubBook epubBook = await EpubReader.ReadBookAsync(sourceFilePath);
         var book = new Book { Title = epubBook.Title ?? "" };
@@ -53,9 +53,15 @@ public class EpubScannerService
             }
         }
 
-        if (string.IsNullOrWhiteSpace(book.Title) || !book.Authors.Any() || epubBook.CoverImage == null)
+        bool hasTitle = !string.IsNullOrWhiteSpace(book.Title);
+        bool hasAuthor = book.Authors.Any();
+        bool hasSynopsis = !string.IsNullOrWhiteSpace(book.Description);
+        bool hasCover = epubBook.CoverImage != null;
+
+        if (!hasTitle || !hasAuthor || !hasCover)
         {
-            var query = !string.IsNullOrWhiteSpace(book.Title) ? book.Title : Path.GetFileNameWithoutExtension(sourceFilePath);
+            var fallbackName = originalFileName ?? Path.GetFileNameWithoutExtension(sourceFilePath);
+            var query = hasTitle ? book.Title : Path.GetFileNameWithoutExtension(fallbackName);
             var orderedProviders = _providers.OrderByDescending(p => p.ProviderName == preferredProviderName);
 
             BookMetadata? metadata = null;
@@ -136,6 +142,12 @@ public class EpubScannerService
         string volumeStr = book.SeriesVolume.HasValue ? $"Vol {book.SeriesVolume} - " : "";
 
         string safeAuthor = GetSafeFilename(mainAuthor);
+        
+        // Si el título sigue estando vacío, usamos el originalFileName o un nombre por defecto
+        if (string.IsNullOrWhiteSpace(book.Title))
+        {
+            book.Title = originalFileName != null ? Path.GetFileNameWithoutExtension(originalFileName) : "Unknown Book";
+        }
         string safeTitle = GetSafeFilename(book.Title);
         
         string targetDir = Path.Combine(libraryRoot, safeAuthor);
@@ -147,9 +159,9 @@ public class EpubScannerService
         string bookSubDir = Path.Combine(targetDir, $"{volumeStr}{safeTitle}");
         Directory.CreateDirectory(bookSubDir);
 
-        // Mover EPUB
+        // Mover EPUB evitando el error Cross-device link (File.Move entre particiones)
         string newEpubPath = Path.Combine(bookSubDir, $"{safeTitle}.epub");
-        File.Move(sourceFilePath, newEpubPath, overwrite: true);
+        File.Copy(sourceFilePath, newEpubPath, overwrite: true);
         book.EpubFilePath = newEpubPath;
 
         // Mover Audio (si existe)
@@ -164,7 +176,8 @@ public class EpubScannerService
             if (File.Exists(possibleAudioPath))
             {
                 string newAudioPath = Path.Combine(bookSubDir, $"{safeTitle}{ext}");
-                File.Move(possibleAudioPath, newAudioPath, overwrite: true);
+                File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
+                try { File.Delete(possibleAudioPath); } catch { }
                 book.AudioFilePath = newAudioPath;
                 hasAudio = true;
                 break;
@@ -200,12 +213,13 @@ public class EpubScannerService
         }
         
         // Evaluar completitud de metadatos
-        bool hasTitle = !string.IsNullOrWhiteSpace(book.Title);
-        bool hasAuthor = book.Authors.Any();
-        bool hasSynopsis = !string.IsNullOrWhiteSpace(book.Description);
-        bool hasCover = !string.IsNullOrWhiteSpace(book.CoverImagePath) || epubBook.CoverImage != null;
+        hasTitle = !string.IsNullOrWhiteSpace(book.Title);
+        hasAuthor = book.Authors.Any();
+        hasSynopsis = !string.IsNullOrWhiteSpace(book.Description);
+        hasCover = !string.IsNullOrWhiteSpace(book.CoverImagePath) || epubBook.CoverImage != null;
         
-        bool hasGoogleBooksKey = settingsDict.ContainsKey("GoogleBooksApiKey") && !string.IsNullOrWhiteSpace(settingsDict["GoogleBooksApiKey"]);
+        settingsDict.TryGetValue("GoogleBooksApiKey", out var googleBooksKey);
+        bool hasGoogleBooksKey = !string.IsNullOrWhiteSpace(googleBooksKey);
         bool needsRating = hasGoogleBooksKey;
         bool ratingSatisfied = !needsRating || book.AverageRating.HasValue;
 

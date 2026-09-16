@@ -1,4 +1,4 @@
-﻿export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi) {
+export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi) {
     var book = ePub(epubUrl);
     var rendition = book.renderTo(elementId, {
         width: "100%",
@@ -48,8 +48,12 @@
     }
 
     // Añadir soporte para botones de navegación desde Blazor o JS
-    window.epubNext = () => rendition.next();
-    window.epubPrev = () => rendition.prev();
+    window.epubNext = () => {
+        try { rendition.next(); } catch (e) { console.warn("Cannot navigate next:", e); }
+    };
+    window.epubPrev = () => {
+        try { rendition.prev(); } catch (e) { console.warn("Cannot navigate prev:", e); }
+    };
 }
 
 export function nextEpubPage() {

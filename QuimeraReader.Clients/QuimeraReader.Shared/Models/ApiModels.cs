@@ -43,3 +43,15 @@ public record SystemSetting
     public string Key { get; init; } = string.Empty;
     public string Value { get; init; } = string.Empty;
 }
+
+public record Category
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}
+
+public record Author
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}

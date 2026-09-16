@@ -1,8 +1,57 @@
 @page "/categories"
+@using QuimeraReader.Shared.Models
+@inject QuimeraReader.Shared.Services.IQuimeraApiClient ApiClient
 
-<PageTitle>CategorÌas</PageTitle>
+<PageTitle>Categor√≠as</PageTitle>
 
-<div class="card p-4 text-center mt-4">
-    <h2><span class="bi bi-tags-fill"></span> Explorador de GÈneros</h2>
-    <p class="text-muted mt-3">PrÛximamente: Navega por categorÌas, sagas y universos de forma visual.</p>
+<div class="card p-4 mt-4 bg-transparent border-0">
+    <h2 class="mb-4"><span class="bi bi-tags-fill text-primary"></span> Explorador de G√©neros</h2>
+
+    @if (categories == null)
+    {
+        <div class="text-center mt-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="mt-2 text-muted">Cargando categor√≠as...</p>
+        </div>
+    }
+    else if (!categories.Any())
+    {
+        <div class="alert alert-info">
+            No se encontraron categor√≠as en la base de datos.
+        </div>
+    }
+    else
+    {
+        <div class="row row-cols-1 row-cols-md-3 row-cols-lg-4 g-4">
+            @foreach (var cat in categories)
+            {
+                <div class="col">
+                    <div class="card h-100 shadow-sm border-0" style="background: var(--surface-main);">
+                        <div class="card-body text-center d-flex flex-column justify-content-center">
+                            <h5 class="card-title mb-0" style="color: var(--text-main);">@cat.Name</h5>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
 </div>
+
+@code {
+    private IEnumerable<Category>? categories;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            categories = await ApiClient.GetCategoriesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cargando categor√≠as: {ex.Message}");
+            categories = Array.Empty<Category>();
+        }
+    }
+}

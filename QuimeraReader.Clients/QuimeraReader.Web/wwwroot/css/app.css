@@ -359,14 +359,14 @@ code {
         text-align: center;
     }
 
-    .book-title {
+    .reader-book-title {
         font-size: 1.1rem;
         font-weight: 700;
         margin: 0;
         text-shadow: 0 2px 4px rgba(0,0,0,0.5);
     }
 
-    .book-author {
+    .reader-book-author {
         font-size: 0.85rem;
         color: #aaa;
         margin: 4px 0 0 0;
@@ -571,7 +571,7 @@ code {
     }
 
     .text-muted {
-        color: var(--text-muted);
+        color: var(--text-muted) !important;
         font-size: 0.9rem;
         margin: 0 0 16px 0;
     }
@@ -667,8 +667,8 @@ code {
     .btn-primary { background: var(--primary-color); color: var(--text-inverse); }
     .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
 
-    .btn-secondary { background: var(--border-color); color: var(--text-inverse); border: 1px solid #3f3f46; }
-    .btn-secondary:hover:not(:disabled) { background: #3f3f46; }
+    .btn-secondary { background: var(--bg-hover); color: var(--text-main); border: 1px solid var(--border-color); }
+    .btn-secondary:hover:not(:disabled) { background: var(--bg-active); }
 
     .btn-success { background: var(--success-color); color: var(--text-inverse); padding: 12px 28px; }
     .btn-success:hover:not(:disabled) { background: var(--success-hover); }
@@ -829,12 +829,12 @@ main {
 
 .nav-item a.active {
     background-color: var(--bg-active);
-    color: var(--text-inverse);
+    color: var(--text-main);
 }
 
 .nav-item a:hover {
     background-color: var(--bg-hover);
-    color: var(--text-inverse);
+    color: var(--text-main);
 }
 
 @media (min-width: 641px) {

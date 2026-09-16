@@ -6,7 +6,7 @@
     <div class="cover-container">
         @if (!string.IsNullOrEmpty(Book?.CoverUrl))
         {
-            <img src="@Book.CoverUrl" alt="Portada de @Book.Title" class="cover-image" loading="lazy" />
+            <img src="@Book.CoverUrl" alt="Portada de @Book.Title" class="cover-image" loading="lazy" onerror="this.outerHTML='<div class=\'placeholder-cover\'><span>Sin Portada</span></div>'" />
         }
         else
         {

@@ -19,6 +19,8 @@ public interface IQuimeraApiClient
 {
     Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50);
     Task<Book?> GetBookAsync(int id);
+    Task<IEnumerable<Category>> GetCategoriesAsync();
+    Task<IEnumerable<Author>> GetAuthorsAsync();
     Task<string> GetSyncMapAsync(int id);
     Task<Dictionary<string, string>> GetSettingsAsync();
     Task SaveSettingAsync(SystemSetting setting);
@@ -29,6 +31,7 @@ public interface IQuimeraApiClient
     Task<Book> UploadEpubAsync(Stream fileStream, string fileName);
     Task UpdatePositionAsync(int bookId, string? epubCfi = null, double? audioPosition = null, double? percentage = null);
     Task<List<Book>> GetRecommendationsAsync();
+    Task RescanMetadataAsync();
 }
 
 public class QuimeraApiClient : IQuimeraApiClient
@@ -45,6 +48,16 @@ public class QuimeraApiClient : IQuimeraApiClient
         // Esto reemplaza al listBooks de RTK Query y maneja la paginación que antes estaba en transformResponse
         var response = await _httpClient.GetFromJsonAsync<PaginatedResult<Book>>($"api/Books?page={page}&pageSize={pageSize}");
         return response ?? new PaginatedResult<Book> { Page = page, PageSize = pageSize, Total = 0, Data = [] };
+    }
+
+    public async Task<IEnumerable<Category>> GetCategoriesAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<IEnumerable<Category>>("api/Books/categories") ?? Array.Empty<Category>();
+    }
+
+    public async Task<IEnumerable<Author>> GetAuthorsAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<IEnumerable<Author>>("api/Books/authors") ?? Array.Empty<Author>();
     }
 
     public async Task<Book?> GetBookAsync(int id)
@@ -140,5 +153,11 @@ public class QuimeraApiClient : IQuimeraApiClient
         {
             return new List<Book>();
         }
+    }
+
+    public async Task RescanMetadataAsync()
+    {
+        var response = await _httpClient.PostAsync("api/Books/scan/metadata", null);
+        response.EnsureSuccessStatusCode();
     }
 }

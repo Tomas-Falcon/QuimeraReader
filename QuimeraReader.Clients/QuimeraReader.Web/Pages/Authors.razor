@@ -1,8 +1,57 @@
 @page "/authors"
+@using QuimeraReader.Shared.Models
+@inject QuimeraReader.Shared.Services.IQuimeraApiClient ApiClient
 
 <PageTitle>Autores</PageTitle>
 
-<div class="card p-4 text-center mt-4">
-    <h2><span class="bi bi-people-fill"></span> Explorador de Autores</h2>
-    <p class="text-muted mt-3">Próximamente: Navega por tu biblioteca filtrada por autores, descubre su biografía y libros relacionados.</p>
+<div class="card p-4 mt-4 bg-transparent border-0">
+    <h2 class="mb-4"><span class="bi bi-people-fill text-primary"></span> Autores</h2>
+
+    @if (authors == null)
+    {
+        <div class="text-center mt-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="mt-2 text-muted">Cargando autores...</p>
+        </div>
+    }
+    else if (!authors.Any())
+    {
+        <div class="alert alert-info">
+            No se encontraron autores en la base de datos.
+        </div>
+    }
+    else
+    {
+        <div class="row row-cols-1 row-cols-md-3 row-cols-lg-4 g-4">
+            @foreach (var author in authors)
+            {
+                <div class="col">
+                    <div class="card h-100 shadow-sm border-0" style="background: var(--surface-main);">
+                        <div class="card-body text-center d-flex flex-column justify-content-center">
+                            <h5 class="card-title mb-0" style="color: var(--text-main);">@author.Name</h5>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
 </div>
+
+@code {
+    private IEnumerable<Author>? authors;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            authors = await ApiClient.GetAuthorsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cargando autores: {ex.Message}");
+            authors = Array.Empty<Author>();
+        }
+    }
+}

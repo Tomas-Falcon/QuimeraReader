@@ -160,6 +160,16 @@
                     
                     <div class="tasks-panel mt-3">
                         <div class="task-info">
+                            <strong>Reparación de Metadatos</strong>
+                            <span class="task-status idle">Libros con datos faltantes</span>
+                        </div>
+                        <button class="btn-primary" @onclick="RescanMetadataAsync">
+                            Completar Metadatos
+                        </button>
+                    </div>
+
+                    <div class="tasks-panel mt-3">
+                        <div class="task-info">
                             <strong>Alineación de Audio a Texto (Whisper)</strong>
                             <span class="task-status idle">En pausa (0 en cola)</span>
                         </div>
@@ -336,6 +346,19 @@
         catch (Exception ex)
         {
             ShowMessage("Error cancelando el escaneo: " + ex.Message, false);
+        }
+    }
+
+    private async Task RescanMetadataAsync()
+    {
+        try
+        {
+            await ApiClient.RescanMetadataAsync();
+            ShowMessage("Se ha iniciado la búsqueda de metadatos en segundo plano.", true);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage("Error al buscar metadatos: " + ex.Message, false);
         }
     }
 
