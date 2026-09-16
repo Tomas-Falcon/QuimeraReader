@@ -84,7 +84,7 @@
     
     private void GoBack()
     {
-        NavManager.NavigateTo("/");
+        NavManager.NavigateTo($"/book/{BookId}");
     }
     
     private bool _isLoading = true;
@@ -124,12 +124,22 @@
     }
 
     private int _lastActiveIndex = -1;
+    private double _lastSavedTime = -1;
 
     [JSInvokable]
     public async Task OnTimeUpdate(double time)
     {
         _currentTime = time;
         
+        // Guardar progreso cada 10 segundos
+        if (_lastSavedTime == -1 || (time - _lastSavedTime) > 10)
+        {
+            _lastSavedTime = time;
+            // Solo mandamos el audioPosition, dejamos el epubCfi intacto o null. 
+            // Percentage se podría calcular si tuviéramos el total duration.
+            _ = ApiClient.UpdatePositionAsync(BookId, audioPosition: time);
+        }
+
         var currentIndex = _segments.FindIndex(s => time >= s.Start && time <= s.End);
         if (currentIndex != -1 && currentIndex != _lastActiveIndex)
         {

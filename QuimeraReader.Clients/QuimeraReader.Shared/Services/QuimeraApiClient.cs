@@ -26,6 +26,7 @@ public interface IQuimeraApiClient
     Task DownloadWhisperModelAsync();
     Task<ScanStatus?> GetScanStatusAsync();
     Task UpdatePositionAsync(int bookId, string? epubCfi = null, double? audioPosition = null, double? percentage = null);
+    Task<List<Book>> GetRecommendationsAsync();
 }
 
 public class QuimeraApiClient : IQuimeraApiClient
@@ -106,5 +107,18 @@ public class QuimeraApiClient : IQuimeraApiClient
             await _httpClient.PostAsJsonAsync($"api/Books/{bookId}/positions", request);
         }
         catch { }
+    }
+
+    public async Task<List<Book>> GetRecommendationsAsync()
+    {
+        try
+        {
+            var results = await _httpClient.GetFromJsonAsync<List<Book>>("api/Books/recommendations");
+            return results ?? new List<Book>();
+        }
+        catch
+        {
+            return new List<Book>();
+        }
     }
 }

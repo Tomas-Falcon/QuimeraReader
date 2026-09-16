@@ -1,6 +1,7 @@
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @inject IQuimeraApiClient ApiClient
+@inject ToastService ToastService
 @namespace QuimeraReader.Shared.Components
 
 <div class="settings-page">
@@ -24,12 +25,6 @@
     <div class="settings-content">
         <div class="settings-header">
             <h2>Configuración del Servidor</h2>
-            @if (!string.IsNullOrEmpty(_message))
-            {
-                <div class="toast-message @(_isSuccess ? "success" : "error")">
-                    @_message
-                </div>
-            }
         </div>
 
         @if (_isLoading)
@@ -326,7 +321,13 @@
 
     private void ShowMessage(string message, bool isSuccess)
     {
-        _message = message;
-        _isSuccess = isSuccess;
+        if (isSuccess)
+        {
+            ToastService.ShowSuccess(message);
+        }
+        else
+        {
+            ToastService.ShowError(message);
+        }
     }
 }

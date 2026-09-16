@@ -1,0 +1,56 @@
+@using QuimeraReader.Shared.Services
+@inject ToastService ToastService
+@implements IDisposable
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 10000;">
+    @foreach (var toast in _toasts)
+    {
+        <div class="toast align-items-center text-white bg-@(toast.Type switch { "success" => "success", "error" => "danger", _ => "info" }) border-0 show" role="alert" aria-live="assertive" aria-atomic="true" style="margin-top: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+            <div class="d-flex">
+                <div class="toast-body">
+                    @toast.Message
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" @onclick="() => RemoveToast(toast)" aria-label="Close"></button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ToastModel> _toasts = new();
+
+    protected override void OnInitialized()
+    {
+        ToastService.OnShow += ShowToast;
+    }
+
+    private async void ShowToast(string message, string type)
+    {
+        var toast = new ToastModel { Message = message, Type = type };
+        _toasts.Add(toast);
+        InvokeAsync(StateHasChanged);
+        
+        await Task.Delay(3000); // Auto dismiss
+        RemoveToast(toast);
+    }
+
+    private void RemoveToast(ToastModel toast)
+    {
+        if (_toasts.Contains(toast))
+        {
+            _toasts.Remove(toast);
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        ToastService.OnShow -= ShowToast;
+    }
+
+    private class ToastModel
+    {
+        public string Message { get; set; } = string.Empty;
+        public string Type { get; set; } = "info";
+    }
+}

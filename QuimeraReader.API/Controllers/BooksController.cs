@@ -112,6 +112,57 @@ public class BooksController : ControllerBase
         });
     }
 
+    [HttpGet("recommendations")]
+    public async Task<IActionResult> GetRecommendations()
+    {
+        // 1. Get categories from recently read books
+        var readBooksCategories = await _dbContext.Books
+            .Where(b => b.LastReadAt != null)
+            .Include(b => b.Categories)
+            .SelectMany(b => b.Categories.Select(c => c.CategoryId))
+            .Distinct()
+            .ToListAsync();
+
+        var query = _dbContext.Books
+            .Include(b => b.Authors).ThenInclude(ba => ba.Author)
+            .Include(b => b.Categories).ThenInclude(bc => bc.Category)
+            .AsQueryable();
+
+        // 2. Prioritize unread books from those categories
+        if (readBooksCategories.Any())
+        {
+            query = query.Where(b => b.LastReadAt == null && b.Categories.Any(c => readBooksCategories.Contains(c.CategoryId)));
+        }
+        else
+        {
+            // Fallback: Highest rated unread books
+            query = query.Where(b => b.LastReadAt == null).OrderByDescending(b => b.AverageRating);
+        }
+
+        var recommendations = await query
+            .Take(8)
+            .Select(b => new 
+            {
+                Id = b.Id,
+                Title = b.Title,
+                Isbn = b.Isbn,
+                Description = b.Description,
+                AverageRating = b.AverageRating,
+                ProcessingStatus = b.ProcessingStatus == "SYNCED" ? "ALIGNED" : b.ProcessingStatus,
+                Authors = b.Authors.Select(a => a.Author!.Name).ToList(),
+                Categories = b.Categories.Select(c => c.Category!.Name).ToList(),
+                HasCover = !string.IsNullOrEmpty(b.CoverImagePath),
+                HasEpub = !string.IsNullOrEmpty(b.EpubFilePath),
+                HasAudio = !string.IsNullOrEmpty(b.AudioFilePath),
+                IsAligned = b.ProcessingStatus == "SYNCED",
+                LastReadAt = b.LastReadAt,
+                PercentageCompleted = b.PercentageCompleted
+            })
+            .ToListAsync();
+
+        return Ok(recommendations);
+    }
+
     [HttpGet("scan/status")]
     public IActionResult GetScanStatus()
     {

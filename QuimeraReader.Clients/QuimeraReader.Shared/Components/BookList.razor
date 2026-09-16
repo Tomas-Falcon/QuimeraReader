@@ -32,8 +32,22 @@
                     }
                 </div>
             </div>
-            <h4 class="mb-3">Agregados recientemente</h4>
         }
+
+        if (_recommendations != null && _recommendations.Any())
+        {
+            <div class="recommendations mb-5">
+                <h4 class="mb-3">Recomendados para ti</h4>
+                <div class="books-grid">
+                    @foreach (var book in _recommendations)
+                    {
+                        <BookCard Book="book" />
+                    }
+                </div>
+            </div>
+        }
+
+        <h4 class="mb-3">Agregados recientemente</h4>
     }
 
     @if (_isLoading && _books.Count == 0)
@@ -94,6 +108,7 @@
     private ElementReference _loadMoreElement;
     private DotNetObjectReference<BookList>? _objRef;
     private List<Book> _books = new();
+    private List<Book> _recommendations = new();
     private int _currentPage = 1;
     private bool _isLoading = false;
     private bool _hasMore = true;
@@ -103,7 +118,9 @@
     protected override async Task OnInitializedAsync()
     {
         _objRef = DotNetObjectReference.Create(this);
+        var fetchRecs = ApiClient.GetRecommendationsAsync();
         await LoadBooksAsync();
+        _recommendations = await fetchRecs;
         _ = PollNewBooksAsync();
     }
 

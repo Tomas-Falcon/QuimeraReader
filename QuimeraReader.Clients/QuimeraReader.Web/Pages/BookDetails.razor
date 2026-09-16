@@ -6,6 +6,12 @@
 
 <PageTitle>Detalles del Libro</PageTitle>
 
+<div class="mb-4">
+    <button class="btn btn-outline-secondary" @onclick="GoBack">
+        <i class="bi bi-arrow-left"></i> Volver a la Biblioteca
+    </button>
+</div>
+
 @if (_isLoading)
 {
     <p>Cargando detalles...</p>
@@ -47,16 +53,26 @@ else
             <p class="description lead" style="white-space: pre-wrap;">@_book.Description</p>
             
             <div class="actions mt-4">
-                <button class="btn btn-lg btn-primary" @onclick="GoToRead">
-                    @if (_book.PercentageCompleted.HasValue && _book.PercentageCompleted.Value > 0)
-                    {
-                        <i class="bi bi-play-fill"></i> @($"Continuar ({Math.Round(_book.PercentageCompleted.Value)}%)")
-                    }
-                    else
-                    {
-                        <i class="bi bi-play-fill"></i> @("Reproducir / Leer")
-                    }
-                </button>
+                @if (!_book.HasEpub && !_book.HasAudio)
+                {
+                    <button class="btn btn-lg btn-secondary" disabled>
+                        <i class="bi bi-slash-circle"></i> Archivo no disponible
+                    </button>
+                    <p class="text-muted mt-2 small">Este libro no tiene un archivo asociado para leer o escuchar.</p>
+                }
+                else
+                {
+                    <button class="btn btn-lg btn-primary" @onclick="GoToRead">
+                        @if (_book.PercentageCompleted.HasValue && _book.PercentageCompleted.Value > 0)
+                        {
+                            <i class="bi bi-play-fill"></i> @($"Continuar ({Math.Round(_book.PercentageCompleted.Value)}%)")
+                        }
+                        else
+                        {
+                            <i class="bi bi-play-fill"></i> @("Reproducir / Leer")
+                        }
+                    </button>
+                }
             </div>
         </div>
     </div>
@@ -78,5 +94,10 @@ else
     private void GoToRead()
     {
         NavManager.NavigateTo($"/read/{Id}");
+    }
+
+    private void GoBack()
+    {
+        NavManager.NavigateTo("/");
     }
 }
