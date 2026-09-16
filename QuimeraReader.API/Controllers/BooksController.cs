@@ -211,23 +211,56 @@ public class BooksController : ControllerBase
     [HttpPost("{bookId}/categories")]
     public async Task<IActionResult> AddCustomCategory(int bookId, [FromBody] string categoryName)
     {
-        var book = await _dbContext.Books.Include(b => b.Categories).FirstOrDefaultAsync(b => b.Id == bookId);
+        if (string.IsNullOrWhiteSpace(categoryName)) return BadRequest("El nombre de la categoría no puede estar vacío.");
+
+        var book = await _dbContext.Books.Include(b => b.Categories).ThenInclude(bc => bc.Category).FirstOrDefaultAsync(b => b.Id == bookId);
         if (book == null) return NotFound();
 
-        var category = await _dbContext.Set<Category>().FirstOrDefaultAsync(c => c.Name == categoryName);
+        var category = await _dbContext.Categories.FirstOrDefaultAsync(c => c.Name == categoryName);
         if (category == null)
         {
-            category = new Category { Name = categoryName, IsUserGenerated = true };
-            _dbContext.Add(category);
-        }
-
-        if (!book.Categories.Any(c => c.CategoryId == category.Id))
-        {
-            book.Categories.Add(new BookCategory { BookId = book.Id, Category = category });
+            category = new Category { Name = categoryName };
+            _dbContext.Categories.Add(category);
             await _dbContext.SaveChangesAsync();
         }
 
-        return Ok();
+        if (!book.Categories.Any(bc => bc.CategoryId == category.Id))
+        {
+            book.Categories.Add(new BookCategory { Category = category });
+            await _dbContext.SaveChangesAsync();
+        }
+
+        return Ok(new { Message = "Categoría añadida exitosamente." });
+    }
+
+    [HttpPost("upload")]
+    public async Task<IActionResult> UploadEpub(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("No se proporcionó ningún archivo.");
+
+        if (!file.FileName.EndsWith(".epub", StringComparison.OrdinalIgnoreCase))
+            return BadRequest("Solo se permiten archivos .epub.");
+
+        try
+        {
+            var tempPath = Path.GetTempFileName() + ".epub";
+            using (var stream = new FileStream(tempPath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var scannerService = HttpContext.RequestServices.GetRequiredService<QuimeraReader.Infrastructure.Services.EpubScannerService>();
+            var book = await scannerService.ScanEpubAsync(tempPath, "GoogleBooks");
+            _dbContext.Books.Add(book);
+            await _dbContext.SaveChangesAsync();
+
+            return Ok(book);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Error interno: {ex.Message}");
+        }
     }
 
     public class UpdatePositionRequest

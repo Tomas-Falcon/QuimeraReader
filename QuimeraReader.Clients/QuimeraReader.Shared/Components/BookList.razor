@@ -1,6 +1,7 @@
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @inject IQuimeraApiClient ApiClient
+@inject ToastService ToastService
 @namespace QuimeraReader.Shared.Components
 
 <div class="library-container">
@@ -8,7 +9,15 @@
         <div class="search-box" style="flex: 0 0 300px;">
             <input type="text" class="form-control" placeholder="Buscar libros, autores..." @bind="_searchQuery" @bind:event="oninput" />
         </div>
-        <div class="filters d-flex gap-2">
+        <div class="filters d-flex gap-2 align-items-center">
+            @if (_isUploading)
+            {
+                <span class="text-muted small"><i class="bi bi-arrow-repeat spin"></i> Subiendo...</span>
+            }
+            <label class="btn btn-primary m-0 d-flex align-items-center gap-2" style="cursor: pointer;">
+                <i class="bi bi-cloud-arrow-up"></i> Subir EPUB
+                <InputFile OnChange="HandleFileUpload" accept=".epub" class="d-none" />
+            </label>
             <select class="form-select" style="width: auto;">
                 <option>Añadidos recientemente</option>
                 <option>Título (A-Z)</option>
@@ -65,7 +74,17 @@
             <i class="bi bi-bookshelf" style="font-size: 4rem; color: var(--text-muted);"></i>
             <h3 class="mt-3">Tu biblioteca está vacía</h3>
             <p class="text-muted">No se encontraron libros en la base de datos.</p>
-            <a href="settings" class="btn btn-primary mt-3"><i class="bi bi-search"></i> Escanear Biblioteca</a>
+            <div class="d-flex justify-content-center gap-3 mt-4">
+                <label class="btn btn-primary d-flex align-items-center gap-2" style="cursor: pointer;">
+                    <i class="bi bi-cloud-arrow-up"></i> Subir EPUB
+                    <InputFile OnChange="HandleFileUpload" accept=".epub" class="d-none" />
+                </label>
+                <a href="settings" class="btn btn-outline-secondary"><i class="bi bi-gear"></i> Ajustes de Escáner</a>
+            </div>
+            @if (_isUploading)
+            {
+                <p class="text-muted small mt-3"><i class="bi bi-arrow-repeat spin"></i> Subiendo archivo...</p>
+            }
         </div>
     }
     else if (_books.Count == 0 && !string.IsNullOrWhiteSpace(_searchQuery))
@@ -112,8 +131,48 @@
     private int _currentPage = 1;
     private bool _isLoading = false;
     private bool _hasMore = true;
+    private bool _isUploading = false;
     private CancellationTokenSource _cts = new();
     private string _searchQuery = string.Empty;
+
+    private async Task HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        if (!file.Name.EndsWith(".epub", StringComparison.OrdinalIgnoreCase))
+        {
+            ToastService.ShowError("Solo se permiten archivos .epub");
+            return;
+        }
+
+        _isUploading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Allowed up to 100MB
+            using var stream = file.OpenReadStream(maxAllowedSize: 104857600);
+            var uploadedBook = await ApiClient.UploadEpubAsync(stream, file.Name);
+            
+            ToastService.ShowSuccess($"¡{uploadedBook.Title} importado con éxito!");
+            
+            // Refrescar biblioteca
+            _currentPage = 1;
+            _hasMore = true;
+            _books.Clear();
+            await LoadBooksAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al subir el libro: " + ex.Message);
+        }
+        finally
+        {
+            _isUploading = false;
+            StateHasChanged();
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

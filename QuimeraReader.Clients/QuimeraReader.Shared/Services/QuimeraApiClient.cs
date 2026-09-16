@@ -26,6 +26,7 @@ public interface IQuimeraApiClient
     Task CancelScanAsync();
     Task DownloadWhisperModelAsync();
     Task<ScanStatus?> GetScanStatusAsync();
+    Task<Book> UploadEpubAsync(Stream fileStream, string fileName);
     Task UpdatePositionAsync(int bookId, string? epubCfi = null, double? audioPosition = null, double? percentage = null);
     Task<List<Book>> GetRecommendationsAsync();
 }
@@ -104,6 +105,18 @@ public class QuimeraApiClient : IQuimeraApiClient
         {
             return null;
         }
+    }
+
+    public async Task<Book> UploadEpubAsync(Stream fileStream, string fileName)
+    {
+        using var content = new MultipartFormDataContent();
+        using var streamContent = new StreamContent(fileStream);
+        content.Add(streamContent, "file", fileName);
+
+        var response = await _httpClient.PostAsync("api/Books/upload", content);
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadFromJsonAsync<Book>() ?? throw new InvalidOperationException("Respuesta inválida del servidor");
     }
 
     public async Task UpdatePositionAsync(int bookId, string? epubCfi = null, double? audioPosition = null, double? percentage = null)
