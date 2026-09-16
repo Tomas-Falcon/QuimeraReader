@@ -11,7 +11,6 @@
     <link rel="stylesheet" href="css/app.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="QuimeraReader.Web.styles.css" rel="stylesheet" />
-    <script type="importmap"></script>
 </head>
 
 <body>
@@ -26,28 +25,41 @@
     <div id="blazor-error-ui">
         An unhandled error has occurred.
         <a href="." class="reload">Reload</a>
-        <span class="dismiss">🗙</span>
+        <span class="dismiss">??</span>
     </div>
     
     <script>
-        // Theme Management
         window.themeManager = {
-            init: function() {
-                const storedTheme = localStorage.getItem('theme') || 'dark';
-                document.documentElement.setAttribute('data-theme', storedTheme);
-            },
-            toggleTheme: function() {
-                const currentTheme = document.documentElement.getAttribute('data-theme');
-                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            toggleTheme: function () {
+                const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
                 document.documentElement.setAttribute('data-theme', newTheme);
                 localStorage.setItem('theme', newTheme);
-                return newTheme;
+            },
+            initTheme: function () {
+                const savedTheme = localStorage.getItem('theme');
+                if (savedTheme) {
+                    document.documentElement.setAttribute('data-theme', savedTheme);
+                } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                }
             }
         };
-        // Initialize theme immediately to prevent flash
-        window.themeManager.init();
+        window.themeManager.initTheme();
+
+        window.infiniteScroll = {
+            initialize: function (element, dotnetHelper) {
+                if (!element) return;
+                const observer = new IntersectionObserver(async (entries) => {
+                    if (entries[0].isIntersecting) {
+                        await dotnetHelper.invokeMethodAsync('LoadMoreRequested');
+                    }
+                }, { rootMargin: "200px" });
+                observer.observe(element);
+            }
+        };
     </script>
-    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+    <script src="_framework/blazor.webassembly.js"></script>
 </body>
 
 </html>

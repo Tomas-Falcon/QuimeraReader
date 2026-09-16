@@ -75,20 +75,24 @@
         
         @if (_hasMore && string.IsNullOrWhiteSpace(_searchQuery))
         {
-            <div class="load-more mt-4 text-center">
-                <button class="btn btn-outline-primary" @onclick="LoadMoreAsync" disabled="@_isLoading">
-                    @(_isLoading ? "Cargando..." : "Cargar más")
-                </button>
+            <div @ref="_loadMoreElement" class="load-more-trigger mt-4 text-center p-3">
+                @if (_isLoading)
+                {
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando más...</span>
+                    </div>
+                }
             </div>
         }
     }
 </div>
 
-
-
 @implements IDisposable
+@inject IJSRuntime JSRuntime
 
 @code {
+    private ElementReference _loadMoreElement;
+    private DotNetObjectReference<BookList>? _objRef;
     private List<Book> _books = new();
     private int _currentPage = 1;
     private bool _isLoading = false;
@@ -98,8 +102,31 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _objRef = DotNetObjectReference.Create(this);
         await LoadBooksAsync();
         _ = PollNewBooksAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_hasMore && _loadMoreElement.Id != null && string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("infiniteScroll.initialize", _loadMoreElement, _objRef);
+            }
+            catch { }
+        }
+    }
+
+    [JSInvokable]
+    public async Task LoadMoreRequested()
+    {
+        if (!_isLoading && _hasMore && string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            await LoadMoreAsync();
+            StateHasChanged();
+        }
     }
 
     private async Task PollNewBooksAsync()
@@ -174,5 +201,6 @@
     {
         _cts.Cancel();
         _cts.Dispose();
+        _objRef?.Dispose();
     }
 }
