@@ -7,6 +7,14 @@ using System.Linq;
 
 namespace QuimeraReader.Shared.Services;
 
+public class ScanStatus
+{
+    public bool IsScanning { get; set; }
+    public int TotalFilesFound { get; set; }
+    public int FilesProcessed { get; set; }
+    public string CurrentFile { get; set; } = string.Empty;
+}
+
 public interface IQuimeraApiClient
 {
     Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50);
@@ -16,6 +24,7 @@ public interface IQuimeraApiClient
     Task SaveSettingAsync(SystemSetting setting);
     Task<string> TriggerScanAsync(object payload);
     Task DownloadWhisperModelAsync();
+    Task<ScanStatus?> GetScanStatusAsync();
 }
 
 public class QuimeraApiClient : IQuimeraApiClient
@@ -74,5 +83,17 @@ public class QuimeraApiClient : IQuimeraApiClient
     {
         var response = await _httpClient.PostAsync("api/Settings/whisper/download", null);
         response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<ScanStatus?> GetScanStatusAsync()
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<ScanStatus>("api/Books/scan/status");
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

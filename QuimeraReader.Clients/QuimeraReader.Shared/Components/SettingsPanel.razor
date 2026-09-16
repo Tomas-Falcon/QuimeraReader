@@ -133,13 +133,27 @@
                     <hr />
 
                     <div class="tasks-panel">
+                        @if (_scanStatus != null && _scanStatus.IsScanning)
+                        {
+                            var progress = _scanStatus.TotalFilesFound > 0 ? (int)((_scanStatus.FilesProcessed * 100.0) / _scanStatus.TotalFilesFound) : 0;
+                            <div class="alert alert-info mb-4" style="border-radius: 8px;">
+                                <h5>Escanéo en progreso...</h5>
+                                <p class="mb-1 text-truncate">Procesando: @_scanStatus.CurrentFile</p>
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: @progress%" aria-valuenow="@progress" aria-valuemin="0" aria-valuemax="100">
+                                        @_scanStatus.FilesProcessed / @_scanStatus.TotalFilesFound
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
                         <div class="task-info">
                             <strong>Escáner de Directorio</strong>
-                            <span class="task-status @(_isScanning ? "running" : "idle")">
-                                @(_isScanning ? "Escaneando..." : "Inactivo")
+                            <span class="task-status @((_isScanning || (_scanStatus != null && _scanStatus.IsScanning)) ? "running" : "idle")">
+                                @((_isScanning || (_scanStatus != null && _scanStatus.IsScanning)) ? "Escaneando..." : "Inactivo")
                             </span>
                         </div>
-                        <button class="btn-primary" @onclick="TriggerScanAsync" disabled="@_isScanning">
+                        <button class="btn-primary" @onclick="TriggerScanAsync" disabled="@(_isScanning || (_scanStatus != null && _scanStatus.IsScanning))">
                             Escanear /media
                         </button>
                     </div>
@@ -167,12 +181,16 @@
 
 
 
+@implements IDisposable
+
 @code {
     private bool _isLoading = true;
     private bool _isSaving = false;
     private string _message = string.Empty;
     private bool _isSuccess = false;
     private bool _isScanning = false;
+    private ScanStatus? _scanStatus;
+    private CancellationTokenSource _cts = new();
 
     public string ActiveTab { get; set; } = "general";
 
@@ -206,6 +224,31 @@
         {
             _isLoading = false;
         }
+
+        _ = PollStatusAsync();
+    }
+
+    private async Task PollStatusAsync()
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+            while (await timer.WaitForNextTickAsync(_cts.Token))
+            {
+                if (ActiveTab == "tasks")
+                {
+                    _scanStatus = await ApiClient.GetScanStatusAsync();
+                    StateHasChanged();
+                }
+            }
+        }
+        catch { }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
     }
 
     private async Task SaveSettingsAsync()

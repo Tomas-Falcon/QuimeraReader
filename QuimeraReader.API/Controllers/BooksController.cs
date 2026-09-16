@@ -18,13 +18,15 @@ public class BooksController : ControllerBase
     private readonly AudioAlignmentService _alignmentService;
 
     private readonly AudioAlignmentQueue _queue;
+    private readonly LibraryScanState _scanState;
 
-    public BooksController(AppDbContext dbContext, EpubScannerService scannerService, AudioAlignmentService alignmentService, AudioAlignmentQueue queue)
+    public BooksController(AppDbContext dbContext, EpubScannerService scannerService, AudioAlignmentService alignmentService, AudioAlignmentQueue queue, LibraryScanState scanState)
     {
         _dbContext = dbContext;
         _scannerService = scannerService;
         _alignmentService = alignmentService;
         _queue = queue;
+        _scanState = scanState;
     }
 
     [HttpGet]
@@ -93,6 +95,18 @@ public class BooksController : ControllerBase
         });
     }
 
+    [HttpGet("scan/status")]
+    public IActionResult GetScanStatus()
+    {
+        return Ok(new
+        {
+            _scanState.IsScanning,
+            _scanState.TotalFilesFound,
+            _scanState.FilesProcessed,
+            _scanState.CurrentFile
+        });
+    }
+
     [HttpPost("scan")]
     public async Task<IActionResult> ScanFolder([FromBody] ScanRequest request)
     {
@@ -109,7 +123,8 @@ public class BooksController : ControllerBase
         }
 
         await _dbContext.SaveChangesAsync();
-        return Ok(new { Message = "Escaneo programado. El servicio procesará los libros en segundo plano." });
+        _scanState.IsScanning = true;
+        return Ok(new { Message = "Escaneo programado." });
     }
 
     [HttpPost("{bookId}/categories")]

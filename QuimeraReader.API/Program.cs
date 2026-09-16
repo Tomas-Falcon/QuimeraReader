@@ -24,6 +24,7 @@ builder.Services.AddScoped<IMetadataProvider, GoogleBooksMetadataProvider>();
 builder.Services.AddScoped<IMetadataProvider, OpenLibraryMetadataProvider>();
 
 // Registrar servicios de infraestructura
+builder.Services.AddSingleton<LibraryScanState>();
 builder.Services.AddSingleton<AudioAlignmentQueue>();
 builder.Services.AddScoped<EpubScannerService>();
 builder.Services.AddScoped<AudioAlignmentService>();

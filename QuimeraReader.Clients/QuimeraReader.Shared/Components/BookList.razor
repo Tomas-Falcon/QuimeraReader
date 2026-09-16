@@ -38,15 +38,45 @@
 
 
 
+@implements IDisposable
+
 @code {
     private List<Book> _books = new();
     private int _currentPage = 1;
     private bool _isLoading = false;
     private bool _hasMore = true;
+    private CancellationTokenSource _cts = new();
 
     protected override async Task OnInitializedAsync()
     {
         await LoadBooksAsync();
+        _ = PollNewBooksAsync();
+    }
+
+    private async Task PollNewBooksAsync()
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+            while (await timer.WaitForNextTickAsync(_cts.Token))
+            {
+                if (_isLoading || _books.Count == 0) continue;
+                
+                try
+                {
+                    var result = await ApiClient.GetBooksAsync(1, 1);
+                    if (result.Data.Length > 0 && result.Data[0].Id > _books[0].Id)
+                    {
+                        _currentPage = 1;
+                        _hasMore = true;
+                        _books.Clear();
+                        await LoadBooksAsync();
+                    }
+                }
+                catch { }
+            }
+        }
+        catch (OperationCanceledException) { }
     }
 
     private async Task LoadBooksAsync()
@@ -65,7 +95,6 @@
                 _books.AddRange(result.Data);
                 _currentPage++;
                 
-                // Si trajimos menos del tamaño de página, ya no hay más
                 if (result.Data.Length < 20)
                 {
                     _hasMore = false;
@@ -90,5 +119,11 @@
     private async Task LoadMoreAsync()
     {
         await LoadBooksAsync();
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
     }
 }

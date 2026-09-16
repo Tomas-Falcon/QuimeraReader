@@ -16,11 +16,13 @@ public class LibraryScanBackgroundService : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<LibraryScanBackgroundService> _logger;
+    private readonly LibraryScanState _scanState;
 
-    public LibraryScanBackgroundService(IServiceProvider serviceProvider, ILogger<LibraryScanBackgroundService> logger)
+    public LibraryScanBackgroundService(IServiceProvider serviceProvider, ILogger<LibraryScanBackgroundService> logger, LibraryScanState scanState)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
+        _scanState = scanState;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -36,10 +38,10 @@ public class LibraryScanBackgroundService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error occurred executing LibraryScanBackgroundService.");
+                _scanState.IsScanning = false;
             }
 
-            // Esperar 1 minuto hasta el próximo chequeo
-            await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken); // Check more frequently
         }
     }
 
@@ -51,7 +53,7 @@ public class LibraryScanBackgroundService : BackgroundService
 
         var setting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "IncomingScanFolder", stoppingToken);
         if (setting == null || string.IsNullOrWhiteSpace(setting.Value))
-            return; // No hay carpeta configurada para escanear
+            return;
 
         if (!Directory.Exists(setting.Value))
         {
@@ -59,24 +61,27 @@ public class LibraryScanBackgroundService : BackgroundService
             return;
         }
 
+        var allFiles = Directory.GetFiles(setting.Value, "*.epub", SearchOption.AllDirectories);
+        if (allFiles.Length == 0)
+        {
+            _scanState.IsScanning = false;
+            return;
+        }
+
+        _scanState.IsScanning = true;
+        _scanState.TotalFilesFound = allFiles.Length;
+        _scanState.FilesProcessed = 0;
+
         var batchSizeSetting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "ScanBatchSize", stoppingToken);
         int batchSize = int.TryParse(batchSizeSetting?.Value, out int parsedSize) ? parsedSize : 100;
 
-        var files = Directory.GetFiles(setting.Value, "*.epub", SearchOption.AllDirectories)
-            .Take(batchSize) // Configurable, por defecto 100 archivos por minuto
-            .ToList();
-
-        if (!files.Any())
-        {
-            _logger.LogInformation("No hay más archivos EPUB para escanear en la carpeta temporal.");
-            // Opcional: borrar el setting para no seguir buscando
-            return;
-        }
+        var files = allFiles.Take(batchSize).ToList();
 
         foreach (var file in files)
         {
             if (stoppingToken.IsCancellationRequested) break;
 
+            _scanState.CurrentFile = Path.GetFileName(file);
             try
             {
                 var book = await scannerService.ScanEpubAsync(file, "GoogleBooks");
@@ -87,8 +92,17 @@ public class LibraryScanBackgroundService : BackgroundService
             {
                 _logger.LogError(ex, $"Error escaneando el archivo {file}");
             }
+            finally
+            {
+                _scanState.FilesProcessed++;
+            }
         }
 
         await dbContext.SaveChangesAsync(stoppingToken);
+        
+        if (_scanState.FilesProcessed >= _scanState.TotalFilesFound)
+        {
+            _scanState.IsScanning = false;
+        }
     }
 }
