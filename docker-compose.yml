@@ -16,11 +16,11 @@ services:
       - QUIMERA_DB_PATH=/config/quimerareader.db
     volumes:
       # Carpeta donde dejas los libros sueltos (Si usas el modo "Mover", asegúrate de no poner :ro)
-      - /tu/ruta/descargas:/media
+      - ./media:/media
       
       # Carpeta donde QuimeraReader organiza tu biblioteca (EPUBs/Audios finales)
-      - /tu/ruta/biblioteca:/library
+      - ./library:/library
       
       # Carpeta donde guarda la Base de Datos SQLite, Ajustes y SyncMaps
-      - /tu/ruta/configuracion:/config
+      - ./config:/config
     restart: unless-stopped
