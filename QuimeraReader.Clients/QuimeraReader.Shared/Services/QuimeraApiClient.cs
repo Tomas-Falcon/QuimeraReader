@@ -14,6 +14,7 @@ public interface IQuimeraApiClient
     Task<string> GetSyncMapAsync(int id);
     Task<Dictionary<string, string>> GetSettingsAsync();
     Task SaveSettingAsync(SystemSetting setting);
+    Task<string> TriggerScanAsync(object payload);
 }
 
 public class QuimeraApiClient : IQuimeraApiClient
@@ -57,6 +58,14 @@ public class QuimeraApiClient : IQuimeraApiClient
 
     public async Task SaveSettingAsync(SystemSetting setting)
     {
-        await _httpClient.PostAsJsonAsync("api/Settings", setting);
+        var response = await _httpClient.PostAsJsonAsync("api/Settings", setting);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<string> TriggerScanAsync(object payload)
+    {
+        var response = await _httpClient.PostAsJsonAsync("api/Books/scan", payload);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
     }
 }

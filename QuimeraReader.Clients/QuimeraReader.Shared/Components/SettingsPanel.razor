@@ -30,13 +30,18 @@
             </small>
         </div>
 
-        <button class="btn-save" @onclick="SaveSettingsAsync" disabled="@_isSaving">
-            @(_isSaving ? "Guardando..." : "Guardar Cambios")
-        </button>
+        <div class="form-actions">
+            <button class="btn-save" @onclick="SaveSettingsAsync" disabled="@_isSaving">
+                @(_isSaving ? "Guardando..." : "Guardar Cambios")
+            </button>
+            <button class="btn-scan" @onclick="TriggerScanAsync" disabled="@_isScanning">
+                @(_isScanning ? "Iniciando escaneo..." : "Escanear Biblioteca Ahora")
+            </button>
+        </div>
 
         @if (!string.IsNullOrEmpty(_message))
         {
-            <div class="alert @(_isSuccess ? "alert-success" : "alert-error")">
+            <div class="message @(_isSuccess ? "success" : "error")">
                 @_message
             </div>
         }
@@ -190,6 +195,30 @@
         finally
         {
             _isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private bool _isScanning = false;
+
+    private async Task TriggerScanAsync()
+    {
+        _isScanning = true;
+        _message = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            var response = await ApiClient.TriggerScanAsync(new { FolderPath = _libraryRootPath });
+            ShowMessage("El escáner se ha iniciado en segundo plano. Los libros aparecerán pronto en la biblioteca.", true);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"Error al iniciar escaneo: {ex.Message}", false);
+        }
+        finally
+        {
+            _isScanning = false;
             StateHasChanged();
         }
     }
