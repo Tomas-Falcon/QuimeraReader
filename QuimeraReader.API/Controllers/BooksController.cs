@@ -231,28 +231,23 @@ public class BooksController : ControllerBase
             var scanner = scope.ServiceProvider.GetRequiredService<QuimeraReader.Infrastructure.Services.EpubScannerService>();
 
             var ghostBooks = await dbContext.Books
+                .Include(b => b.Authors)
+                .ThenInclude(ba => ba.Author)
+                .Include(b => b.Categories)
+                .ThenInclude(bc => bc.Category)
                 .Where(b => !b.IsMetadataComplete || string.IsNullOrEmpty(b.CoverImagePath) || string.IsNullOrEmpty(b.Description))
                 .ToListAsync();
 
             foreach (var book in ghostBooks)
             {
-                if (!string.IsNullOrEmpty(book.EpubFilePath) && System.IO.File.Exists(book.EpubFilePath))
+                try
                 {
-                    try
-                    {
-                        var updatedBook = await scanner.ScanEpubAsync(book.EpubFilePath, "GoogleBooks");
-                        // Copiar propiedades actualizadas si estaban vacías
-                        if (string.IsNullOrEmpty(book.Description)) book.Description = updatedBook.Description;
-                        if (string.IsNullOrEmpty(book.CoverImagePath)) book.CoverImagePath = updatedBook.CoverImagePath;
-                        if (!book.IsMetadataComplete) book.IsMetadataComplete = updatedBook.IsMetadataComplete;
-                        
-                        // NOTA: No reemplazamos EpubFilePath para evitar conflictos si el escáner lo movió temporalmente,
-                        // aunque el escáner asume que es un archivo nuevo. Idealmente solo fetch data API.
-                        // Para evitar moverlo de nuevo, idealmente usaríamos un método de fetch dedicado.
-                        
-                        await dbContext.SaveChangesAsync();
-                    }
-                    catch { }
+                    await scanner.EnrichMetadataAsync(book, "GoogleBooks");
+                    await dbContext.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error enriqueciendo libro {book.Id}: {ex.Message}");
                 }
             }
         });

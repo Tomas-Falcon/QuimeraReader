@@ -228,6 +228,113 @@ public class EpubScannerService
         return book;
     }
 
+    public async Task EnrichMetadataAsync(Book book, string preferredProviderName)
+    {
+        var settingsDict = await _dbContext.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
+
+        var query = !string.IsNullOrWhiteSpace(book.Title) ? book.Title : Path.GetFileNameWithoutExtension(book.EpubFilePath);
+        var orderedProviders = _providers.OrderByDescending(p => p.ProviderName == preferredProviderName);
+
+        BookMetadata? metadata = null;
+        foreach (var provider in orderedProviders)
+        {
+            metadata = await provider.GetMetadataAsync(query, isbn: book.Isbn, settings: settingsDict);
+            if (metadata != null) break;
+        }
+
+        if (metadata != null)
+        {
+            if (string.IsNullOrWhiteSpace(book.Title) && !string.IsNullOrWhiteSpace(metadata.Title))
+                book.Title = metadata.Title;
+
+            if (string.IsNullOrWhiteSpace(book.Description) && !string.IsNullOrWhiteSpace(metadata.Synopsis))
+                book.Description = metadata.Synopsis;
+
+            if (!book.AverageRating.HasValue && metadata.AverageRating.HasValue)
+                book.AverageRating = metadata.AverageRating.Value;
+
+            if (!book.Authors.Any() && metadata.Authors != null && metadata.Authors.Any())
+            {
+                foreach (var auth in metadata.Authors)
+                    book.Authors.Add(new BookAuthor { Author = new Author { Name = auth, FileAs = auth } });
+            }
+
+            if (metadata.Categories != null && metadata.Categories.Any())
+            {
+                foreach (var catName in metadata.Categories)
+                {
+                    if (!book.Categories.Any(c => c.Category.Name == catName))
+                    {
+                        var category = await _dbContext.Categories.FirstOrDefaultAsync(c => c.Name == catName);
+                        if (category == null)
+                        {
+                            category = new Category { Name = catName, IsUserGenerated = false };
+                            _dbContext.Add(category);
+                        }
+                        book.Categories.Add(new BookCategory { Category = category });
+                    }
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(metadata.SeriesName) && book.Series == null)
+            {
+                var seriesName = metadata.SeriesName;
+                double? seriesVolume = null;
+                var match = System.Text.RegularExpressions.Regex.Match(seriesName, @"(?:Vol\.|Book|#)\s*([\d\.]+)");
+                if (match.Success && double.TryParse(match.Groups[1].Value, out double parsedVol))
+                {
+                    seriesVolume = parsedVol;
+                }
+                
+                var series = await _dbContext.Series.FirstOrDefaultAsync(s => s.Name == seriesName);
+                if (series == null)
+                {
+                    series = new Series { Name = seriesName };
+                    _dbContext.Add(series);
+                }
+                book.Series = series;
+                book.SeriesVolume = seriesVolume;
+            }
+
+            if (string.IsNullOrEmpty(book.CoverImagePath) && !string.IsNullOrWhiteSpace(metadata.CoverImageUri))
+            {
+                try
+                {
+                    var imageBytes = await _httpClient.GetByteArrayAsync(metadata.CoverImageUri);
+                    
+                    settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
+                    if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+                    
+                    string mainAuthor = book.Authors.FirstOrDefault()?.Author.Name ?? "Unknown Author";
+                    string safeAuthor = GetSafeFilename(mainAuthor);
+                    string safeTitle = GetSafeFilename(book.Title);
+                    string bookSubDir = Path.Combine(libraryRoot, safeAuthor, safeTitle);
+                    
+                    Directory.CreateDirectory(bookSubDir);
+                    string coverPath = Path.Combine(bookSubDir, "cover.jpg");
+                    await File.WriteAllBytesAsync(coverPath, imageBytes);
+                    book.CoverImagePath = coverPath;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error descargando carátula de {metadata.CoverImageUri}: {ex.Message}");
+                }
+            }
+        }
+
+        bool hasTitle = !string.IsNullOrWhiteSpace(book.Title);
+        bool hasAuthor = book.Authors.Any();
+        bool hasSynopsis = !string.IsNullOrWhiteSpace(book.Description);
+        bool hasCover = !string.IsNullOrWhiteSpace(book.CoverImagePath);
+        
+        settingsDict.TryGetValue("GoogleBooksApiKey", out var googleBooksKey);
+        bool hasGoogleBooksKey = !string.IsNullOrWhiteSpace(googleBooksKey);
+        bool needsRating = hasGoogleBooksKey;
+        bool ratingSatisfied = !needsRating || book.AverageRating.HasValue;
+
+        book.IsMetadataComplete = hasTitle && hasAuthor && hasSynopsis && hasCover && ratingSatisfied;
+    }
+
     private string GetSafeFilename(string filename)
     {
         return string.Join("_", filename.Split(Path.GetInvalidFileNameChars()));
