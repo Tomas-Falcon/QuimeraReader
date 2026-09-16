@@ -21,10 +21,17 @@ public static class MauiProgram
 		builder.Logging.AddDebug();
 #endif
 		
-        // En Android localhost es 10.0.2.2. En iOS/Windows es localhost.
-        var baseUrl = DeviceInfo.Platform == DevicePlatform.Android ? "http://10.0.2.2:5000/" : "http://localhost:5000/";
-        builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(baseUrl) });
+        builder.Services.AddScoped<QuimeraReader.Shared.Services.IServerConfigService, QuimeraReader.Mobile.Services.MobileServerConfigService>();
+        
+        builder.Services.AddScoped(sp => 
+        {
+            var config = sp.GetRequiredService<QuimeraReader.Shared.Services.IServerConfigService>();
+            var url = config.ServerUrl ?? "http://localhost:5000/";
+            return new HttpClient { BaseAddress = new Uri(url) };
+        });
+
         builder.Services.AddScoped<QuimeraReader.Shared.Services.IQuimeraApiClient, QuimeraReader.Shared.Services.QuimeraApiClient>();
+        builder.Services.AddScoped<QuimeraReader.Shared.Services.ToastService>();
 
 		return builder.Build();
 	}

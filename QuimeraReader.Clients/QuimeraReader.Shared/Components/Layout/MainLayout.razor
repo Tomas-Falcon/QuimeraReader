@@ -1,6 +1,24 @@
 @inherits LayoutComponentBase
 @inject IJSRuntime JSRuntime
+@inject QuimeraReader.Shared.Services.IServerConfigService ServerConfig
+@inject NavigationManager NavManager
+@namespace QuimeraReader.Shared.Components.Layout
 
+@if (ServerConfig.NeedsConfiguration)
+{
+    <div class="d-flex align-items-center justify-content-center vh-100 bg-dark text-light">
+        <div class="card p-4 bg-secondary" style="max-width: 400px; width: 100%; border-radius: 12px;">
+            <h3 class="mb-4 text-center">Configuración del Servidor</h3>
+            <p class="text-center mb-4">Introduce la dirección IP o dominio de tu servidor QuimeraReader.</p>
+            <div class="mb-3">
+                <input type="url" class="form-control" @bind="_serverInput" placeholder="http://192.168.1.10:5000/" />
+            </div>
+            <button class="btn btn-primary w-100" @onclick="SaveConfig">Conectar</button>
+        </div>
+    </div>
+}
+else
+{
 <div class="page">
     <div class="sidebar">
         <NavMenu />
@@ -26,9 +44,20 @@
     </main>
 </div>
 <QuimeraReader.Shared.Components.ToastContainer />
+}
 
 @code {
     private bool isDarkTheme = true;
+    private string _serverInput = "http://";
+
+    private void SaveConfig()
+    {
+        if (!string.IsNullOrWhiteSpace(_serverInput))
+        {
+            ServerConfig.SaveServerUrl(_serverInput);
+            NavManager.NavigateTo(NavManager.Uri, forceLoad: true);
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
