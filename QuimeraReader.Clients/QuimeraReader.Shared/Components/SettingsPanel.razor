@@ -133,8 +133,15 @@
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label fw-bold">Hardcover API Key (GraphQL)</label>
-                                        <input type="password" class="form-control bg-secondary text-light border-0" @bind="_hardcoverKey" placeholder="Token de acceso personal..." />
-                                        <div class="form-text text-white-50">Token de acceso de Hardcover (hardcover.app). Permite hasta 5,000 peticiones diarias gratuitas para extraer metadatos.</div>
+                                        <input type="password" class="form-control bg-secondary text-light border-0 mb-2" @bind="_hardcoverKey" placeholder="Token de acceso personal..." />
+                                        
+                                        <div class="form-check form-switch mt-2">
+                                            <input class="form-check-input" type="checkbox" id="hardcoverSyncCheck" @bind="_hardcoverSyncEnabled">
+                                            <label class="form-check-label fw-bold" for="hardcoverSyncCheck">Sincronización de mi contenido (Hardcover)</label>
+                                        </div>
+                                        <div class="form-text text-white-50">
+                                            Si está activado, QuimeraReader actualizará tu progreso de lectura y marcará los libros como leídos en tu cuenta de Hardcover.app automáticamente. Si está desactivado, el Token solo se usará para descargar metadatos de la tienda.
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -242,6 +249,7 @@
     private string _openAiKey = string.Empty;
     private string _googleBooksKey = string.Empty;
     private string _hardcoverKey = string.Empty;
+    private bool _hardcoverSyncEnabled = false;
     private string _whisperModelPath = "ggml-base.bin";
     private string _whisperMode = "LocalServer";
     private string _openAiEndpoint = "https://api.openai.com/v1/";
@@ -258,6 +266,7 @@
             if (settings.TryGetValue("OpenAIApiKey", out var openai)) _openAiKey = openai;
             if (settings.TryGetValue("GoogleBooksApiKey", out var gbooks)) _googleBooksKey = gbooks;
             if (settings.TryGetValue("HardcoverApiKey", out var hardcover)) _hardcoverKey = hardcover;
+            if (settings.TryGetValue("HardcoverSyncEnabled", out var hSync)) _hardcoverSyncEnabled = bool.TryParse(hSync, out var b) && b;
             if (settings.TryGetValue("WhisperModelPath", out var whisper)) _whisperModelPath = whisper;
             if (settings.TryGetValue("WhisperMode", out var wMode)) _whisperMode = wMode;
             if (settings.TryGetValue("OpenAIEndpoint", out var wEndpoint)) _openAiEndpoint = wEndpoint;
@@ -311,6 +320,7 @@
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "OpenAIApiKey", Value = _openAiKey });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "GoogleBooksApiKey", Value = _googleBooksKey });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "HardcoverApiKey", Value = _hardcoverKey });
+            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "HardcoverSyncEnabled", Value = _hardcoverSyncEnabled.ToString() });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "WhisperModelPath", Value = _whisperModelPath });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "WhisperMode", Value = _whisperMode });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "OpenAIEndpoint", Value = _openAiEndpoint });
