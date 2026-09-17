@@ -21,8 +21,20 @@ public class OpenLibraryMetadataProvider : IMetadataProvider
 
     public async Task<BookMetadata?> GetMetadataAsync(string query, string? isbn = null, Dictionary<string, string>? settings = null)
     {
-        string search = isbn != null ? $"isbn:{isbn}" : $"title={Uri.EscapeDataString(query)}";
-        string url = $"https://openlibrary.org/search.json?{search}&limit=1";
+        // Intento 1: Por ISBN si existe
+        if (!string.IsNullOrWhiteSpace(isbn))
+        {
+            var result = await FetchFromOpenLibrary($"isbn:{isbn}");
+            if (result != null) return result;
+        }
+
+        // Intento 2: Por título (Fallback o si no hay ISBN)
+        return await FetchFromOpenLibrary($"title={Uri.EscapeDataString(query)}");
+    }
+
+    private async Task<BookMetadata?> FetchFromOpenLibrary(string queryParams)
+    {
+        string url = $"https://openlibrary.org/search.json?{queryParams}&limit=1";
 
         try
         {

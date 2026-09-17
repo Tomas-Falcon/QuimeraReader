@@ -24,8 +24,20 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
         string? apiKey = null;
         settings?.TryGetValue("GoogleBooksApiKey", out apiKey);
 
-        string search = isbn != null ? $"isbn:{isbn}" : $"intitle:{query}";
-        string url = $"https://www.googleapis.com/books/v1/volumes?q={Uri.EscapeDataString(search)}";
+        // Intento 1: Por ISBN si existe
+        if (!string.IsNullOrWhiteSpace(isbn))
+        {
+            var result = await FetchFromGoogleBooks($"isbn:{isbn}", apiKey);
+            if (result != null) return result;
+        }
+
+        // Intento 2: Por Título (Fallback o si no había ISBN)
+        return await FetchFromGoogleBooks($"intitle:{query}", apiKey);
+    }
+
+    private async Task<BookMetadata?> FetchFromGoogleBooks(string searchString, string? apiKey)
+    {
+        string url = $"https://www.googleapis.com/books/v1/volumes?q={Uri.EscapeDataString(searchString)}";
         if (!string.IsNullOrWhiteSpace(apiKey))
         {
             url += $"&key={apiKey}";
@@ -42,7 +54,7 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
             {
                 Title = firstItem.Title,
                 Authors = firstItem.Authors ?? new List<string>(),
-                CoverImageUri = firstItem.ImageLinks?.Thumbnail,
+                CoverImageUri = firstItem.ImageLinks?.Thumbnail?.Replace("http:", "https:"),
                 Categories = firstItem.Categories ?? new List<string>(),
                 Synopsis = firstItem.Description,
                 AverageRating = firstItem.AverageRating
