@@ -20,39 +20,45 @@
 }
 else
 {
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4" style="justify-content: flex-end; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border-color); background-color: var(--bg-card);">
-            
-            <button class="btn btn-outline-secondary metadata-btn" @onclick="FetchMissingMetadata" disabled="@_isFetchingMetadata" style="border-radius: 20px; display: flex; align-items: center; gap: 6px;">
-                @if (_isFetchingMetadata)
-                {
-                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    <span>Buscando...</span>
-                }
-                else
-                {
-                    <span class="bi bi-cloud-download" aria-hidden="true"></span> <span>Metadatos</span>
-                }
-            </button>
-
-            <button class="btn btn-outline-primary theme-toggle" @onclick="ToggleThemeAsync" style="border-radius: 20px; display: flex; align-items: center; gap: 6px;">
-                @if (isDarkTheme)
-                {
-                    <span class="bi bi-moon-fill" aria-hidden="true"></span> <span>Modo Oscuro</span>
-                }
-                else
-                {
-                    <span class="bi bi-sun-fill" aria-hidden="true"></span> <span>Modo Claro</span>
-                }
-            </button>
+<div class="page @(IsReadingMode ? "reading-mode" : "")">
+    @if (!IsReadingMode)
+    {
+        <div class="sidebar">
+            <NavMenu />
         </div>
+    }
 
-        <article class="content px-4 mt-3">
+    <main class="@(IsReadingMode ? "p-0" : "")">
+        @if (!IsReadingMode)
+        {
+            <div class="top-row px-4" style="justify-content: flex-end; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border-color); background-color: var(--bg-card);">
+                
+                <button class="btn btn-outline-secondary metadata-btn" @onclick="FetchMissingMetadata" disabled="@_isFetchingMetadata" style="border-radius: 20px; display: flex; align-items: center; gap: 6px;">
+                    @if (_isFetchingMetadata)
+                    {
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        <span>Buscando...</span>
+                    }
+                    else
+                    {
+                        <span class="bi bi-cloud-download" aria-hidden="true"></span> <span>Metadatos</span>
+                    }
+                </button>
+
+                <button class="btn btn-outline-primary theme-toggle" @onclick="ToggleThemeAsync" style="border-radius: 20px; display: flex; align-items: center; gap: 6px;">
+                    @if (isDarkTheme)
+                    {
+                        <span class="bi bi-moon-fill" aria-hidden="true"></span> <span>Modo Oscuro</span>
+                    }
+                    else
+                    {
+                        <span class="bi bi-sun-fill" aria-hidden="true"></span> <span>Modo Claro</span>
+                    }
+                </button>
+            </div>
+        }
+
+        <article class="content @(IsReadingMode ? "p-0 m-0" : "px-4 mt-3")">
             @Body
         </article>
     </main>
@@ -64,6 +70,12 @@ else
     private bool isDarkTheme = true;
     private string _serverInput = "http://";
     private bool _isFetchingMetadata = false;
+    private bool IsReadingMode => NavManager.Uri.Contains("/read/", StringComparison.OrdinalIgnoreCase);
+
+    protected override void OnInitialized()
+    {
+        NavManager.LocationChanged += (s, e) => StateHasChanged();
+    }
 
     private async Task FetchMissingMetadata()
     {

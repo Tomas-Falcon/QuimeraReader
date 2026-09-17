@@ -18,41 +18,38 @@
     }
     else if (Book != null)
     {
-        <!-- Background Blur -->
-        <div class="background-blur" style="background-image: url('@Book.CoverUrl');"></div>
-        <div class="background-overlay"></div>
-
         <!-- Main Content -->
-        <div class="reader-content">
-            <!-- Header -->
-            <div class="reader-header">
-                <button class="btn-back" @onclick="GoBack">
-                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                    Volver
+        <div class="reader-content d-flex flex-column" style="height: 100vh; overflow: hidden; background: var(--bg-body); padding: 0;">
+            <!-- Header (Auto-hidden in future, but keep for back button for now) -->
+            <div class="reader-header" style="padding: 10px 20px; z-index: 10; display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); border-bottom: 1px solid var(--border-color);">
+                <button class="btn btn-link text-white text-decoration-none px-0" @onclick="GoBack">
+                    <i class="bi bi-arrow-left me-2"></i> Volver
                 </button>
-                <div class="header-titles">
-                    <h2 class="reader-book-title">@Book.Title</h2>
-                    <p class="reader-book-author">Leyendo ahora</p>
+                <div class="text-center" style="flex: 1;">
+                    <h5 class="mb-0 text-truncate" style="max-width: 300px; margin: 0 auto;">@Book.Title</h5>
                 </div>
-                <div class="header-spacer"></div>
+                <div style="width: 70px;"></div> <!-- Spacer -->
             </div>
 
             <!-- Text Area / EPUB Reader -->
-            <div class="text-container" id="text-container">
+            <div class="text-container position-relative" id="text-container" style="flex: 1; display: flex; flex-direction: column;">
                 @if (Book.HasEpub)
                 {
-                    <div id="epub-viewer" style="width: 100%; height: 60vh; background: var(--bg-card); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                    <div id="epub-viewer" style="flex: 1; width: 100%; height: 100%; overflow: hidden;">
                         <!-- Epub.js will render the book here -->
                     </div>
-                    <div class="epub-controls mt-3 d-flex justify-content-between align-items-center w-100">
-                        <button class="btn btn-outline-light rounded-circle prev-btn" @onclick="PrevPage" style="width: 50px; height: 50px;" aria-label="Previous Page"><i class="bi bi-chevron-left"></i></button>
-                        <span class="text-muted small">Modo Lectura</span>
-                        <button class="btn btn-outline-light rounded-circle next-btn" @onclick="NextPage" style="width: 50px; height: 50px;" aria-label="Next Page"><i class="bi bi-chevron-right"></i></button>
+                    
+                    <!-- Progress Footer -->
+                    <div class="reading-progress text-center py-2" style="background: var(--bg-card); font-size: 0.85rem; color: var(--text-muted);">
+                        @if (Book.PercentageCompleted.HasValue)
+                        {
+                            <span>@($"{Math.Round(Book.PercentageCompleted.Value, 1)}% leído")</span>
+                        }
                     </div>
                 }
                 else if (_segments != null && _segments.Any())
                 {
-                    <div class="sync-text">
+                    <div class="sync-text p-4" style="flex: 1; overflow-y: auto;">
                         @for (int i = 0; i < _segments.Count; i++)
                         {
                             var segment = _segments[i];
@@ -66,7 +63,7 @@
                 }
                 else
                 {
-                    <div class="no-sync-map text-center pt-5">
+                    <div class="no-sync-map text-center pt-5" style="flex: 1;">
                         <img src="@Book.CoverUrl" class="fallback-cover mb-4" style="max-width: 200px; border-radius: 8px;" />
                         <h3>Modo Audiolibro Puro</h3>
                         <p class="text-muted">No se encontraron transcripciones o texto para este título.</p>
@@ -74,10 +71,13 @@
                 }
             </div>
 
-            <!-- Native Player (Styled container) -->
-            <div class="player-controls">
-                <audio @ref="_audioElement" src="@Book.AudioUrl" controls class="native-audio" />
-            </div>
+            <!-- Native Player (Hidden unless audio exists and we want to show it, for now we keep it visible at the bottom if Audio exists) -->
+            @if (Book.HasAudio)
+            {
+                <div class="player-controls" style="background: var(--bg-card); padding: 10px;">
+                    <audio @ref="_audioElement" src="@Book.AudioUrl" controls class="native-audio w-100" />
+                </div>
+            }
         </div>
     }
 </div>
@@ -157,10 +157,19 @@
     }
 
     [JSInvokable]
-    public void OnEpubLocationChanged(string cfi)
+    public void OnEpubLocationChanged(string cfi, double percentage)
     {
-        // Guardar el CFI (marcapáginas) de forma asíncrona (fuego y olvido)
-        _ = ApiClient.UpdatePositionAsync(BookId, epubCfi: cfi);
+        // Guardar el CFI y el porcentaje
+        double scaledPercentage = percentage * 100.0;
+        
+        if (Book != null)
+        {
+            Book.CurrentEpubCfi = cfi;
+            Book.PercentageCompleted = scaledPercentage;
+            StateHasChanged();
+        }
+
+        _ = ApiClient.UpdatePositionAsync(BookId, epubCfi: cfi, percentage: scaledPercentage);
     }
 
     private async Task NextPage()
