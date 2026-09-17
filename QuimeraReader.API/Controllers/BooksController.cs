@@ -58,90 +58,106 @@ public class BooksController : ControllerBase
     [HttpGet("authors")]
     public async Task<IActionResult> GetAuthors()
     {
-        var authors = await _dbContext.Authors
-            .Select(a => new {
-                a.Id,
-                a.Name,
-                ProfileImageUrl = (string?)null,
-                BookCount = a.Books.Count,
-                SampleCoverUrl = a.Books.Where(b => b.Book.CoverImagePath != null)
-                                        .Select(b => "/api/media/books/" + b.Book.Id + "/cover")
-                                        .FirstOrDefault()
-            })
-            .OrderBy(a => a.Name)
-            .ToListAsync();
-            
-        // Eliminar duplicados en memoria si la BD todavía tiene problemas
-        var uniqueAuthors = authors
-            .GroupBy(a => a.Name)
-            .Select(g => g.First())
-            .ToList();
-            
-        return Ok(uniqueAuthors);
+        try
+        {
+            var authors = await _dbContext.Authors
+                .Select(a => new {
+                    a.Id,
+                    Name = a.Name ?? "Desconocido",
+                    ProfileImageUrl = (string?)null,
+                    BookCount = a.Books.Count,
+                    SampleCoverUrl = a.Books.Where(b => b.Book.CoverImagePath != null)
+                                            .Select(b => "/api/media/books/" + b.Book.Id + "/cover")
+                                            .FirstOrDefault()
+                })
+                .OrderBy(a => a.Name)
+                .ToListAsync();
+                
+            // Eliminar duplicados en memoria si la BD todavía tiene problemas
+            var uniqueAuthors = authors
+                .GroupBy(a => a.Name)
+                .Select(g => g.First())
+                .ToList();
+
+            return Ok(uniqueAuthors);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al cargar autores");
+            return StatusCode(500, new { Error = ex.Message });
+        }
     }
 
     [HttpGet]
     public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null)
     {
-        if (page < 1) page = 1;
-        if (pageSize < 1) pageSize = 50;
-        if (pageSize > 100) pageSize = 100;
-
-        var query = _dbContext.Books.AsQueryable();
-
-        // Ocultar libros "fantasma" que no tienen archivo asociado (ni EPUB ni Audio)
-        query = query.Where(b => !string.IsNullOrEmpty(b.EpubFilePath) || !string.IsNullOrEmpty(b.AudioFilePath));
-
-        if (!string.IsNullOrWhiteSpace(search))
+        try 
         {
-            var searchLower = search.ToLower();
-            query = query.Where(b => 
-                b.Title.ToLower().Contains(searchLower) ||
-                b.Authors.Any(ba => ba.Author.Name.ToLower().Contains(searchLower)) ||
-                b.Categories.Any(bc => bc.Category.Name.ToLower().Contains(searchLower)) ||
-                (b.Series != null && b.Series.Name.ToLower().Contains(searchLower))
-            );
-        }
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 50;
+            if (pageSize > 100) pageSize = 100;
 
-        var totalBooks = await query.CountAsync();
+            var query = _dbContext.Books.AsQueryable();
 
-        var books = await query
-            .Include(b => b.Authors).ThenInclude(ba => ba.Author)
-            .Include(b => b.Categories).ThenInclude(bc => bc.Category)
-            .Include(b => b.Series).ThenInclude(s => s.Universe)
-            .OrderByDescending(b => b.Id)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(b => new 
+            // Ocultar libros "fantasma" que no tienen archivo asociado (ni EPUB ni Audio)
+            query = query.Where(b => !string.IsNullOrEmpty(b.EpubFilePath) || !string.IsNullOrEmpty(b.AudioFilePath));
+
+            if (!string.IsNullOrWhiteSpace(search))
             {
-                Id = b.Id,
-                Title = b.Title,
-                Isbn = b.Isbn,
-                Description = b.Description,
-                AverageRating = b.AverageRating,
-                ProcessingStatus = b.ProcessingStatus == "SYNCED" ? "ALIGNED" : b.ProcessingStatus,
-                Authors = b.Authors.Select(a => a.Author!.Name).ToList(),
-                Categories = b.Categories.Select(c => c.Category!.Name).ToList(),
-                Series = b.Series != null ? b.Series.Name : null,
-                Universe = b.Series != null && b.Series.Universe != null ? b.Series.Universe.Name : null,
-                HasCover = !string.IsNullOrEmpty(b.CoverImagePath),
-                HasEpub = !string.IsNullOrEmpty(b.EpubFilePath),
-                HasAudio = !string.IsNullOrEmpty(b.AudioFilePath),
-                IsAligned = b.ProcessingStatus == "SYNCED",
-                LastReadAt = b.LastReadAt,
-                CurrentEpubCfi = b.CurrentEpubCfi,
-                CurrentAudioPosition = b.CurrentAudioPosition,
-                PercentageCompleted = b.PercentageCompleted
-            })
-            .ToListAsync();
+                var searchLower = search.ToLower();
+                query = query.Where(b => 
+                    b.Title.ToLower().Contains(searchLower) ||
+                    b.Authors.Any(ba => ba.Author.Name.ToLower().Contains(searchLower)) ||
+                    b.Categories.Any(bc => bc.Category.Name.ToLower().Contains(searchLower)) ||
+                    (b.Series != null && b.Series.Name.ToLower().Contains(searchLower))
+                );
+            }
 
-        return Ok(new 
+            var totalBooks = await query.CountAsync();
+
+            var books = await query
+                .Include(b => b.Authors).ThenInclude(ba => ba.Author)
+                .Include(b => b.Categories).ThenInclude(bc => bc.Category)
+                .Include(b => b.Series).ThenInclude(s => s.Universe)
+                .OrderByDescending(b => b.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(b => new 
+                {
+                    Id = b.Id,
+                    Title = b.Title,
+                    Isbn = b.Isbn,
+                    Description = b.Description,
+                    AverageRating = b.AverageRating,
+                    ProcessingStatus = b.ProcessingStatus == "SYNCED" ? "ALIGNED" : b.ProcessingStatus,
+                    Authors = b.Authors.Where(a => a.Author != null).Select(a => a.Author!.Name).ToList(),
+                    Categories = b.Categories.Where(c => c.Category != null).Select(c => c.Category!.Name).ToList(),
+                    Series = b.Series != null ? b.Series.Name : null,
+                    Universe = b.Series != null && b.Series.Universe != null ? b.Series.Universe.Name : null,
+                    HasCover = !string.IsNullOrEmpty(b.CoverImagePath),
+                    HasEpub = !string.IsNullOrEmpty(b.EpubFilePath),
+                    HasAudio = !string.IsNullOrEmpty(b.AudioFilePath),
+                    IsAligned = b.ProcessingStatus == "SYNCED",
+                    LastReadAt = b.LastReadAt,
+                    CurrentEpubCfi = b.CurrentEpubCfi,
+                    CurrentAudioPosition = b.CurrentAudioPosition,
+                    PercentageCompleted = b.PercentageCompleted
+                })
+                .ToListAsync();
+
+            return Ok(new 
+            {
+                Total = totalBooks,
+                Page = page,
+                PageSize = pageSize,
+                Data = books
+            });
+        }
+        catch (Exception ex)
         {
-            total = totalBooks,
-            page = page,
-            pageSize = pageSize,
-            data = books
-        });
+            _logger.LogError(ex, "Error al cargar libros");
+            return StatusCode(500, new { Error = ex.Message });
+        }
     }
 
     [HttpGet("{id}")]
@@ -163,8 +179,8 @@ public class BooksController : ControllerBase
             Description = book.Description,
             AverageRating = book.AverageRating,
             ProcessingStatus = book.ProcessingStatus == "SYNCED" ? "ALIGNED" : book.ProcessingStatus,
-            Authors = book.Authors.Select(a => a.Author!.Name).ToList(),
-            Categories = book.Categories.Select(c => c.Category!.Name).ToList(),
+            Authors = book.Authors.Where(a => a.Author != null).Select(a => a.Author!.Name).ToList(),
+            Categories = book.Categories.Where(c => c.Category != null).Select(c => c.Category!.Name).ToList(),
             Series = book.Series != null ? book.Series.Name : null,
             Universe = book.Series != null && book.Series.Universe != null ? book.Series.Universe.Name : null,
             HasCover = !string.IsNullOrEmpty(book.CoverImagePath),

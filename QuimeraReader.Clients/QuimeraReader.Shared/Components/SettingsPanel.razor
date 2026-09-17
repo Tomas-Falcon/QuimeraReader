@@ -51,6 +51,12 @@
                                         <div class="form-text text-white-50">Ruta donde caen los EPUBs o MP3 sueltos (Volumen montado en Docker).</div>
                                     </div>
 
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold">Directorio de Salida (Librería Organizada)</label>
+                                        <input type="text" class="form-control bg-secondary text-light border-0" @bind="_outgoingLibraryPath" placeholder="/library" />
+                                        <div class="form-text text-white-50">Ruta donde se guardarán y organizarán los libros y carátulas (ej: /app/media/books o C:\MisLibros).</div>
+                                    </div>
+
                                     <div class="mb-2">
                                         <label class="form-label fw-bold">Modo de Importación</label>
                                         <select class="form-select bg-secondary text-light border-0" @bind="_ingestionMode">
@@ -187,12 +193,12 @@
                                         
                                         <div class="list-group-item bg-transparent border-secondary text-light d-flex justify-content-between align-items-center py-3 px-0">
                                             <div>
-                                                <h6 class="mb-1 fw-bold text-muted">Alineación de Audio a Texto</h6>
-                                                <p class="mb-0 text-muted small">Genera la sincronización JIT (Just-In-Time) usando Whisper.</p>
+                                                <h6 class="mb-1 fw-bold">Alineación de Audio a Texto (Background Job)</h6>
+                                                <p class="mb-0 text-white-50 small">Sincroniza automáticamente MP3 y EPUBs en segundo plano si Whisper está configurado.</p>
                                             </div>
-                                            <button class="btn btn-secondary rounded-pill px-4" disabled>
-                                                Próximamente
-                                            </button>
+                                            <span class="badge bg-success rounded-pill px-3 py-2">
+                                                <i class="bi bi-check-circle-fill me-1"></i> Activo
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -226,6 +232,7 @@
     public string ActiveTab { get; set; } = "general";
 
     private string _libraryRootPath = "/media";
+    private string _outgoingLibraryPath = "/app/media/books";
     private string _ingestionMode = "Move";
     private string _openAiKey = string.Empty;
     private string _googleBooksKey = string.Empty;
@@ -239,7 +246,8 @@
         try
         {
             var settings = await ApiClient.GetSettingsAsync();
-            if (settings.TryGetValue("LibraryRootPath", out var path)) _libraryRootPath = path;
+            if (settings.TryGetValue("IncomingScanFolder", out var incoming)) _libraryRootPath = incoming;
+            if (settings.TryGetValue("LibraryRootPath", out var outgoing)) _outgoingLibraryPath = outgoing;
             if (settings.TryGetValue("IngestionMode", out var mode)) _ingestionMode = mode;
             if (settings.TryGetValue("OpenAIApiKey", out var openai)) _openAiKey = openai;
             if (settings.TryGetValue("GoogleBooksApiKey", out var gbooks)) _googleBooksKey = gbooks;
@@ -263,9 +271,9 @@
     {
         try
         {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
-            while (await timer.WaitForNextTickAsync(_cts.Token))
+            while (!_cts.Token.IsCancellationRequested)
             {
+                await Task.Delay(2000, _cts.Token);
                 if (ActiveTab == "tasks")
                 {
                     _scanStatus = await ApiClient.GetScanStatusAsync();
@@ -290,7 +298,8 @@
 
         try
         {
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "LibraryRootPath", Value = _libraryRootPath });
+            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "IncomingScanFolder", Value = _libraryRootPath });
+            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "LibraryRootPath", Value = _outgoingLibraryPath });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "IngestionMode", Value = _ingestionMode });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "OpenAIApiKey", Value = _openAiKey });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "GoogleBooksApiKey", Value = _googleBooksKey });

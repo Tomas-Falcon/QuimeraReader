@@ -16,7 +16,7 @@
             }
             <label class="btn btn-primary m-0 d-flex align-items-center gap-2" style="cursor: pointer;">
                 <i class="bi bi-cloud-arrow-up"></i> Subir EPUB
-                <InputFile OnChange="HandleFileUpload" accept=".epub" class="d-none" />
+                <InputFile OnChange="HandleFileUpload" accept=".epub" class="d-none" multiple />
             </label>
             <select class="form-select" style="width: auto;">
                 <option>Añadidos recientemente</option>
@@ -60,7 +60,7 @@
                 {
                     <label class="btn btn-outline-primary mt-3 px-4 py-2" style="border-radius: 20px;">
                         <i class="bi bi-cloud-arrow-up me-2"></i> Subir tu primer libro
-                        <InputFile OnChange="HandleFileUpload" class="d-none" accept=".epub" />
+                        <InputFile OnChange="HandleFileUpload" class="d-none" accept=".epub" multiple />
                     </label>
                 }
             }
@@ -118,25 +118,40 @@
 
     private async Task HandleFileUpload(InputFileChangeEventArgs e)
     {
-        var file = e.File;
-        if (file == null) return;
+        var files = e.GetMultipleFiles(maximumFileCount: 50);
+        if (!files.Any()) return;
 
         _isUploading = true;
         StateHasChanged();
 
         try
         {
-            await ApiClient.UploadEpubAsync(file.OpenReadStream(maxAllowedSize: 104857600), file.Name);
-            ToastService.ShowSuccess($"¡{file.Name} subido correctamente!");
+            int successCount = 0;
+            foreach (var file in files)
+            {
+                try
+                {
+                    await ApiClient.UploadEpubAsync(file.OpenReadStream(maxAllowedSize: 104857600), file.Name);
+                    successCount++;
+                }
+                catch (Exception fileEx)
+                {
+                    ToastService.ShowError($"Error subiendo '{file.Name}': {fileEx.Message}");
+                }
+            }
             
-            _currentPage = 1;
-            _hasMore = true;
-            _books.Clear();
-            await LoadBooksAsync();
+            if (successCount > 0)
+            {
+                ToastService.ShowSuccess($"{successCount} libro(s) subido(s) correctamente!");
+                _currentPage = 1;
+                _hasMore = true;
+                _books.Clear();
+                await LoadBooksAsync();
+            }
         }
         catch (Exception ex)
         {
-            ToastService.ShowError("Error al subir el libro: " + ex.Message);
+            ToastService.ShowError($"Error general: {ex.Message}");
         }
         finally
         {
