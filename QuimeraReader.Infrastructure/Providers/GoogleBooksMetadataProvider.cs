@@ -24,11 +24,12 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
         string? apiKey = null;
         settings?.TryGetValue("GoogleBooksApiKey", out apiKey);
 
-        if (string.IsNullOrWhiteSpace(apiKey)) 
-            return null;
-
         string search = isbn != null ? $"isbn:{isbn}" : $"intitle:{query}";
-        string url = $"https://www.googleapis.com/books/v1/volumes?q={Uri.EscapeDataString(search)}&key={apiKey}";
+        string url = $"https://www.googleapis.com/books/v1/volumes?q={Uri.EscapeDataString(search)}";
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            url += $"&key={apiKey}";
+        }
 
         try
         {

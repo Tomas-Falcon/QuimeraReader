@@ -57,6 +57,13 @@ else
                         <h5 class="text-warning mb-3"><i class="bi bi-collection"></i> Saga: @_book.Series</h5>
                     }
 
+                    @if (!string.IsNullOrEmpty(_book.Isbn))
+                    {
+                        <div class="mb-3 text-white-50">
+                            <i class="bi bi-upc-scan me-1"></i> <strong>ISBN:</strong> @_book.Isbn
+                        </div>
+                    }
+
                     @if (_book.Categories.Any())
                     {
                         <div class="mb-4 d-flex gap-2 flex-wrap">

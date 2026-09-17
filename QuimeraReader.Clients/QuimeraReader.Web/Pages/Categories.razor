@@ -1,5 +1,7 @@
 @page "/categories"
+@using QuimeraReader.Domain.Entities
 @using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Components
 @inject QuimeraReader.Shared.Services.IQuimeraApiClient ApiClient
 
 <PageTitle>Categorías</PageTitle>
@@ -10,39 +12,97 @@
     @if (categories == null)
     {
         <div class="text-center mt-5">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando...</span>
-            </div>
+            <div class="spinner-border text-primary" role="status"></div>
             <p class="mt-2 text-muted">Cargando categorías...</p>
         </div>
     }
     else if (!categories.Any())
     {
-        <div class="alert alert-info">
-            No se encontraron categorías en la base de datos.
-        </div>
+        <div class="alert alert-info">No se encontraron categorías en la base de datos.</div>
     }
     else
     {
-        <div class="row row-cols-1 row-cols-md-3 row-cols-lg-4 g-4">
+        <div class="accordion" id="categoriesAccordion">
             @foreach (var cat in categories)
             {
-                <div class="col">
-                    <a href="/?q=@Uri.EscapeDataString(cat.Name)" class="text-decoration-none">
-                        <div class="card h-100 shadow-sm border-0" style="background: var(--surface-main); cursor: pointer;">
-                            <div class="card-body text-center d-flex flex-column justify-content-center">
-                                <h5 class="card-title mb-0" style="color: var(--text-main);">@cat.Name</h5>
+                var targetId = $"collapseCat_{cat.Id}";
+                var headingId = $"headingCat_{cat.Id}";
+                var isOpen = _expandedCategoryId == cat.Id;
+
+                <div class="accordion-item bg-dark border-secondary mb-3" style="border-radius: 12px; overflow: hidden;">
+                    <h2 class="accordion-header" id="@headingId">
+                        <button class="accordion-button @(isOpen ? "" : "collapsed") bg-transparent text-light" type="button" @onclick="() => ToggleCategory(cat)">
+                            <div class="d-flex align-items-center gap-3 w-100">
+                                @if (!string.IsNullOrEmpty(cat.SampleCoverUrl))
+                                {
+                                    <img src="@cat.SampleCoverUrl" alt="Sample cover" style="width: 40px; height: 60px; object-fit: cover; border-radius: 4px;" />
+                                }
+                                else
+                                {
+                                    <div class="bg-secondary d-flex align-items-center justify-content-center" style="width: 40px; height: 60px; border-radius: 4px;">
+                                        <i class="bi bi-tag text-white-50"></i>
+                                    </div>
+                                }
+                                <div class="d-flex flex-column text-start">
+                                    <span class="fs-5 fw-bold">@cat.Name</span>
+                                    <span class="text-white-50 small">@cat.BookCount libros</span>
+                                </div>
                             </div>
+                        </button>
+                    </h2>
+                    <div id="@targetId" class="accordion-collapse collapse @(isOpen ? "show" : "")" aria-labelledby="@headingId" data-bs-parent="#categoriesAccordion">
+                        <div class="accordion-body">
+                            @if (isOpen)
+                            {
+                                @if (_categoryBooks == null)
+                                {
+                                    <div class="text-center py-3">
+                                        <div class="spinner-border spinner-border-sm text-primary"></div>
+                                    </div>
+                                }
+                                else if (!_categoryBooks.Any())
+                                {
+                                    <p class="text-muted">No se encontraron libros de este género.</p>
+                                }
+                                else
+                                {
+                                    <div class="row row-cols-2 row-cols-md-4 row-cols-lg-6 g-3">
+                                        @foreach (var book in _categoryBooks)
+                                        {
+                                            <div class="col">
+                                                <a href="/book/@book.Id" class="text-decoration-none">
+                                                    <div class="card h-100 bg-transparent border-0 book-card-hover">
+                                                        <img src="@book.CoverUrl" class="card-img-top rounded shadow-sm" style="aspect-ratio: 2/3; object-fit: cover;" onerror="this.outerHTML='<div class=\'placeholder-cover shadow-sm rounded d-flex align-items-center justify-content-center\' style=\'aspect-ratio:2/3;background:#333;color:#888;font-size:0.8rem;text-align:center;padding:5px;\'><span>Sin Portada</span></div>'" />
+                                                        <div class="card-body p-2 text-center">
+                                                            <p class="card-title text-light small mb-0 fw-bold text-truncate" title="@book.Title">@book.Title</p>
+                                                        </div>
+                                                    </div>
+                                                </a>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            }
                         </div>
-                    </a>
+                    </div>
                 </div>
             }
         </div>
     }
 </div>
 
+<style>
+    .accordion-button:focus { box-shadow: none; }
+    .accordion-button:not(.collapsed) { background-color: rgba(255,255,255,0.05) !important; color: white; }
+    .accordion-button::after { filter: invert(1); }
+    .book-card-hover { transition: transform 0.2s ease, opacity 0.2s; }
+    .book-card-hover:hover { transform: scale(1.03); opacity: 0.9; }
+</style>
+
 @code {
     private IEnumerable<Category>? categories;
+    private int? _expandedCategoryId = null;
+    private List<Book>? _categoryBooks = null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -54,6 +114,31 @@
         {
             Console.WriteLine($"Error cargando categorías: {ex.Message}");
             categories = Array.Empty<Category>();
+        }
+    }
+
+    private async Task ToggleCategory(Category cat)
+    {
+        if (_expandedCategoryId == cat.Id)
+        {
+            _expandedCategoryId = null;
+            _categoryBooks = null;
+        }
+        else
+        {
+            _expandedCategoryId = cat.Id;
+            _categoryBooks = null;
+            StateHasChanged();
+
+            try
+            {
+                var result = await ApiClient.GetBooksAsync(1, 100, cat.Name);
+                _categoryBooks = result.Items.ToList();
+            }
+            catch
+            {
+                _categoryBooks = new List<Book>();
+            }
         }
     }
 }

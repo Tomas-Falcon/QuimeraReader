@@ -4,202 +4,213 @@
 @inject ToastService ToastService
 @namespace QuimeraReader.Shared.Components
 
-<div class="settings-page">
-    <div class="settings-sidebar">
-        <ul class="nav-tabs">
-            <li class="tab-item @(ActiveTab == "general" ? "active" : "")" @onclick='() => ActiveTab = "general"'>
-                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                General
-            </li>
-            <li class="tab-item @(ActiveTab == "apikeys" ? "active" : "")" @onclick='() => ActiveTab = "apikeys"'>
-                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
-                Integraciones (API)
-            </li>
-            <li class="tab-item @(ActiveTab == "tasks" ? "active" : "")" @onclick='() => ActiveTab = "tasks"'>
-                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-                Tareas y Escaneo
-            </li>
-        </ul>
-    </div>
-
-    <div class="settings-content">
-        <div class="settings-header">
-            <h2>Configuración del Servidor</h2>
+<div class="container mt-4 mb-5">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 mb-4">
+            <div class="list-group shadow-sm" style="border-radius: 12px; overflow: hidden;">
+                <button class="list-group-item list-group-item-action @(ActiveTab == "general" ? "active bg-primary border-primary" : "bg-dark text-light border-secondary")" @onclick='() => ActiveTab = "general"'>
+                    <i class="bi bi-gear-fill me-2"></i> General
+                </button>
+                <button class="list-group-item list-group-item-action @(ActiveTab == "apikeys" ? "active bg-primary border-primary" : "bg-dark text-light border-secondary")" @onclick='() => ActiveTab = "apikeys"'>
+                    <i class="bi bi-cpu-fill me-2"></i> Integraciones (API)
+                </button>
+                <button class="list-group-item list-group-item-action @(ActiveTab == "tasks" ? "active bg-primary border-primary" : "bg-dark text-light border-secondary")" @onclick='() => ActiveTab = "tasks"'>
+                    <i class="bi bi-list-task me-2"></i> Tareas y Escaneo
+                </button>
+            </div>
         </div>
 
-        @if (_isLoading)
-        {
-            <p>Cargando preferencias...</p>
-        }
-        else
-        {
-            @if (ActiveTab == "general")
-            {
-                <div class="card">
-                    <h3>Carpetas del Servidor</h3>
-                    <p class="text-muted">Define dónde buscará QuimeraReader los libros y cómo los importará.</p>
-                    <hr />
-
-                    <div class="form-group">
-                        <label>Directorio de Origen (Descargas/Media)</label>
-                        <input type="text" class="form-control" @bind="_libraryRootPath" placeholder="/media" />
-                        <span class="help-text">Ruta donde caen los EPUBs o MP3 sueltos (Volumen montado en Docker).</span>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Modo de Importación</label>
-                        <select class="form-control" @bind="_ingestionMode">
-                            <option value="Move">Mover y Organizar (Ahorra Espacio)</option>
-                            <option value="LeaveInPlace">Dejar en lugar original (Para Torrents)</option>
-                        </select>
-                        <span class="help-text">Si seleccionas mover, el archivo se pasará a /library y se ordenará por autor.</span>
-                    </div>
+        <!-- Content -->
+        <div class="col-md-9">
+            <div class="card bg-transparent border-0">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h2 class="text-light fw-bold">Configuración del Servidor</h2>
                 </div>
-            }
 
-            @if (ActiveTab == "apikeys")
-            {
-                <div class="card">
-                    <h3>Inteligencia Artificial y Transcripción (Whisper)</h3>
-                    <p class="text-muted">Configura cómo deseas ejecutar los modelos de Inteligencia Artificial.</p>
-                    <hr />
-
-                    <div class="form-group">
-                        <label>Modo de Ejecución de Whisper</label>
-                        <select class="form-control" @bind="_whisperMode">
-                            <option value="LocalServer">Plug & Play: Ejecutar Whisper localmente en este Servidor</option>
-                            <option value="ExternalApi">API Externa: Conectar a OpenAI o red local (Ollama / LLMStudio)</option>
-                        </select>
-                    </div>
-
-                    @if (_whisperMode == "LocalServer")
+                <div class="card-body">
+                    @if (_isLoading)
                     {
-                        <div class="card-inner-box">
-                            <h4>Configuración Local (Whisper.net)</h4>
-                            <p class="help-text mb-3">Se descargarán los pesos del modelo directamente al contenedor. Depende del CPU/GPU del servidor.</p>
-                            
-                            <div class="form-group">
-                                <label>Ruta del Modelo Base (.bin)</label>
-                                <div style="display: flex; gap: 8px;">
-                                    <input type="text" class="form-control" @bind="_whisperModelPath" placeholder="ggml-base.bin" style="flex:1;" />
-                                    <button class="btn-primary" @onclick="DownloadWhisperModelAsync" disabled="@_isDownloadingWhisper">
-                                        @(_isDownloadingWhisper ? "Descargando..." : "Descargar Modelo Ahora")
-                                    </button>
-                                </div>
-                            </div>
+                        <div class="d-flex justify-content-center align-items-center py-5">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <span class="ms-3 text-muted">Cargando preferencias...</span>
                         </div>
                     }
                     else
                     {
-                        <div class="card-inner-box">
-                            <h4>Configuración API Externa</h4>
-                            <p class="help-text mb-3">Conecta QuimeraReader a OpenAI o a un modelo Whisper alojado en otro servidor (ej. Ollama).</p>
-                            
-                            <div class="form-group">
-                                <label>Endpoint URL (OpenAI API / Local Network)</label>
-                                <input type="text" class="form-control" @bind="_openAiEndpoint" placeholder="https://api.openai.com/v1/" />
-                            </div>
-                            
-                            <div class="form-group">
-                                <label>API Key</label>
-                                <input type="password" class="form-control" @bind="_openAiKey" placeholder="sk-..." />
-                                <span class="help-text">Si usas un modelo en red local sin autenticación, puedes dejar esto vacío.</span>
-                            </div>
-                        </div>
-                    }
-                </div>
-                
-                <div class="card mt-4">
-                    <h3>Metadatos y Portadas</h3>
-                    <hr />
-                    <div class="form-group">
-                        <label>Google Books API Key (Opcional)</label>
-                        <input type="password" class="form-control" @bind="_googleBooksKey" placeholder="AIza..." />
-                        <span class="help-text">Mejora la descarga de portadas en alta resolución. OpenLibrary se usa por defecto sin llave.</span>
-                    </div>
-                </div>
-            }
-
-            @if (ActiveTab == "tasks")
-            {
-                <div class="card">
-                    <h3>Sincronización Manual</h3>
-                    <p class="text-muted">Fuerza a los Background Workers a escanear en busca de nuevos libros ahora mismo.</p>
-                    <hr />
-
-                    <div class="tasks-panel">
-                        @if (_scanStatus != null && _scanStatus.IsScanning)
+                        @if (ActiveTab == "general")
                         {
-                            var progress = _scanStatus.TotalFilesFound > 0 ? (int)((_scanStatus.FilesProcessed * 100.0) / _scanStatus.TotalFilesFound) : 0;
-                            <div class="alert alert-info mb-4" style="border-radius: 8px;">
-                                <h5>Escanéo en progreso...</h5>
-                                <p class="mb-1 text-truncate">Procesando: @_scanStatus.CurrentFile</p>
-                                <div class="progress" style="height: 20px; position: relative;">
-                                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: @progress%" aria-valuenow="@progress" aria-valuemin="0" aria-valuemax="100">
+                            <div class="card bg-dark text-light border-secondary shadow-sm mb-4" style="border-radius: 12px;">
+                                <div class="card-body p-4">
+                                    <h4 class="card-title text-primary"><i class="bi bi-folder-fill me-2"></i> Carpetas del Servidor</h4>
+                                    <p class="text-white-50 small mb-4">Define dónde buscará QuimeraReader los libros y cómo los importará.</p>
+
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold">Directorio de Origen (Descargas/Media)</label>
+                                        <input type="text" class="form-control bg-secondary text-light border-0" @bind="_libraryRootPath" placeholder="/media" />
+                                        <div class="form-text text-white-50">Ruta donde caen los EPUBs o MP3 sueltos (Volumen montado en Docker).</div>
                                     </div>
-                                    <div class="text-center w-100 position-absolute fw-bold" style="line-height: 20px; color: var(--text-inverse); z-index: 10;">
-                                        @_scanStatus.FilesProcessed / @_scanStatus.TotalFilesFound (@progress%)
+
+                                    <div class="mb-2">
+                                        <label class="form-label fw-bold">Modo de Importación</label>
+                                        <select class="form-select bg-secondary text-light border-0" @bind="_ingestionMode">
+                                            <option value="Move">Mover y Organizar (Ahorra Espacio)</option>
+                                            <option value="LeaveInPlace">Dejar en lugar original (Para Torrents - Crea Enlaces/Symlinks)</option>
+                                        </select>
+                                        <div class="form-text text-white-50">Si seleccionas mover, el archivo se pasará a /library y se ordenará por autor. Si seleccionas Dejar, se crearán Symlinks.</div>
                                     </div>
-                                </div>
-                                <div class="mt-2 text-end">
-                                    <button class="btn btn-sm btn-outline-danger" @onclick="CancelScanAsync">Cancelar Escaneo</button>
                                 </div>
                             </div>
                         }
 
-                        <div class="task-info">
-                            <strong>Escáner de Directorio</strong>
-                            <span class="task-status @((_isScanning || (_scanStatus != null && _scanStatus.IsScanning)) ? "running" : "idle")">
-                                @((_isScanning || (_scanStatus != null && _scanStatus.IsScanning)) ? "Escaneando..." : "Inactivo")
-                            </span>
-                        </div>
-                        <button class="btn-primary" @onclick="TriggerScanAsync" disabled="@(_isScanning || (_scanStatus != null && _scanStatus.IsScanning))">
-                            Escanear /media
-                        </button>
-                    </div>
-                    
-                    <div class="tasks-panel mt-3">
-                        <div class="task-info">
-                            <strong>Reparación de Metadatos</strong>
-                            <span class="task-status idle">Libros con datos faltantes</span>
-                        </div>
-                        <button class="btn-primary" @onclick="RescanMetadataAsync">
-                            Completar Metadatos
-                        </button>
-                    </div>
+                        @if (ActiveTab == "apikeys")
+                        {
+                            <div class="card bg-dark text-light border-secondary shadow-sm mb-4" style="border-radius: 12px;">
+                                <div class="card-body p-4">
+                                    <h4 class="card-title text-primary"><i class="bi bi-robot me-2"></i> Inteligencia Artificial y Transcripción (Whisper)</h4>
+                                    <p class="text-white-50 small mb-4">Configura cómo deseas ejecutar los modelos de Inteligencia Artificial para sincronizar texto y audio.</p>
 
-                    <div class="tasks-panel mt-3">
-                        <div class="task-info">
-                            <strong>Limpieza de Duplicados</strong>
-                            <span class="task-status idle">Fusionar autores y categorías repetidas</span>
-                        </div>
-                        <button class="btn-primary" @onclick="MergeDuplicatesAsync">
-                            Fusionar Duplicados
-                        </button>
-                    </div>
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold">Modo de Ejecución de Whisper</label>
+                                        <select class="form-select bg-secondary text-light border-0 mb-3" @bind="_whisperMode">
+                                            <option value="LocalServer">Plug & Play: Ejecutar Whisper localmente en este Servidor</option>
+                                            <option value="ExternalApi">API Externa: Conectar a OpenAI o red local (Ollama / LLMStudio)</option>
+                                        </select>
 
-                    <div class="tasks-panel mt-3">
-                        <div class="task-info">
-                            <strong>Alineación de Audio a Texto (Whisper)</strong>
-                            <span class="task-status idle">En pausa (0 en cola)</span>
+                                        @if (_whisperMode == "LocalServer")
+                                        {
+                                            <div class="p-3 bg-secondary rounded mt-2">
+                                                <h6 class="fw-bold"><i class="bi bi-hdd-network-fill me-2"></i> Configuración Local (Whisper.net)</h6>
+                                                <p class="text-white-50 small">Se descargarán los pesos del modelo directamente al contenedor. Depende del CPU/GPU del servidor.</p>
+                                                
+                                                <label class="form-label small">Ruta del Modelo Base (.bin)</label>
+                                                <div class="input-group">
+                                                    <input type="text" class="form-control bg-dark text-light border-0" @bind="_whisperModelPath" placeholder="ggml-base.bin" />
+                                                    <button class="btn btn-outline-primary" @onclick="DownloadWhisperModelAsync" disabled="@_isDownloadingWhisper">
+                                                        @if (_isDownloadingWhisper) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                                                        @(_isDownloadingWhisper ? "Descargando..." : "Descargar Ahora")
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="p-3 bg-secondary rounded mt-2">
+                                                <h6 class="fw-bold"><i class="bi bi-cloud-arrow-up-fill me-2"></i> Configuración API Externa</h6>
+                                                <p class="text-white-50 small">Conecta QuimeraReader a OpenAI o a un modelo alojado en otro servidor (ej. Ollama).</p>
+                                                
+                                                <div class="mb-3">
+                                                    <label class="form-label small">Endpoint URL (OpenAI API / Local Network)</label>
+                                                    <input type="text" class="form-control bg-dark text-light border-0" @bind="_openAiEndpoint" placeholder="https://api.openai.com/v1/" />
+                                                </div>
+                                                
+                                                <div>
+                                                    <label class="form-label small">API Key</label>
+                                                    <input type="password" class="form-control bg-dark text-light border-0" @bind="_openAiKey" placeholder="sk-..." />
+                                                    <div class="form-text text-white-50">Si usas un modelo en red local sin autenticación, déjalo vacío.</div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card bg-dark text-light border-secondary shadow-sm mb-4" style="border-radius: 12px;">
+                                <div class="card-body p-4">
+                                    <h4 class="card-title text-primary"><i class="bi bi-tags-fill me-2"></i> Metadatos y Portadas</h4>
+                                    <p class="text-white-50 small mb-4">Mejora la calidad de la biblioteca conectando con bases de datos externas.</p>
+                                    
+                                    <div>
+                                        <label class="form-label fw-bold">Google Books API Key (Opcional)</label>
+                                        <input type="password" class="form-control bg-secondary text-light border-0" @bind="_googleBooksKey" placeholder="AIza..." />
+                                        <div class="form-text text-white-50">Mejora la descarga de portadas en alta resolución. QuimeraReader usará Google Books (sin key) o OpenLibrary por defecto.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        @if (ActiveTab == "tasks")
+                        {
+                            <div class="card bg-dark text-light border-secondary shadow-sm mb-4" style="border-radius: 12px;">
+                                <div class="card-body p-4">
+                                    <h4 class="card-title text-primary"><i class="bi bi-arrow-repeat me-2"></i> Sincronización Manual</h4>
+                                    <p class="text-white-50 small mb-4">Fuerza a los Background Workers a ejecutar tareas de mantenimiento ahora mismo.</p>
+
+                                    @if (_scanStatus != null && _scanStatus.IsScanning)
+                                    {
+                                        var progress = _scanStatus.TotalFilesFound > 0 ? (int)((_scanStatus.FilesProcessed * 100.0) / _scanStatus.TotalFilesFound) : 0;
+                                        <div class="alert alert-primary mb-4" style="border-radius: 8px; border: 1px solid var(--bs-primary);">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <h5 class="mb-0 fw-bold"><i class="bi bi-search me-2"></i> Escaneo en progreso...</h5>
+                                                <button class="btn btn-sm btn-outline-danger rounded-pill" @onclick="CancelScanAsync">Cancelar</button>
+                                            </div>
+                                            <p class="mb-3 text-truncate small">Procesando: <strong>@_scanStatus.CurrentFile</strong></p>
+                                            <div class="progress bg-secondary" style="height: 24px; position: relative; border-radius: 12px; overflow: hidden;">
+                                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: @progress%" aria-valuenow="@progress" aria-valuemin="0" aria-valuemax="100"></div>
+                                                <div class="text-center w-100 position-absolute fw-bold" style="line-height: 24px; color: white; z-index: 10; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
+                                                    @_scanStatus.FilesProcessed / @_scanStatus.TotalFilesFound (@progress%)
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+
+                                    <div class="list-group bg-transparent">
+                                        <div class="list-group-item bg-transparent border-secondary text-light d-flex justify-content-between align-items-center py-3 px-0">
+                                            <div>
+                                                <h6 class="mb-1 fw-bold">Escanear Directorio Base</h6>
+                                                <p class="mb-0 text-white-50 small">Busca nuevos archivos EPUB y MP3 en el volumen montado.</p>
+                                            </div>
+                                            <button class="btn btn-primary rounded-pill px-4" @onclick="TriggerScanAsync" disabled="@(_scanStatus?.IsScanning == true || _isScanning)">
+                                                <i class="bi bi-play-fill me-1"></i> Iniciar
+                                            </button>
+                                        </div>
+
+                                        <div class="list-group-item bg-transparent border-secondary text-light d-flex justify-content-between align-items-center py-3 px-0">
+                                            <div>
+                                                <h6 class="mb-1 fw-bold">Reparación de Metadatos</h6>
+                                                <p class="mb-0 text-white-50 small">Busca portadas y sinopsis faltantes en Google Books y OpenLibrary.</p>
+                                            </div>
+                                            <button class="btn btn-outline-light rounded-pill px-4" @onclick="RescanMetadataAsync">
+                                                <i class="bi bi-cloud-download me-1"></i> Completar
+                                            </button>
+                                        </div>
+
+                                        <div class="list-group-item bg-transparent border-secondary text-light d-flex justify-content-between align-items-center py-3 px-0">
+                                            <div>
+                                                <h6 class="mb-1 fw-bold">Limpieza de Duplicados</h6>
+                                                <p class="mb-0 text-white-50 small">Fusiona autores y categorías que se hayan guardado múltiples veces.</p>
+                                            </div>
+                                            <button class="btn btn-outline-light rounded-pill px-4" @onclick="MergeDuplicatesAsync">
+                                                <i class="bi bi-magic me-1"></i> Fusionar
+                                            </button>
+                                        </div>
+                                        
+                                        <div class="list-group-item bg-transparent border-secondary text-light d-flex justify-content-between align-items-center py-3 px-0">
+                                            <div>
+                                                <h6 class="mb-1 fw-bold text-muted">Alineación de Audio a Texto</h6>
+                                                <p class="mb-0 text-muted small">Genera la sincronización JIT (Just-In-Time) usando Whisper.</p>
+                                            </div>
+                                            <button class="btn btn-secondary rounded-pill px-4" disabled>
+                                                Próximamente
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <div class="d-flex justify-content-end mt-2">
+                            <button class="btn btn-success btn-lg rounded-pill px-5 shadow-sm fw-bold" @onclick="SaveSettingsAsync" disabled="@_isSaving">
+                                @if (_isSaving) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                                @(_isSaving ? "Guardando..." : "Guardar Todos los Cambios")
+                            </button>
                         </div>
-                        <button class="btn-secondary" disabled>
-                            Sincronizar Cola
-                        </button>
-                    </div>
+                    }
                 </div>
-            }
-
-            <div class="bottom-actions">
-                <button class="btn btn-success mt-4 w-100" @onclick="SaveSettingsAsync" disabled="@_isSaving">
-                    @(_isSaving ? "Guardando..." : "Guardar Todos los Cambios")
-                </button>
             </div>
-        }
+        </div>
     </div>
 </div>
-
-
 
 @implements IDisposable
 

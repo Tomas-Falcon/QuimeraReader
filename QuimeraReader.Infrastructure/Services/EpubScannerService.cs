@@ -189,9 +189,27 @@ public class EpubScannerService
         string bookSubDir = Path.Combine(targetDir, $"{volumeStr}{safeTitle}");
         Directory.CreateDirectory(bookSubDir);
 
-        // Mover EPUB evitando el error Cross-device link (File.Move entre particiones)
+        // Mover o crear Symlink basado en IngestionMode
         string newEpubPath = Path.Combine(bookSubDir, $"{safeTitle}.epub");
-        File.Copy(sourceFilePath, newEpubPath, overwrite: true);
+        settingsDict.TryGetValue("IngestionMode", out var ingestionMode);
+        
+        if (ingestionMode == "LeaveInPlace")
+        {
+            try
+            {
+                if (File.Exists(newEpubPath)) File.Delete(newEpubPath);
+                File.CreateSymbolicLink(newEpubPath, sourceFilePath);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creando Symlink, cayendo de nuevo a Copy: {ex.Message}");
+                File.Copy(sourceFilePath, newEpubPath, overwrite: true);
+            }
+        }
+        else
+        {
+            File.Copy(sourceFilePath, newEpubPath, overwrite: true);
+        }
         book.EpubFilePath = newEpubPath;
 
         // Mover Audio (si existe)
@@ -206,8 +224,25 @@ public class EpubScannerService
             if (File.Exists(possibleAudioPath))
             {
                 string newAudioPath = Path.Combine(bookSubDir, $"{safeTitle}{ext}");
-                File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
-                try { File.Delete(possibleAudioPath); } catch { }
+                if (ingestionMode == "LeaveInPlace")
+                {
+                    try
+                    {
+                        if (File.Exists(newAudioPath)) File.Delete(newAudioPath);
+                        File.CreateSymbolicLink(newAudioPath, possibleAudioPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error creando Symlink Audio: {ex.Message}");
+                        File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
+                    }
+                }
+                else
+                {
+                    File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
+                    try { File.Delete(possibleAudioPath); } catch { }
+                }
+                
                 book.AudioFilePath = newAudioPath;
                 hasAudio = true;
                 break;

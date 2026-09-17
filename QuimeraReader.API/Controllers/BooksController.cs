@@ -33,8 +33,14 @@ public class BooksController : ControllerBase
     public async Task<IActionResult> GetCategories()
     {
         var categories = await _dbContext.Categories
+            .Select(c => new {
+                c.Id,
+                c.Name,
+                c.IsUserGenerated,
+                BookCount = c.Books.Count,
+                SampleCoverUrl = c.Books.Select(b => b.Book.CoverImagePath).FirstOrDefault(cover => cover != null)
+            })
             .OrderBy(c => c.Name)
-            .Select(c => new { c.Id, c.Name, c.IsUserGenerated })
             .ToListAsync();
         return Ok(categories);
     }
@@ -42,13 +48,18 @@ public class BooksController : ControllerBase
     [HttpGet("authors")]
     public async Task<IActionResult> GetAuthors()
     {
-        // Avoid loading the huge Books navigation property
         var authors = await _dbContext.Authors
+            .Select(a => new {
+                a.Id,
+                a.Name,
+                a.ProfileImageUrl,
+                BookCount = a.Books.Count,
+                SampleCoverUrl = a.Books.Select(b => b.Book.CoverImagePath).FirstOrDefault(c => c != null)
+            })
             .OrderBy(a => a.Name)
-            .Select(a => new { a.Id, a.Name, a.ProfileImageUrl })
             .ToListAsync();
             
-        // Eliminar duplicados en memoria si la BD todavÃ­a tiene problemas
+        // Eliminar duplicados en memoria si la BD todavía tiene problemas
         var uniqueAuthors = authors
             .GroupBy(a => a.Name)
             .Select(g => g.First())

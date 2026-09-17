@@ -33,6 +33,16 @@ else
         {
             <div class="top-row px-4" style="justify-content: flex-end; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border-color); background-color: var(--bg-card);">
                 
+                @if (_scanStatus != null && _scanStatus.IsScanning)
+                {
+                    <div class="d-flex align-items-center gap-2 me-auto ms-2 text-primary fw-bold pulse-animation">
+                        <div class="spinner-grow spinner-grow-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <span style="font-size: 0.9rem;">Analizando biblioteca... @(_scanStatus.TotalFilesFound > 0 ? $"{(_scanStatus.FilesProcessed * 100) / _scanStatus.TotalFilesFound}%" : "")</span>
+                    </div>
+                }
+
                 <button class="btn btn-outline-secondary metadata-btn" @onclick="FetchMissingMetadata" disabled="@_isFetchingMetadata" style="border-radius: 20px; display: flex; align-items: center; gap: 6px;">
                     @if (_isFetchingMetadata)
                     {
@@ -71,10 +81,39 @@ else
     private string _serverInput = "http://";
     private bool _isFetchingMetadata = false;
     private bool IsReadingMode => NavManager.Uri.Contains("/read/", StringComparison.OrdinalIgnoreCase);
+    private QuimeraReader.Shared.Models.ScanStatus? _scanStatus;
+    private System.Threading.CancellationTokenSource _cts = new();
 
     protected override void OnInitialized()
     {
         NavManager.LocationChanged += (s, e) => StateHasChanged();
+        if (!ServerConfig.NeedsConfiguration)
+        {
+            _ = PollScanStatusAsync();
+        }
+    }
+    
+    private async Task PollScanStatusAsync()
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+            while (await timer.WaitForNextTickAsync(_cts.Token))
+            {
+                if (!IsReadingMode)
+                {
+                    _scanStatus = await ApiClient.GetScanStatusAsync();
+                    StateHasChanged();
+                }
+            }
+        }
+        catch { }
+    }
+    
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
     }
 
     private async Task FetchMissingMetadata()
@@ -85,6 +124,7 @@ else
         try
         {
             await ApiClient.RescanMetadataAsync();
+            // Mostrar notificación global? Wait, ToastService is not injected in MainLayout yet. 
         }
         catch (Exception ex)
         {
