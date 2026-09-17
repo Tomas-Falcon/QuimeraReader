@@ -30,6 +30,9 @@ public class Book
     // Metadata Tracking
     public bool IsMetadataComplete { get; set; } = false;
     
+    // Sincronización
+    public bool IsReadInHardcover { get; set; }
+
     // Relations
     public ICollection<BookAuthor> Authors { get; set; } = new List<BookAuthor>();
     public ICollection<BookCategory> Categories { get; set; } = new List<BookCategory>();

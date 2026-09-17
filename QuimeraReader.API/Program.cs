@@ -34,6 +34,7 @@ builder.Services.AddSingleton<AudioAlignmentQueue>();
 builder.Services.AddScoped<EpubScannerService>();
 builder.Services.AddScoped<AudioAlignmentService>();
 builder.Services.AddScoped<MediaPackagerService>();
+builder.Services.AddScoped<QuimeraReader.Infrastructure.Services.HardcoverSyncService>();
 
 // Registrar el Background Service
 builder.Services.AddHostedService<LibraryScanBackgroundService>();

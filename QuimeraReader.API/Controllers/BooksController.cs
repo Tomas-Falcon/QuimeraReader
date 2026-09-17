@@ -309,6 +309,17 @@ public class BooksController : ControllerBase
                     Console.WriteLine("Error en la limpieza de huérfanos post-escaneo: " + ex.Message);
                 }
 
+                try
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    var syncService = scope.ServiceProvider.GetRequiredService<QuimeraReader.Infrastructure.Services.HardcoverSyncService>();
+                    await syncService.PullReadBooksAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error en la sincronización con Hardcover: " + ex.Message);
+                }
+
                 scanState.IsScanning = false;
                 scanState.CurrentFile = string.Empty;
                 scanState.TotalFilesFound = 0;
