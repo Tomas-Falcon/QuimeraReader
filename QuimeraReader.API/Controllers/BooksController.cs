@@ -529,6 +529,46 @@ public class BooksController : ControllerBase
 
         return Content(book.SyncMap.SyncMapJson, "application/json");
     }
+
+    [HttpDelete("{id}/epub")]
+    public async Task<IActionResult> DeleteEpub(int id)
+    {
+        var book = await _dbContext.Books.FindAsync(id);
+        if (book == null) return NotFound();
+
+        if (!string.IsNullOrEmpty(book.EpubFilePath) && System.IO.File.Exists(book.EpubFilePath))
+        {
+            try { System.IO.File.Delete(book.EpubFilePath); } catch { }
+        }
+        book.EpubFilePath = null;
+        
+        if (string.IsNullOrEmpty(book.AudioFilePath))
+        {
+            _dbContext.Books.Remove(book);
+        }
+        await _dbContext.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpDelete("{id}/audio")]
+    public async Task<IActionResult> DeleteAudio(int id)
+    {
+        var book = await _dbContext.Books.FindAsync(id);
+        if (book == null) return NotFound();
+
+        if (!string.IsNullOrEmpty(book.AudioFilePath) && System.IO.File.Exists(book.AudioFilePath))
+        {
+            try { System.IO.File.Delete(book.AudioFilePath); } catch { }
+        }
+        book.AudioFilePath = null;
+        
+        if (string.IsNullOrEmpty(book.EpubFilePath))
+        {
+            _dbContext.Books.Remove(book);
+        }
+        await _dbContext.SaveChangesAsync();
+        return Ok();
+    }
 }
 
 public class ScanRequest 

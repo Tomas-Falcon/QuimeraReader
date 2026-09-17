@@ -34,6 +34,8 @@ public interface IQuimeraApiClient
     Task RescanMetadataAsync();
     Task RescanSingleBookMetadataAsync(int bookId);
     Task MergeDuplicatesAsync();
+    Task DeleteEpubAsync(int bookId);
+    Task DeleteAudioAsync(int bookId);
 }
 
 public class QuimeraApiClient : IQuimeraApiClient
@@ -48,6 +50,18 @@ public class QuimeraApiClient : IQuimeraApiClient
     public async Task MergeDuplicatesAsync()
     {
         var response = await _httpClient.PostAsync("api/Books/maintenance/merge-duplicates", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteEpubAsync(int bookId)
+    {
+        var response = await _httpClient.DeleteAsync($"api/Books/{bookId}/epub");
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteAudioAsync(int bookId)
+    {
+        var response = await _httpClient.DeleteAsync($"api/Books/{bookId}/audio");
         response.EnsureSuccessStatusCode();
     }
 
