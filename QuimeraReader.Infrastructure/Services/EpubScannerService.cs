@@ -65,12 +65,42 @@ public class EpubScannerService
         string? extractedIsbn = null;
         if (epubBook.Schema?.Package?.Metadata?.Identifiers != null)
         {
-            var isbnIdentifier = epubBook.Schema.Package.Metadata.Identifiers
-                .FirstOrDefault(id => id.Scheme != null && id.Scheme.Equals("ISBN", StringComparison.OrdinalIgnoreCase));
-            
-            if (isbnIdentifier != null)
+            foreach (var id in epubBook.Schema.Package.Metadata.Identifiers)
             {
-                extractedIsbn = isbnIdentifier.Identifier;
+                var val = id.Identifier ?? "";
+                
+                // Si el esquema dice explícitamente ISBN
+                if (id.Scheme != null && id.Scheme.Equals("ISBN", StringComparison.OrdinalIgnoreCase))
+                {
+                    extractedIsbn = val;
+                    break;
+                }
+                
+                // Si el ID contiene "isbn" en alguna parte
+                if (id.Id != null && id.Id.Contains("isbn", StringComparison.OrdinalIgnoreCase))
+                {
+                    extractedIsbn = val;
+                    break;
+                }
+
+                // Intentar deducir si es un ISBN13 o ISBN10 por formato numérico
+                var numericOnly = new string(val.Where(c => char.IsDigit(c) || c == 'X' || c == 'x').ToArray());
+                if (numericOnly.Length == 13 && numericOnly.StartsWith("978") || numericOnly.StartsWith("979"))
+                {
+                    extractedIsbn = numericOnly;
+                    break;
+                }
+                if (numericOnly.Length == 10 && (id.Identifier.Contains("urn:isbn:") || val.StartsWith("ISBN", StringComparison.OrdinalIgnoreCase)))
+                {
+                    extractedIsbn = numericOnly;
+                    break;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(extractedIsbn))
+            {
+                // Limpiar prefijos comunes como urn:isbn:
+                extractedIsbn = extractedIsbn.Replace("urn:isbn:", "", StringComparison.OrdinalIgnoreCase).Trim();
                 book.Isbn = extractedIsbn;
             }
         }
