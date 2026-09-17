@@ -6,6 +6,7 @@ using QuimeraReader.Domain.Entities;
 using System.Threading.Tasks;
 using System.Linq;
 using System.IO;
+using Microsoft.Extensions.Logging;
 
 namespace QuimeraReader.API.Controllers;
 
@@ -16,17 +17,24 @@ public class BooksController : ControllerBase
     private readonly AppDbContext _dbContext;
     private readonly EpubScannerService _scannerService;
     private readonly AudioAlignmentService _alignmentService;
-
     private readonly AudioAlignmentQueue _queue;
     private readonly LibraryScanState _scanState;
+    private readonly ILogger<BooksController> _logger;
 
-    public BooksController(AppDbContext dbContext, EpubScannerService scannerService, AudioAlignmentService alignmentService, AudioAlignmentQueue queue, LibraryScanState scanState)
+    public BooksController(
+        AppDbContext dbContext, 
+        EpubScannerService scannerService, 
+        AudioAlignmentService alignmentService, 
+        AudioAlignmentQueue queue, 
+        LibraryScanState scanState,
+        ILogger<BooksController> logger)
     {
         _dbContext = dbContext;
         _scannerService = scannerService;
         _alignmentService = alignmentService;
         _queue = queue;
         _scanState = scanState;
+        _logger = logger;
     }
 
     [HttpGet("categories")]
@@ -346,6 +354,7 @@ public class BooksController : ControllerBase
     [HttpPost("maintenance/merge-duplicates")]
     public async Task<IActionResult> MergeDuplicates()
     {
+        _logger.LogInformation("Iniciando fusión de duplicados de Autores y Categorías...");
         try
         {
             // Agrupar y borrar autores duplicados
@@ -363,6 +372,7 @@ public class BooksController : ControllerBase
                 
                 foreach (var dup in duplicates)
                 {
+                    _logger.LogInformation("Fusionando autor duplicado '{Name}' (ID: {DupId}) hacia (ID: {MinId})", dup.Name, dup.Id, minId);
                     var bookAuthors = await _dbContext.Set<QuimeraReader.Domain.Entities.BookAuthor>().Where(ba => ba.AuthorId == dup.Id).ToListAsync();
                     foreach (var ba in bookAuthors)
                     {
@@ -370,7 +380,6 @@ public class BooksController : ControllerBase
                         if (alreadyExists) {
                             _dbContext.Remove(ba);
                         } else {
-                            // EF Core might complain if we change part of the PK. The safest way is to remove and re-add.
                             _dbContext.Remove(ba);
                             _dbContext.Set<QuimeraReader.Domain.Entities.BookAuthor>().Add(new QuimeraReader.Domain.Entities.BookAuthor { BookId = ba.BookId, AuthorId = minId, Role = ba.Role });
                         }
@@ -395,6 +404,7 @@ public class BooksController : ControllerBase
                 
                 foreach (var dup in duplicates)
                 {
+                    _logger.LogInformation("Fusionando categoría duplicada '{Name}' (ID: {DupId}) hacia (ID: {MinId})", dup.Name, dup.Id, minId);
                     var bookCategories = await _dbContext.Set<QuimeraReader.Domain.Entities.BookCategory>().Where(bc => bc.CategoryId == dup.Id).ToListAsync();
                     foreach (var bc in bookCategories)
                     {
@@ -412,10 +422,12 @@ public class BooksController : ControllerBase
             }
 
             await _dbContext.SaveChangesAsync();
+            _logger.LogInformation("Mantenimiento completado. {Authors} autores, {Categories} categorías.", authorsMerged, categoriesMerged);
             return Ok(new { Message = $"Mantenimiento completado. Se fusionaron {authorsMerged} autores y {categoriesMerged} categorías duplicadas." });
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Error crítico durante MergeDuplicates");
             return StatusCode(500, new { Message = "Error interno durante la fusión", Details = ex.Message, Inner = ex.InnerException?.Message });
         }
     }
