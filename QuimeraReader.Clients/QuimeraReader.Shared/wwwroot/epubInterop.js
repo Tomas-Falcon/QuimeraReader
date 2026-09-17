@@ -20,6 +20,7 @@ export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi) {
     });
 
     rendition.on("relocated", function (location) {
+        if (!location || !location.start || !location.start.cfi) return;
         var percentage = book.locations ? book.locations.percentageFromCfi(location.start.cfi) : 0;
         dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage);
     });

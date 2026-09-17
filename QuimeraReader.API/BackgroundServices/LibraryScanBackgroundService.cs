@@ -61,7 +61,16 @@ public class LibraryScanBackgroundService : BackgroundService
             return;
         }
 
-        var allFiles = Directory.GetFiles(setting.Value, "*.epub", SearchOption.AllDirectories);
+        var rawFiles = Directory.GetFiles(setting.Value, "*.epub", SearchOption.AllDirectories);
+        
+        // Excluir archivos que ya han sido procesados (para el modo LeaveInPlace)
+        var processedSources = await dbContext.Books
+            .Where(b => b.SourceFilePath != null)
+            .Select(b => b.SourceFilePath)
+            .ToListAsync(stoppingToken);
+
+        var allFiles = rawFiles.Where(f => !processedSources.Contains(f)).ToArray();
+
         if (allFiles.Length == 0)
         {
             _scanState.IsScanning = false;

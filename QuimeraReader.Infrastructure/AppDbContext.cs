@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Domain.Entities;
+using QuimeraReader.Application.Interfaces;
 
 namespace QuimeraReader.Infrastructure;
 
-public class AppDbContext : DbContext
+public class AppDbContext : DbContext, IAppDbContext
 {
     public DbSet<Book> Books { get; set; } = null!;
     public DbSet<Author> Authors { get; set; } = null!;

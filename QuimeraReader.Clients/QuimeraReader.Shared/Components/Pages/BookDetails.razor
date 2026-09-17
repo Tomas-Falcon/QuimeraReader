@@ -27,7 +27,7 @@ else
 {
     <div class="book-details-hero">
         <!-- Background Blur effect similar to Spotify/Reader -->
-        <div class="hero-bg" style="background-image: url('@_book.CoverUrl');"></div>
+        <div class="hero-bg" style="background-image: url('@(ApiClient.BaseAddress + _book.CoverUrl)');"></div>
         <div class="hero-overlay"></div>
 
         <div class="container position-relative" style="z-index: 10; padding-top: 2rem; padding-bottom: 3rem;">
@@ -40,7 +40,7 @@ else
             <div class="d-flex flex-column flex-md-row gap-5 align-items-center align-items-md-start">
                 <!-- Cover -->
                 <div class="cover-section" style="flex: 0 0 auto; width: 100%; max-width: 300px;">
-                    <img src="@_book.CoverUrl" alt="Portada" class="img-fluid rounded shadow-lg" style="width: 100%;" onerror="this.outerHTML='<div class=\'placeholder-cover shadow-lg rounded d-flex align-items-center justify-content-center\' style=\'width:100%;aspect-ratio:2/3;background:#2a2a2a;color:#888;\'><span>Sin Portada</span></div>'" />
+                    <img src="@(ApiClient.BaseAddress + @_book.CoverUrl)" alt="Portada" class="img-fluid rounded shadow-lg" style="width: 100%;" onerror="this.outerHTML='<div class=\'placeholder-cover shadow-lg rounded d-flex align-items-center justify-content-center\' style=\'width:100%;aspect-ratio:2/3;background:#2a2a2a;color:#888;\'><span>Sin Portada</span></div>'" />
                 </div>
                 
                 <!-- Metadata -->
@@ -261,7 +261,16 @@ else
         {
             await ApiClient.DeleteEpubAsync(Id);
             ToastService.ShowSuccess("Archivo EPUB eliminado.");
-            await LoadBookAsync();
+            
+            try 
+            {
+                await LoadBookAsync();
+            }
+            catch
+            {
+                // El libro ha sido borrado completamente de la base de datos
+                _book = null;
+            }
             
             if (_book == null || (!_book.HasEpub && !_book.HasAudio))
             {
@@ -283,7 +292,16 @@ else
         {
             await ApiClient.DeleteAudioAsync(Id);
             ToastService.ShowSuccess("Audiolibro eliminado.");
-            await LoadBookAsync();
+            
+            try 
+            {
+                await LoadBookAsync();
+            }
+            catch
+            {
+                // El libro ha sido borrado completamente de la base de datos
+                _book = null;
+            }
             
             if (_book == null || (!_book.HasEpub && !_book.HasAudio))
             {
@@ -301,3 +319,5 @@ else
         NavManager.NavigateTo("/");
     }
 }
+
+

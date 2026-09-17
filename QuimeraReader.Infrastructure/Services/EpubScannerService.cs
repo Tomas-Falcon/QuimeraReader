@@ -80,86 +80,94 @@ public class EpubScannerService
         bool hasSynopsis = !string.IsNullOrWhiteSpace(book.Description);
         bool hasCover = epubBook.CoverImage != null;
 
-        if (!hasTitle || !hasAuthor || !hasCover)
-        {
-            var fallbackName = originalFileName ?? Path.GetFileNameWithoutExtension(sourceFilePath);
-            var query = hasTitle ? book.Title : Path.GetFileNameWithoutExtension(fallbackName);
-            var orderedProviders = _providers.OrderByDescending(p => p.ProviderName == preferredProviderName);
+        var fallbackName = originalFileName ?? Path.GetFileNameWithoutExtension(sourceFilePath);
+        var query = hasTitle ? book.Title : Path.GetFileNameWithoutExtension(fallbackName);
+        var orderedProviders = _providers.OrderByDescending(p => p.ProviderName == preferredProviderName);
 
-            BookMetadata? metadata = null;
-            foreach (var provider in orderedProviders)
+        BookMetadata? metadata = null;
+        foreach (var provider in orderedProviders)
+        {
+            metadata = await provider.GetMetadataAsync(query, isbn: extractedIsbn, settings: settingsDict);
+            if (metadata != null) break;
+        }
+
+        byte[]? apiCoverBytes = null;
+
+        if (metadata != null)
+        {
+            if (string.IsNullOrWhiteSpace(book.Title) && !string.IsNullOrWhiteSpace(metadata.Title))
+                book.Title = metadata.Title;
+
+            if (string.IsNullOrWhiteSpace(book.Description) && !string.IsNullOrWhiteSpace(metadata.Synopsis))
+                book.Description = metadata.Synopsis;
+
+            if (!book.AverageRating.HasValue && metadata.AverageRating.HasValue)
+                book.AverageRating = metadata.AverageRating.Value;
+
+            if (!book.Authors.Any() && metadata.Authors != null && metadata.Authors.Any())
             {
-                metadata = await provider.GetMetadataAsync(query, isbn: extractedIsbn, settings: settingsDict);
-                if (metadata != null) break;
+                foreach (var auth in metadata.Authors)
+                {
+                    var existingAuthor = await _dbContext.Authors.FirstOrDefaultAsync(a => a.Name == auth);
+                    if (existingAuthor == null)
+                    {
+                        existingAuthor = new Author { Name = auth, FileAs = auth };
+                        _dbContext.Authors.Add(existingAuthor);
+                    }
+                    book.Authors.Add(new BookAuthor { Author = existingAuthor });
+                }
             }
 
-            if (metadata != null)
+            if (metadata.Categories != null && metadata.Categories.Any())
             {
-                if (string.IsNullOrWhiteSpace(book.Title) && !string.IsNullOrWhiteSpace(metadata.Title))
-                    book.Title = metadata.Title;
-
-                if (string.IsNullOrWhiteSpace(book.Description) && !string.IsNullOrWhiteSpace(metadata.Synopsis))
-                    book.Description = metadata.Synopsis;
-
-                if (!book.AverageRating.HasValue && metadata.AverageRating.HasValue)
-                    book.AverageRating = metadata.AverageRating.Value;
-
-                if (!book.Authors.Any() && metadata.Authors != null && metadata.Authors.Any())
+                foreach (var catName in metadata.Categories)
                 {
-                    foreach (var auth in metadata.Authors)
-                    {
-                        var existingAuthor = await _dbContext.Authors.FirstOrDefaultAsync(a => a.Name == auth);
-                        if (existingAuthor == null)
-                        {
-                            existingAuthor = new Author { Name = auth, FileAs = auth };
-                            _dbContext.Authors.Add(existingAuthor);
-                        }
-                        book.Authors.Add(new BookAuthor { Author = existingAuthor });
-                    }
-                }
-
-                if (metadata.Categories != null && metadata.Categories.Any())
-                {
-                    foreach (var catName in metadata.Categories)
-                    {
-                        var category = _dbContext.ChangeTracker.Entries<Category>()
-                            .Select(e => e.Entity)
-                            .FirstOrDefault(c => c.Name == catName) 
-                            ?? await _dbContext.Set<Category>().FirstOrDefaultAsync(c => c.Name == catName);
-                        
-                        if (category == null)
-                        {
-                            category = new Category { Name = catName, IsUserGenerated = false };
-                            _dbContext.Add(category);
-                        }
-                        book.Categories.Add(new BookCategory { Category = category });
-                    }
-                }
-
-                if (!string.IsNullOrWhiteSpace(metadata.SeriesName))
-                {
-                    var seriesName = metadata.SeriesName;
-                    double? seriesVolume = null;
-                    
-                    var match = System.Text.RegularExpressions.Regex.Match(seriesName, @"(?:Vol\.|Book|#)\s*([\d\.]+)");
-                    if (match.Success && double.TryParse(match.Groups[1].Value, out double parsedVol))
-                    {
-                        seriesVolume = parsedVol;
-                    }
-                    
-                    var series = _dbContext.ChangeTracker.Entries<Series>()
+                    var category = _dbContext.ChangeTracker.Entries<Category>()
                         .Select(e => e.Entity)
-                        .FirstOrDefault(s => s.Name == seriesName)
-                        ?? await _dbContext.Set<Series>().FirstOrDefaultAsync(s => s.Name == seriesName);
-                        
-                    if (series == null)
+                        .FirstOrDefault(c => c.Name == catName) 
+                        ?? await _dbContext.Set<Category>().FirstOrDefaultAsync(c => c.Name == catName);
+                    
+                    if (category == null)
                     {
-                        series = new Series { Name = seriesName };
-                        _dbContext.Add(series);
+                        category = new Category { Name = catName, IsUserGenerated = false };
+                        _dbContext.Add(category);
                     }
-                    book.Series = series;
-                    book.SeriesVolume = seriesVolume;
+                    book.Categories.Add(new BookCategory { Category = category });
                 }
+            }
+
+            if (!string.IsNullOrWhiteSpace(metadata.SeriesName))
+            {
+                var seriesName = metadata.SeriesName;
+                double? seriesVolume = null;
+                
+                var match = System.Text.RegularExpressions.Regex.Match(seriesName, @"(?:Vol\.|Book|#)\s*([\d\.]+)");
+                if (match.Success && double.TryParse(match.Groups[1].Value, out double parsedVol))
+                {
+                    seriesVolume = parsedVol;
+                }
+                
+                var series = _dbContext.ChangeTracker.Entries<Series>()
+                    .Select(e => e.Entity)
+                    .FirstOrDefault(s => s.Name == seriesName)
+                    ?? await _dbContext.Set<Series>().FirstOrDefaultAsync(s => s.Name == seriesName);
+                    
+                if (series == null)
+                {
+                    series = new Series { Name = seriesName };
+                    _dbContext.Add(series);
+                }
+                book.Series = series;
+                book.SeriesVolume = seriesVolume;
+            }
+
+            if (!string.IsNullOrWhiteSpace(metadata.CoverImageUri))
+            {
+                try
+                {
+                    apiCoverBytes = await _httpClient.GetByteArrayAsync(metadata.CoverImageUri);
+                }
+                catch { /* Ignorar si falla la descarga */ }
             }
         }
 
@@ -193,6 +201,8 @@ public class EpubScannerService
         string newEpubPath = Path.Combine(bookSubDir, $"{safeTitle}.epub");
         settingsDict.TryGetValue("IngestionMode", out var ingestionMode);
         
+        book.SourceFilePath = sourceFilePath;
+
         if (string.Equals(Path.GetFullPath(sourceFilePath), Path.GetFullPath(newEpubPath), StringComparison.OrdinalIgnoreCase))
         {
             book.EpubFilePath = newEpubPath;
@@ -214,6 +224,7 @@ public class EpubScannerService
         else
         {
             File.Copy(sourceFilePath, newEpubPath, overwrite: true);
+            try { File.Delete(sourceFilePath); } catch { }
             book.EpubFilePath = newEpubPath;
         }
 
@@ -279,11 +290,12 @@ public class EpubScannerService
             book.ProcessingStatus = "NONE"; // No hay audio
         }
 
-        // Guardar Carátula
-        if (epubBook.CoverImage != null)
+        // Guardar Carátula (priorizando la de la API si se obtuvo)
+        byte[]? finalCoverBytes = apiCoverBytes ?? epubBook.CoverImage;
+        if (finalCoverBytes != null)
         {
             string coverPath = Path.Combine(bookSubDir, "cover.jpg");
-            await File.WriteAllBytesAsync(coverPath, epubBook.CoverImage);
+            await File.WriteAllBytesAsync(coverPath, finalCoverBytes);
             book.CoverImagePath = coverPath;
         }
         
@@ -379,7 +391,7 @@ public class EpubScannerService
                 book.SeriesVolume = seriesVolume;
             }
 
-            if (string.IsNullOrEmpty(book.CoverImagePath) && !string.IsNullOrWhiteSpace(metadata.CoverImageUri))
+            if (!string.IsNullOrWhiteSpace(metadata.CoverImageUri))
             {
                 try
                 {

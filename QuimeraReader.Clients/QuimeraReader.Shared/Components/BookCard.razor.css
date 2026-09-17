@@ -1,0 +1,1 @@
+.book-card { position: relative; } .selection-checkbox { position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 4px; } .selection-checkbox input { transform: scale(1.5); cursor: pointer; } .book-card.selected { border: 2px solid var(--bs-primary); background-color: rgba(var(--bs-primary-rgb), 0.1); }

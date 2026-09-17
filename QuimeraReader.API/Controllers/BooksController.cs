@@ -47,7 +47,7 @@ public class BooksController : ControllerBase
                 c.IsUserGenerated,
                 BookCount = c.Books.Count,
                 SampleCoverUrl = c.Books.Where(b => b.Book.CoverImagePath != null)
-                                        .Select(b => "/api/media/books/" + b.Book.Id + "/cover")
+                                        .Select(b => "api/media/books/" + b.Book.Id + "/cover")
                                         .FirstOrDefault()
             })
             .OrderBy(c => c.Name)
@@ -67,7 +67,7 @@ public class BooksController : ControllerBase
                     ProfileImageUrl = (string?)null,
                     BookCount = a.Books.Count,
                     SampleCoverUrl = a.Books.Where(b => b.Book.CoverImagePath != null)
-                                            .Select(b => "/api/media/books/" + b.Book.Id + "/cover")
+                                            .Select(b => "api/media/books/" + b.Book.Id + "/cover")
                                             .FirstOrDefault()
                 })
                 .OrderBy(a => a.Name)
@@ -93,65 +93,14 @@ public class BooksController : ControllerBase
     {
         try 
         {
-            if (page < 1) page = 1;
-            if (pageSize < 1) pageSize = 50;
-            if (pageSize > 100) pageSize = 100;
-
-            var query = _dbContext.Books.AsQueryable();
-
-            // Ocultar libros "fantasma" que no tienen archivo asociado (ni EPUB ni Audio)
-            query = query.Where(b => !string.IsNullOrEmpty(b.EpubFilePath) || !string.IsNullOrEmpty(b.AudioFilePath));
-
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                var searchLower = search.ToLower();
-                query = query.Where(b => 
-                    b.Title.ToLower().Contains(searchLower) ||
-                    b.Authors.Any(ba => ba.Author.Name.ToLower().Contains(searchLower)) ||
-                    b.Categories.Any(bc => bc.Category.Name.ToLower().Contains(searchLower)) ||
-                    (b.Series != null && b.Series.Name.ToLower().Contains(searchLower))
-                );
-            }
-
-            var totalBooks = await query.CountAsync();
-
-            var books = await query
-                .Include(b => b.Authors).ThenInclude(ba => ba.Author)
-                .Include(b => b.Categories).ThenInclude(bc => bc.Category)
-                .Include(b => b.Series).ThenInclude(s => s.Universe)
-                .OrderByDescending(b => b.Id)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(b => new 
-                {
-                    Id = b.Id,
-                    Title = b.Title,
-                    Isbn = b.Isbn,
-                    Description = b.Description,
-                    AverageRating = b.AverageRating,
-                    ProcessingStatus = b.ProcessingStatus == "SYNCED" ? "ALIGNED" : b.ProcessingStatus,
-                    Authors = b.Authors.Where(a => a.Author != null).Select(a => a.Author!.Name).ToList(),
-                    Categories = b.Categories.Where(c => c.Category != null).Select(c => c.Category!.Name).ToList(),
-                    Series = b.Series != null ? b.Series.Name : null,
-                    Universe = b.Series != null && b.Series.Universe != null ? b.Series.Universe.Name : null,
-                    HasCover = !string.IsNullOrEmpty(b.CoverImagePath),
-                    HasEpub = !string.IsNullOrEmpty(b.EpubFilePath),
-                    HasAudio = !string.IsNullOrEmpty(b.AudioFilePath),
-                    IsAligned = b.ProcessingStatus == "SYNCED",
-                    LastReadAt = b.LastReadAt,
-                    CurrentEpubCfi = b.CurrentEpubCfi,
-                    CurrentAudioPosition = b.CurrentAudioPosition,
-                    PercentageCompleted = b.PercentageCompleted
-                })
-                .ToListAsync();
-
-            return Ok(new 
-            {
-                Total = totalBooks,
-                Page = page,
-                PageSize = pageSize,
-                Data = books
+            var mediator = HttpContext.RequestServices.GetRequiredService<MediatR.IMediator>();
+            var result = await mediator.Send(new QuimeraReader.Application.Books.Queries.GetBooks.GetBooksQuery 
+            { 
+                Page = page, 
+                PageSize = pageSize, 
+                Search = search 
             });
+            return Ok(result);
         }
         catch (Exception ex)
         {
@@ -334,13 +283,39 @@ public class BooksController : ControllerBase
             }
             finally
             {
+                // Limpieza de huérfanos generados durante la actualización de metadatos
+                try
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    var orphanedAuthors = await db.Authors.Include(a => a.Books).Where(a => !a.Books.Any()).ToListAsync();
+                    if (orphanedAuthors.Any()) db.Authors.RemoveRange(orphanedAuthors);
+
+                    var orphanedCategories = await db.Categories.Include(c => c.Books).Where(c => !c.Books.Any()).ToListAsync();
+                    if (orphanedCategories.Any()) db.Categories.RemoveRange(orphanedCategories);
+
+                    var orphanedSeries = await db.Series.Include(s => s.Books).Where(s => !s.Books.Any()).ToListAsync();
+                    if (orphanedSeries.Any()) db.Series.RemoveRange(orphanedSeries);
+
+                    await db.SaveChangesAsync();
+
+                    var orphanedUniverses = await db.Universes.Include(u => u.Series).Where(u => !u.Series.Any()).ToListAsync();
+                    if (orphanedUniverses.Any()) db.Universes.RemoveRange(orphanedUniverses);
+
+                    await db.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error en la limpieza de huérfanos post-escaneo: " + ex.Message);
+                }
+
                 scanState.IsScanning = false;
                 scanState.CurrentFile = string.Empty;
                 scanState.TotalFilesFound = 0;
                 scanState.FilesProcessed = 0;
             }
         });
-        return Ok(new { Message = "Búsqueda de metadatos iniciada." });
+        return Ok(new { Message = "Escaneo de metadatos iniciado en segundo plano." });
     }
 
     [HttpPost("{id}/scan/metadata")]
@@ -370,76 +345,11 @@ public class BooksController : ControllerBase
     [HttpPost("maintenance/merge-duplicates")]
     public async Task<IActionResult> MergeDuplicates()
     {
-        _logger.LogInformation("Iniciando fusión de duplicados de Autores y Categorías...");
         try
         {
-            // Agrupar y borrar autores duplicados
-            var duplicateAuthors = await _dbContext.Authors
-                .GroupBy(a => a.Name)
-                .Where(g => g.Count() > 1)
-                .ToListAsync();
-                
-            int authorsMerged = 0;
-            foreach (var group in duplicateAuthors)
-            {
-                var ordered = group.OrderBy(a => a.Id).ToList();
-                var minId = ordered.First().Id;
-                var duplicates = ordered.Skip(1).ToList();
-                
-                foreach (var dup in duplicates)
-                {
-                    _logger.LogInformation("Fusionando autor duplicado '{Name}' (ID: {DupId}) hacia (ID: {MinId})", dup.Name, dup.Id, minId);
-                    var bookAuthors = await _dbContext.Set<QuimeraReader.Domain.Entities.BookAuthor>().Where(ba => ba.AuthorId == dup.Id).ToListAsync();
-                    foreach (var ba in bookAuthors)
-                    {
-                        var alreadyExists = await _dbContext.Set<QuimeraReader.Domain.Entities.BookAuthor>().AnyAsync(x => x.BookId == ba.BookId && x.AuthorId == minId);
-                        if (alreadyExists) {
-                            _dbContext.Remove(ba);
-                        } else {
-                            _dbContext.Remove(ba);
-                            _dbContext.Set<QuimeraReader.Domain.Entities.BookAuthor>().Add(new QuimeraReader.Domain.Entities.BookAuthor { BookId = ba.BookId, AuthorId = minId, Role = ba.Role });
-                        }
-                    }
-                    _dbContext.Authors.Remove(dup);
-                    authorsMerged++;
-                }
-            }
-
-            // Agrupar y borrar categorías duplicadas
-            var duplicateCategories = await _dbContext.Categories
-                .GroupBy(c => c.Name)
-                .Where(g => g.Count() > 1)
-                .ToListAsync();
-                
-            int categoriesMerged = 0;
-            foreach (var group in duplicateCategories)
-            {
-                var ordered = group.OrderBy(c => c.Id).ToList();
-                var minId = ordered.First().Id;
-                var duplicates = ordered.Skip(1).ToList();
-                
-                foreach (var dup in duplicates)
-                {
-                    _logger.LogInformation("Fusionando categoría duplicada '{Name}' (ID: {DupId}) hacia (ID: {MinId})", dup.Name, dup.Id, minId);
-                    var bookCategories = await _dbContext.Set<QuimeraReader.Domain.Entities.BookCategory>().Where(bc => bc.CategoryId == dup.Id).ToListAsync();
-                    foreach (var bc in bookCategories)
-                    {
-                        var alreadyExists = await _dbContext.Set<QuimeraReader.Domain.Entities.BookCategory>().AnyAsync(x => x.BookId == bc.BookId && x.CategoryId == minId);
-                        if (alreadyExists) {
-                            _dbContext.Remove(bc);
-                        } else {
-                            _dbContext.Remove(bc);
-                            _dbContext.Set<QuimeraReader.Domain.Entities.BookCategory>().Add(new QuimeraReader.Domain.Entities.BookCategory { BookId = bc.BookId, CategoryId = minId });
-                        }
-                    }
-                    _dbContext.Categories.Remove(dup);
-                    categoriesMerged++;
-                }
-            }
-
-            await _dbContext.SaveChangesAsync();
-            _logger.LogInformation("Mantenimiento completado. {Authors} autores, {Categories} categorías.", authorsMerged, categoriesMerged);
-            return Ok(new { Message = $"Mantenimiento completado. Se fusionaron {authorsMerged} autores y {categoriesMerged} categorías duplicadas." });
+            var mediator = HttpContext.RequestServices.GetRequiredService<MediatR.IMediator>();
+            var result = await mediator.Send(new QuimeraReader.Application.Books.Commands.MergeDuplicates.MergeDuplicatesCommand());
+            return Ok(new { Message = result.Message });
         }
         catch (Exception ex)
         {
@@ -613,9 +523,12 @@ public class BooksController : ControllerBase
         
         if (string.IsNullOrEmpty(book.AudioFilePath))
         {
-            _dbContext.Books.Remove(book);
+            await DeleteBookEntityAndFoldersAsync(book);
         }
-        await _dbContext.SaveChangesAsync();
+        else 
+        {
+            await _dbContext.SaveChangesAsync();
+        }
         return Ok();
     }
 
@@ -633,10 +546,72 @@ public class BooksController : ControllerBase
         
         if (string.IsNullOrEmpty(book.EpubFilePath))
         {
-            _dbContext.Books.Remove(book);
+            await DeleteBookEntityAndFoldersAsync(book);
         }
-        await _dbContext.SaveChangesAsync();
+        else
+        {
+            await _dbContext.SaveChangesAsync();
+        }
         return Ok();
+    }
+
+    private async Task DeleteBookEntityAndFoldersAsync(Book book)
+    {
+        // Guardamos la ruta de la carpeta para borrarla luego
+        string? bookDir = null;
+        if (!string.IsNullOrEmpty(book.CoverImagePath)) bookDir = Path.GetDirectoryName(book.CoverImagePath);
+        else if (!string.IsNullOrEmpty(book.EpubFilePath)) bookDir = Path.GetDirectoryName(book.EpubFilePath);
+        else if (!string.IsNullOrEmpty(book.AudioFilePath)) bookDir = Path.GetDirectoryName(book.AudioFilePath);
+
+        _dbContext.Books.Remove(book);
+        await _dbContext.SaveChangesAsync();
+        await CleanupOrphansAsync();
+
+        if (!string.IsNullOrEmpty(bookDir) && Directory.Exists(bookDir))
+        {
+            try 
+            {
+                // Borrar carpeta del libro y todo su contenido (cover.jpg, metadata.opf, etc.)
+                Directory.Delete(bookDir, true);
+
+                // Comprobar si la carpeta padre (Autor o Saga) quedó vacía
+                var parentDir = Directory.GetParent(bookDir)?.FullName;
+                if (parentDir != null && Directory.Exists(parentDir) && !Directory.EnumerateFileSystemEntries(parentDir).Any())
+                {
+                    Directory.Delete(parentDir);
+
+                    // Comprobar si la carpeta abuelo (Autor si estábamos dentro de una Saga) quedó vacía
+                    var grandParentDir = Directory.GetParent(parentDir)?.FullName;
+                    if (grandParentDir != null && Directory.Exists(grandParentDir) && !Directory.EnumerateFileSystemEntries(grandParentDir).Any())
+                    {
+                        Directory.Delete(grandParentDir);
+                    }
+                }
+            } 
+            catch (Exception ex) 
+            { 
+                Console.WriteLine($"Error limpiando directorios del libro: {ex.Message}"); 
+            }
+        }
+    }
+
+    private async Task CleanupOrphansAsync()
+    {
+        var orphanedAuthors = await _dbContext.Authors.Where(a => !a.Books.Any()).ToListAsync();
+        if (orphanedAuthors.Any()) _dbContext.Authors.RemoveRange(orphanedAuthors);
+
+        var orphanedCategories = await _dbContext.Categories.Where(c => !c.Books.Any()).ToListAsync();
+        if (orphanedCategories.Any()) _dbContext.Categories.RemoveRange(orphanedCategories);
+
+        var orphanedSeries = await _dbContext.Series.Where(s => !s.Books.Any()).ToListAsync();
+        if (orphanedSeries.Any()) _dbContext.Series.RemoveRange(orphanedSeries);
+
+        await _dbContext.SaveChangesAsync();
+
+        var orphanedUniverses = await _dbContext.Universes.Where(u => !u.Series.Any()).ToListAsync();
+        if (orphanedUniverses.Any()) _dbContext.Universes.RemoveRange(orphanedUniverses);
+
+        await _dbContext.SaveChangesAsync();
     }
 }
 

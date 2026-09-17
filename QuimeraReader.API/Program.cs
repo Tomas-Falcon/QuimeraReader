@@ -16,6 +16,10 @@ var dbPath = Environment.GetEnvironmentVariable("QUIMERA_DB_PATH") ?? "quimerare
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"));
 
+// Enlazar la interfaz de Aplicación con la implementación de Infraestructura
+builder.Services.AddScoped<QuimeraReader.Application.Interfaces.IAppDbContext>(provider => 
+    provider.GetRequiredService<AppDbContext>());
+
 // Registrar HttpClient general
 builder.Services.AddHttpClient();
 
@@ -34,10 +38,23 @@ builder.Services.AddScoped<MediaPackagerService>();
 builder.Services.AddHostedService<LibraryScanBackgroundService>();
 builder.Services.AddHostedService<AudioAlignmentBackgroundService>();
 
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(QuimeraReader.Application.Interfaces.IAppDbContext).Assembly));
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 
 var app = builder.Build();
+
+app.UseCors("AllowAll");
 
 // Asegurar que la BD se migra correctamente en cada arranque
 using (var scope = app.Services.CreateScope())

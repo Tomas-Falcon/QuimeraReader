@@ -30,6 +30,7 @@ public interface IQuimeraApiClient
     Task MergeDuplicatesAsync();
     Task DeleteEpubAsync(int bookId);
     Task DeleteAudioAsync(int bookId);
+    string BaseAddress { get; }
 }
 
 public class QuimeraApiClient : IQuimeraApiClient
@@ -40,6 +41,8 @@ public class QuimeraApiClient : IQuimeraApiClient
     {
         _httpClient = httpClient;
     }
+    
+    public string BaseAddress => _httpClient.BaseAddress?.ToString() ?? "";
 
     public async Task MergeDuplicatesAsync()
     {

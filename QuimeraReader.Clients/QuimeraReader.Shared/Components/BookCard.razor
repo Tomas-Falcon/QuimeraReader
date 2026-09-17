@@ -1,12 +1,19 @@
 @using QuimeraReader.Shared.Models
 @inject NavigationManager NavManager
+@inject QuimeraReader.Shared.Services.IQuimeraApiClient ApiClient
 @namespace QuimeraReader.Shared.Components
 
-<div class="book-card" @onclick="GoToDetails">
+<div class="book-card @(IsSelected ? "selected" : "")" @onclick="HandleCardClick">
+    @if (SelectionMode)
+    {
+        <div class="selection-checkbox" @onclick:stopPropagation>
+            <input type="checkbox" class="form-check-input" checked="@IsSelected" @onchange="ToggleSelection" />
+        </div>
+    }
     <div class="cover-container">
         @if (!string.IsNullOrEmpty(Book?.CoverUrl))
         {
-            <img src="@Book.CoverUrl" alt="Portada de @Book.Title" class="cover-image" loading="lazy" onerror="this.outerHTML='<div class=\'placeholder-cover\'><span>Sin Portada</span></div>'" />
+            <img src="@(ApiClient.BaseAddress + @Book.CoverUrl)" alt="Portada de @Book.Title" class="cover-image" loading="lazy" onerror="this.outerHTML='<div class=\'placeholder-cover\'><span>Sin Portada</span></div>'" />
         }
         else
         {
@@ -44,6 +51,33 @@
     [Parameter]
     public Book? Book { get; set; }
 
+    [Parameter]
+    public bool SelectionMode { get; set; }
+
+    [Parameter]
+    public bool IsSelected { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> IsSelectedChanged { get; set; }
+
+    private void HandleCardClick()
+    {
+        if (SelectionMode)
+        {
+            ToggleSelection(new ChangeEventArgs { Value = !IsSelected });
+        }
+        else
+        {
+            GoToDetails();
+        }
+    }
+
+    private async Task ToggleSelection(ChangeEventArgs e)
+    {
+        IsSelected = (bool)(e.Value ?? false);
+        await IsSelectedChanged.InvokeAsync(IsSelected);
+    }
+
     private void GoToDetails()
     {
         if (Book != null)
@@ -52,3 +86,5 @@
         }
     }
 }
+
+

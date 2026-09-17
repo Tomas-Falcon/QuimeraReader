@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\QuimeraReader.Domain\QuimeraReader.Domain.csproj" />
+    <ProjectReference Include="..\QuimeraReader.Application\QuimeraReader.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

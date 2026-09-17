@@ -64,7 +64,7 @@
                 else
                 {
                     <div class="no-sync-map text-center pt-5" style="flex: 1;">
-                        <img src="@Book.CoverUrl" class="fallback-cover mb-4" style="max-width: 200px; border-radius: 8px;" />
+                        <img src="@(ApiClient.BaseAddress + @Book.CoverUrl)" class="fallback-cover mb-4" style="max-width: 200px; border-radius: 8px;" />
                         <h3>Modo Audiolibro Puro</h3>
                         <p class="text-muted">No se encontraron transcripciones o texto para este título.</p>
                     </div>
@@ -75,7 +75,7 @@
             @if (Book.HasAudio)
             {
                 <div class="player-controls" style="background: var(--bg-card); padding: 10px;">
-                    <audio @ref="_audioElement" src="@Book.AudioUrl" controls class="native-audio w-100" />
+                    <audio @ref="_audioElement" src="@(ApiClient.BaseAddress + @Book.AudioUrl)" controls class="native-audio w-100" />
                 </div>
             }
         </div>
@@ -133,14 +133,17 @@
         {
             _playerInitialized = true;
             
-            // Audio Player Initialization
-            _jsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/QuimeraReader.Shared/playerInterop.js");
-            _dotNetRef = DotNetObjectReference.Create(this);
-            await _jsModule.InvokeVoidAsync("initializePlayer", _audioElement, _dotNetRef);
-
-            if (Book.CurrentAudioPosition.HasValue && Book.CurrentAudioPosition.Value > 0)
+            if (Book.HasAudio)
             {
-                await _jsModule.InvokeVoidAsync("seekAudio", _audioElement, Book.CurrentAudioPosition.Value);
+                // Audio Player Initialization
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/QuimeraReader.Shared/playerInterop.js");
+                _dotNetRef = DotNetObjectReference.Create(this);
+                await _jsModule.InvokeVoidAsync("initializePlayer", _audioElement, _dotNetRef);
+
+                if (Book.CurrentAudioPosition.HasValue && Book.CurrentAudioPosition.Value > 0)
+                {
+                    await _jsModule.InvokeVoidAsync("seekAudio", _audioElement, Book.CurrentAudioPosition.Value);
+                }
             }
 
             // EPUB Reader Initialization
@@ -148,8 +151,8 @@
             {
                 _epubJsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/QuimeraReader.Shared/epubInterop.js");
                 // Construct the absolute URL to the EPUB file via API
-                var baseUrl = NavManager.BaseUri.TrimEnd('/');
-                var epubApiUrl = $"{baseUrl}{Book.EpubUrl}";
+                var baseUrl = ApiClient.BaseAddress.TrimEnd('/');
+                var epubApiUrl = $"{baseUrl}/{Book.EpubUrl}";
                 
                 await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubApiUrl, _dotNetRef, Book.CurrentEpubCfi);
             }
@@ -259,3 +262,5 @@
         public string Text { get; set; } = string.Empty;
     }
 }
+
+

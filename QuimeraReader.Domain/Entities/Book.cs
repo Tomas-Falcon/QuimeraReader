@@ -12,6 +12,7 @@ public class Book
 
     // Local File Paths
     public string EpubFilePath { get; set; } = string.Empty;
+    public string? SourceFilePath { get; set; } // Tracks original path for LeaveInPlace mode
     public string? AudioFilePath { get; set; }
     public string? CoverImagePath { get; set; }
     
