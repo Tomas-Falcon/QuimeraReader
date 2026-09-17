@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  quimerareader:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: quimerareader
+    ports:
+      - "5000:5000" # Exponemos el servidor unificado en el puerto 5000
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+      # Ruta de la base de datos dentro del contenedor
+      - QUIMERA_DB_PATH=/config/quimerareader.db
+    volumes:
+      # Carpeta donde dejas los libros sueltos (Si usas el modo "Mover", asegúrate de no poner :ro)
+      - ./media:/media
+      
+      # Carpeta donde QuimeraReader organiza tu biblioteca (EPUBs/Audios finales)
+      - ./library:/library
+      
+      # Carpeta donde guarda la Base de Datos SQLite, Ajustes y SyncMaps
+      - ./config:/config
+    restart: unless-stopped
