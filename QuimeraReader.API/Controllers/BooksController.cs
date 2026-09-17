@@ -346,52 +346,78 @@ public class BooksController : ControllerBase
     [HttpPost("maintenance/merge-duplicates")]
     public async Task<IActionResult> MergeDuplicates()
     {
-        // Agrupar y borrar autores duplicados
-        var duplicateAuthors = await _dbContext.Authors
-            .GroupBy(a => a.Name)
-            .Where(g => g.Count() > 1)
-            .ToListAsync();
-            
-        int authorsMerged = 0;
-        foreach (var group in duplicateAuthors)
+        try
         {
-            var ordered = group.OrderBy(a => a.Id).ToList();
-            var minId = ordered.First().Id;
-            var duplicates = ordered.Skip(1).ToList();
-            
-            foreach (var dup in duplicates)
+            // Agrupar y borrar autores duplicados
+            var duplicateAuthors = await _dbContext.Authors
+                .GroupBy(a => a.Name)
+                .Where(g => g.Count() > 1)
+                .ToListAsync();
+                
+            int authorsMerged = 0;
+            foreach (var group in duplicateAuthors)
             {
-                var bookAuthors = await _dbContext.Set<QuimeraReader.Domain.Entities.BookAuthor>().Where(ba => ba.AuthorId == dup.Id).ToListAsync();
-                foreach (var ba in bookAuthors) ba.AuthorId = minId;
-                _dbContext.Authors.Remove(dup);
-                authorsMerged++;
+                var ordered = group.OrderBy(a => a.Id).ToList();
+                var minId = ordered.First().Id;
+                var duplicates = ordered.Skip(1).ToList();
+                
+                foreach (var dup in duplicates)
+                {
+                    var bookAuthors = await _dbContext.Set<QuimeraReader.Domain.Entities.BookAuthor>().Where(ba => ba.AuthorId == dup.Id).ToListAsync();
+                    foreach (var ba in bookAuthors)
+                    {
+                        var alreadyExists = await _dbContext.Set<QuimeraReader.Domain.Entities.BookAuthor>().AnyAsync(x => x.BookId == ba.BookId && x.AuthorId == minId);
+                        if (alreadyExists) {
+                            _dbContext.Remove(ba);
+                        } else {
+                            // EF Core might complain if we change part of the PK. The safest way is to remove and re-add.
+                            _dbContext.Remove(ba);
+                            _dbContext.Set<QuimeraReader.Domain.Entities.BookAuthor>().Add(new QuimeraReader.Domain.Entities.BookAuthor { BookId = ba.BookId, AuthorId = minId, Role = ba.Role });
+                        }
+                    }
+                    _dbContext.Authors.Remove(dup);
+                    authorsMerged++;
+                }
             }
-        }
 
-        // Agrupar y borrar categorías duplicadas
-        var duplicateCategories = await _dbContext.Categories
-            .GroupBy(c => c.Name)
-            .Where(g => g.Count() > 1)
-            .ToListAsync();
-            
-        int categoriesMerged = 0;
-        foreach (var group in duplicateCategories)
+            // Agrupar y borrar categorías duplicadas
+            var duplicateCategories = await _dbContext.Categories
+                .GroupBy(c => c.Name)
+                .Where(g => g.Count() > 1)
+                .ToListAsync();
+                
+            int categoriesMerged = 0;
+            foreach (var group in duplicateCategories)
+            {
+                var ordered = group.OrderBy(c => c.Id).ToList();
+                var minId = ordered.First().Id;
+                var duplicates = ordered.Skip(1).ToList();
+                
+                foreach (var dup in duplicates)
+                {
+                    var bookCategories = await _dbContext.Set<QuimeraReader.Domain.Entities.BookCategory>().Where(bc => bc.CategoryId == dup.Id).ToListAsync();
+                    foreach (var bc in bookCategories)
+                    {
+                        var alreadyExists = await _dbContext.Set<QuimeraReader.Domain.Entities.BookCategory>().AnyAsync(x => x.BookId == bc.BookId && x.CategoryId == minId);
+                        if (alreadyExists) {
+                            _dbContext.Remove(bc);
+                        } else {
+                            _dbContext.Remove(bc);
+                            _dbContext.Set<QuimeraReader.Domain.Entities.BookCategory>().Add(new QuimeraReader.Domain.Entities.BookCategory { BookId = bc.BookId, CategoryId = minId });
+                        }
+                    }
+                    _dbContext.Categories.Remove(dup);
+                    categoriesMerged++;
+                }
+            }
+
+            await _dbContext.SaveChangesAsync();
+            return Ok(new { Message = $"Mantenimiento completado. Se fusionaron {authorsMerged} autores y {categoriesMerged} categorías duplicadas." });
+        }
+        catch (Exception ex)
         {
-            var ordered = group.OrderBy(c => c.Id).ToList();
-            var minId = ordered.First().Id;
-            var duplicates = ordered.Skip(1).ToList();
-            
-            foreach (var dup in duplicates)
-            {
-                var bookCategories = await _dbContext.Set<QuimeraReader.Domain.Entities.BookCategory>().Where(bc => bc.CategoryId == dup.Id).ToListAsync();
-                foreach (var bc in bookCategories) bc.CategoryId = minId;
-                _dbContext.Categories.Remove(dup);
-                categoriesMerged++;
-            }
+            return StatusCode(500, new { Message = "Error interno durante la fusión", Details = ex.Message, Inner = ex.InnerException?.Message });
         }
-
-        await _dbContext.SaveChangesAsync();
-        return Ok(new { Message = $"Mantenimiento completado. Se fusionaron {authorsMerged} autores y {categoriesMerged} categorías duplicadas." });
     }
 
     [HttpPost("{bookId}/categories")]

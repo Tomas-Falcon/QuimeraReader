@@ -1,5 +1,0 @@
-<Solution>
-  <Project Path="QuimeraReader.Mobile/QuimeraReader.Mobile.csproj" />
-  <Project Path="QuimeraReader.Shared/QuimeraReader.Shared.csproj" />
-  <Project Path="QuimeraReader.Web/QuimeraReader.Web.csproj" />
-</Solution>

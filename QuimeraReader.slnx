@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/Backend/">
+    <Project Path="QuimeraReader.API/QuimeraReader.API.csproj" />
+    <Project Path="QuimeraReader.Application/QuimeraReader.Application.csproj" />
+    <Project Path="QuimeraReader.Domain/QuimeraReader.Domain.csproj" />
+    <Project Path="QuimeraReader.Infrastructure/QuimeraReader.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/Clients/">
+    <Project Path="QuimeraReader.Clients/QuimeraReader.Mobile/QuimeraReader.Mobile.csproj" />
+    <Project Path="QuimeraReader.Clients/QuimeraReader.Shared/QuimeraReader.Shared.csproj" />
+    <Project Path="QuimeraReader.Clients/QuimeraReader.Web/QuimeraReader.Web.csproj" />
+  </Folder>
+</Solution>
