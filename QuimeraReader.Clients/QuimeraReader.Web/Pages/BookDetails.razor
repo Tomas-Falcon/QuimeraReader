@@ -3,6 +3,7 @@
 @using QuimeraReader.Shared.Services
 @inject IQuimeraApiClient ApiClient
 @inject NavigationManager NavManager
+@inject IToastService ToastService
 
 <PageTitle>Detalles del Libro</PageTitle>
 
@@ -206,10 +207,12 @@ else
             await ApiClient.RescanSingleBookMetadataAsync(Id);
             // Refresh book details to show the new metadata
             await LoadBookAsync();
+            ToastService.ShowSuccess("Metadatos actualizados correctamente");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error al buscar metadatos: {ex.Message}");
+            ToastService.ShowError($"Error al buscar metadatos: {ex.Message}");
         }
         finally
         {

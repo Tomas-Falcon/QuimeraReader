@@ -66,6 +66,9 @@ public class BooksController : ControllerBase
 
         var query = _dbContext.Books.AsQueryable();
 
+        // Ocultar libros "fantasma" que no tienen archivo asociado (ni EPUB ni Audio)
+        query = query.Where(b => !string.IsNullOrEmpty(b.EpubFilePath) || !string.IsNullOrEmpty(b.AudioFilePath));
+
         if (!string.IsNullOrWhiteSpace(search))
         {
             var searchLower = search.ToLower();
@@ -164,6 +167,7 @@ public class BooksController : ControllerBase
             .ToListAsync();
 
         var query = _dbContext.Books
+            .Where(b => !string.IsNullOrEmpty(b.EpubFilePath) || !string.IsNullOrEmpty(b.AudioFilePath))
             .Include(b => b.Authors).ThenInclude(ba => ba.Author)
             .Include(b => b.Categories).ThenInclude(bc => bc.Category)
             .AsQueryable();
@@ -249,38 +253,55 @@ public class BooksController : ControllerBase
     }
 
     [HttpPost("scan/metadata")]
-    public IActionResult RescanMetadata([FromServices] IServiceScopeFactory scopeFactory)
+    public IActionResult RescanMetadata([FromServices] IServiceScopeFactory scopeFactory, [FromServices] LibraryScanState scanState)
     {
-        // Ejecutar en segundo plano
+        if (scanState.IsScanning) return BadRequest("Ya hay un escaneo en progreso.");
+
         _ = Task.Run(async () =>
         {
-            using var scope = scopeFactory.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var scanner = scope.ServiceProvider.GetRequiredService<QuimeraReader.Infrastructure.Services.EpubScannerService>();
-
-            var ghostBooks = await dbContext.Books
-                .Include(b => b.Authors)
-                .ThenInclude(ba => ba.Author)
-                .Include(b => b.Categories)
-                .ThenInclude(bc => bc.Category)
-                .Where(b => !b.IsMetadataComplete || string.IsNullOrEmpty(b.CoverImagePath) || string.IsNullOrEmpty(b.Description))
-                .ToListAsync();
-
-            foreach (var book in ghostBooks)
+            scanState.IsScanning = true;
+            scanState.FilesProcessed = 0;
+            
+            try
             {
-                try
+                using var scope = scopeFactory.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var scanner = scope.ServiceProvider.GetRequiredService<QuimeraReader.Infrastructure.Services.EpubScannerService>();
+
+                var ghostBooks = await dbContext.Books
+                    .Include(b => b.Authors)
+                    .ThenInclude(ba => ba.Author)
+                    .Include(b => b.Categories)
+                    .ThenInclude(bc => bc.Category)
+                    .Where(b => !b.IsMetadataComplete || string.IsNullOrEmpty(b.CoverImagePath) || string.IsNullOrEmpty(b.Description))
+                    .ToListAsync();
+
+                scanState.TotalFilesFound = ghostBooks.Count;
+
+                foreach (var book in ghostBooks)
                 {
-                    await scanner.EnrichMetadataAsync(book, "GoogleBooks");
-                    await dbContext.SaveChangesAsync();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error enriqueciendo libro {book.Id}: {ex.Message}");
+                    scanState.CurrentFile = $"Obteniendo metadatos: {book.Title}";
+                    try
+                    {
+                        await scanner.EnrichMetadataAsync(book, "GoogleBooks");
+                        await dbContext.SaveChangesAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error enriqueciendo libro {book.Id}: {ex.Message}");
+                    }
+                    scanState.FilesProcessed++;
                 }
             }
+            finally
+            {
+                scanState.IsScanning = false;
+                scanState.CurrentFile = string.Empty;
+                scanState.TotalFilesFound = 0;
+                scanState.FilesProcessed = 0;
+            }
         });
-        
-        return Ok(new { Message = "Búsqueda de metadatos programada." });
+        return Ok(new { Message = "Búsqueda de metadatos iniciada." });
     }
 
     [HttpPost("{id}/scan/metadata")]
