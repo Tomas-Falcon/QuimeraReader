@@ -2,7 +2,7 @@
 @inject IJSRuntime JSRuntime
 @inject QuimeraReader.Shared.Services.IServerConfigService ServerConfig
 @inject NavigationManager NavManager
-@inject QuimeraReader.Shared.Services.QuimeraApiClient ApiClient
+@inject QuimeraReader.Shared.Services.IQuimeraApiClient ApiClient
 @namespace QuimeraReader.Shared.Components.Layout
 
 @if (ServerConfig.NeedsConfiguration)
