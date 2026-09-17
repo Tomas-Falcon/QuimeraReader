@@ -19,16 +19,20 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
         _httpClient = httpClient;
     }
 
-    public async Task<BookMetadata?> GetMetadataAsync(string query, string? isbn = null, Dictionary<string, string>? settings = null)
+    public async Task<BookMetadata?> GetMetadataAsync(string query, IEnumerable<string>? isbns = null, Dictionary<string, string>? settings = null)
     {
         string? apiKey = null;
         settings?.TryGetValue("GoogleBooksApiKey", out apiKey);
 
-        // Intento 1: Por ISBN si existe
-        if (!string.IsNullOrWhiteSpace(isbn))
+        // Intento 1: Por ISBNs si existen (iteramos sobre cada posible ISBN)
+        if (isbns != null && isbns.Any())
         {
-            var result = await FetchFromGoogleBooks($"isbn:{isbn}", apiKey);
-            if (result != null) return result;
+            foreach (var isbn in isbns)
+            {
+                if (string.IsNullOrWhiteSpace(isbn)) continue;
+                var result = await FetchFromGoogleBooks($"isbn:{isbn}", apiKey);
+                if (result != null) return result;
+            }
         }
 
         // Intento 2: Por Título (Fallback o si no había ISBN)

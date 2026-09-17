@@ -62,7 +62,7 @@ public class EpubScannerService
         var settingsDict = await _dbContext.SystemSettings
             .ToDictionaryAsync(s => s.Key, s => s.Value);
 
-        string? extractedIsbn = null;
+        List<string> extractedIsbns = new();
         if (epubBook.Schema?.Package?.Metadata?.Identifiers != null)
         {
             foreach (var id in epubBook.Schema.Package.Metadata.Identifiers)
@@ -72,36 +72,42 @@ public class EpubScannerService
                 // Si el esquema dice explícitamente ISBN
                 if (id.Scheme != null && id.Scheme.Equals("ISBN", StringComparison.OrdinalIgnoreCase))
                 {
-                    extractedIsbn = val;
-                    break;
+                    extractedIsbns.Add(val);
+                    continue;
                 }
                 
                 // Si el ID contiene "isbn" en alguna parte
                 if (id.Id != null && id.Id.Contains("isbn", StringComparison.OrdinalIgnoreCase))
                 {
-                    extractedIsbn = val;
-                    break;
+                    extractedIsbns.Add(val);
+                    continue;
                 }
 
                 // Intentar deducir si es un ISBN13 o ISBN10 por formato numérico
                 var numericOnly = new string(val.Where(c => char.IsDigit(c) || c == 'X' || c == 'x').ToArray());
-                if (numericOnly.Length == 13 && numericOnly.StartsWith("978") || numericOnly.StartsWith("979"))
+                if (numericOnly.Length == 13 && (numericOnly.StartsWith("978") || numericOnly.StartsWith("979")))
                 {
-                    extractedIsbn = numericOnly;
-                    break;
+                    extractedIsbns.Add(numericOnly);
+                    continue;
                 }
-                if (numericOnly.Length == 10 && (id.Identifier.Contains("urn:isbn:") || val.StartsWith("ISBN", StringComparison.OrdinalIgnoreCase)))
+                if (numericOnly.Length == 10 && (val.Contains("urn:isbn:") || val.StartsWith("ISBN", StringComparison.OrdinalIgnoreCase)))
                 {
-                    extractedIsbn = numericOnly;
-                    break;
+                    extractedIsbns.Add(numericOnly);
+                    continue;
                 }
             }
 
-            if (!string.IsNullOrEmpty(extractedIsbn))
+            // Limpiar prefijos y obtener valores únicos
+            var uniqueIsbns = extractedIsbns
+                .Select(i => i.Replace("urn:isbn:", "", StringComparison.OrdinalIgnoreCase).Trim())
+                .Where(i => !string.IsNullOrWhiteSpace(i))
+                .Distinct()
+                .ToList();
+            
+            if (uniqueIsbns.Any())
             {
-                // Limpiar prefijos comunes como urn:isbn:
-                extractedIsbn = extractedIsbn.Replace("urn:isbn:", "", StringComparison.OrdinalIgnoreCase).Trim();
-                book.Isbn = extractedIsbn;
+                book.Isbn = uniqueIsbns.First(); // Guardamos el primero en la DB para referencia visual
+                extractedIsbns = uniqueIsbns;
             }
         }
 
@@ -117,7 +123,7 @@ public class EpubScannerService
         BookMetadata? metadata = null;
         foreach (var provider in orderedProviders)
         {
-            metadata = await provider.GetMetadataAsync(query, isbn: extractedIsbn, settings: settingsDict);
+            metadata = await provider.GetMetadataAsync(query, isbns: extractedIsbns, settings: settingsDict);
             if (metadata != null) break;
         }
 
@@ -355,7 +361,8 @@ public class EpubScannerService
         BookMetadata? metadata = null;
         foreach (var provider in orderedProviders)
         {
-            metadata = await provider.GetMetadataAsync(query, isbn: book.Isbn, settings: settingsDict);
+            var isbnsList = !string.IsNullOrWhiteSpace(book.Isbn) ? new List<string> { book.Isbn } : null;
+            metadata = await provider.GetMetadataAsync(query, isbns: isbnsList, settings: settingsDict);
             if (metadata != null) break;
         }
 
