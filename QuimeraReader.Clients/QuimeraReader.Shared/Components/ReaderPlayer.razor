@@ -110,15 +110,18 @@
     {
         Book = await ApiClient.GetBookAsync(BookId);
         
-        var syncMapJson = await ApiClient.GetSyncMapAsync(BookId);
-        if (!string.IsNullOrEmpty(syncMapJson))
+        if (Book != null && Book.IsAligned)
         {
             try
             {
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                _segments = JsonSerializer.Deserialize<List<SyncSegment>>(syncMapJson, options) ?? new();
+                var syncMapJson = await ApiClient.GetSyncMapAsync(BookId);
+                if (!string.IsNullOrEmpty(syncMapJson))
+                {
+                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    _segments = JsonSerializer.Deserialize<List<SyncSegment>>(syncMapJson, options) ?? new();
+                }
             }
-            catch { /* Ignorar error de parseo por ahora */ }
+            catch { /* Ignorar error por ahora */ }
         }
 
         _isLoading = false;

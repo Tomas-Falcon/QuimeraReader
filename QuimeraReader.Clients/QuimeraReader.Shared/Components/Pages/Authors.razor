@@ -99,8 +99,7 @@
 
     private void SelectAuthor(string authorName)
     {
-        // Navega a la biblioteca aplicando el filtro del autor (asumiendo que BookList soporta el QueryParam o navegando al Home con query)
-        NavManager.NavigateTo($"/?q={Uri.EscapeDataString(authorName)}");
+        NavManager.NavigateTo($"/author/{Uri.EscapeDataString(authorName)}");
     }
 }
 

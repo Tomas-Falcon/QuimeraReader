@@ -99,8 +99,6 @@
 
     private void SelectCategory(string categoryName)
     {
-        NavManager.NavigateTo($"/?q={Uri.EscapeDataString(categoryName)}");
+        NavManager.NavigateTo($"/category/{Uri.EscapeDataString(categoryName)}");
     }
 }
-
-

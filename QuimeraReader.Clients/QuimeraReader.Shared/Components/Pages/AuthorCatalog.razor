@@ -1,0 +1,29 @@
+@page "/author/{AuthorName}"
+@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Components
+@inject QuimeraReader.Shared.Services.IQuimeraApiClient ApiClient
+@inject NavigationManager NavManager
+
+<PageTitle>@AuthorName - QuimeraReader</PageTitle>
+
+<div class="mb-4 d-flex align-items-center">
+    <button class="btn btn-outline-secondary me-3" @onclick="GoBack">
+        <i class="bi bi-arrow-left"></i> Volver a Autores
+    </button>
+    <h2 class="mb-0 text-primary"><i class="bi bi-person-badge-fill me-2"></i> @AuthorName</h2>
+</div>
+
+<hr class="border-secondary mb-4" />
+
+<BookList QueryParam="@AuthorName" />
+
+@code {
+    [Parameter]
+    public string AuthorName { get; set; } = "";
+
+    private void GoBack()
+    {
+        NavManager.NavigateTo("/authors");
+    }
+}
+

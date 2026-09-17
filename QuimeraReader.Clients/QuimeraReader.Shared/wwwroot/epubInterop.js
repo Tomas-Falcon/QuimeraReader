@@ -6,6 +6,20 @@ export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi) {
         spread: "none"
     });
 
+    rendition.themes.register("dark", {
+        "body": { "background": "transparent !important", "color": "#f8f9fa !important" },
+        "p": { "color": "#f8f9fa !important" },
+        "h1": { "color": "#f8f9fa !important" },
+        "h2": { "color": "#f8f9fa !important" },
+        "h3": { "color": "#f8f9fa !important" },
+        "h4": { "color": "#f8f9fa !important" },
+        "h5": { "color": "#f8f9fa !important" },
+        "h6": { "color": "#f8f9fa !important" },
+        "span": { "color": "#f8f9fa !important" },
+        "a": { "color": "#6ea8fe !important" }
+    });
+    rendition.themes.select("dark");
+
     rendition.display(lastCfi || undefined);
 
     book.ready.then(function () {
@@ -15,14 +29,18 @@ export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi) {
         // After generation, update current percentage
         if (rendition.location) {
             var percentage = book.locations.percentageFromCfi(rendition.location.start.cfi);
-            dotNetRef.invokeMethodAsync("OnEpubLocationChanged", rendition.location.start.cfi, percentage);
+            if (dotNetRef) {
+                dotNetRef.invokeMethodAsync("OnEpubLocationChanged", rendition.location.start.cfi, percentage).catch(e => console.warn(e));
+            }
         }
     });
 
     rendition.on("relocated", function (location) {
         if (!location || !location.start || !location.start.cfi) return;
         var percentage = book.locations ? book.locations.percentageFromCfi(location.start.cfi) : 0;
-        dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage);
+        if (dotNetRef) {
+            dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage).catch(e => console.warn(e));
+        }
     });
 
     // Soporte para gestos táctiles (Swipe) y Ratón (Drag)
