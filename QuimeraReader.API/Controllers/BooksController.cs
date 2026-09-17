@@ -38,7 +38,9 @@ public class BooksController : ControllerBase
                 c.Name,
                 c.IsUserGenerated,
                 BookCount = c.Books.Count,
-                SampleCoverUrl = c.Books.Select(b => b.Book.CoverImagePath).FirstOrDefault(cover => cover != null)
+                SampleCoverUrl = c.Books.Where(b => b.Book.CoverImagePath != null)
+                                        .Select(b => "/api/media/books/" + b.Book.Id + "/cover")
+                                        .FirstOrDefault()
             })
             .OrderBy(c => c.Name)
             .ToListAsync();
@@ -54,7 +56,9 @@ public class BooksController : ControllerBase
                 a.Name,
                 a.ProfileImageUrl,
                 BookCount = a.Books.Count,
-                SampleCoverUrl = a.Books.Select(b => b.Book.CoverImagePath).FirstOrDefault(c => c != null)
+                SampleCoverUrl = a.Books.Where(b => b.Book.CoverImagePath != null)
+                                        .Select(b => "/api/media/books/" + b.Book.Id + "/cover")
+                                        .FirstOrDefault()
             })
             .OrderBy(a => a.Name)
             .ToListAsync();

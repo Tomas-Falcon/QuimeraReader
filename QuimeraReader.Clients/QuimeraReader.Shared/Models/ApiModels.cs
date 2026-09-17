@@ -36,6 +36,7 @@ public record PaginatedResult<T>
     public int Page { get; init; }
     public int PageSize { get; init; }
     public T[] Data { get; init; } = [];
+    public T[] Items => Data;
 }
 
 public record SystemSetting
@@ -48,10 +49,17 @@ public record Category
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
+    public string? ImageUrl { get; init; }
+    public int BookCount { get; init; }
+    public string? SampleCoverUrl { get; init; }
 }
 
 public record Author
 {
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
+    public string? ProfileImageUrl { get; init; }
+    public int BookCount { get; init; }
+    public string? SampleCoverUrl { get; init; }
 }
+
