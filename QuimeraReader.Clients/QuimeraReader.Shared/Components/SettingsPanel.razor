@@ -131,6 +131,11 @@
                                         <input type="password" class="form-control bg-secondary text-light border-0" @bind="_googleBooksKey" placeholder="AIza..." />
                                         <div class="form-text text-white-50">Mejora la descarga de portadas en alta resolución. QuimeraReader usará Google Books (sin key) o OpenLibrary por defecto.</div>
                                     </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Hardcover API Key (GraphQL)</label>
+                                        <input type="password" class="form-control bg-secondary text-light border-0" @bind="_hardcoverKey" placeholder="Token de acceso personal..." />
+                                        <div class="form-text text-white-50">Token de acceso de Hardcover (hardcover.app). Permite hasta 5,000 peticiones diarias gratuitas para extraer metadatos.</div>
+                                    </div>
                                 </div>
                             </div>
                         }
@@ -236,6 +241,7 @@
     private string _ingestionMode = "Move";
     private string _openAiKey = string.Empty;
     private string _googleBooksKey = string.Empty;
+    private string _hardcoverKey = string.Empty;
     private string _whisperModelPath = "ggml-base.bin";
     private string _whisperMode = "LocalServer";
     private string _openAiEndpoint = "https://api.openai.com/v1/";
@@ -251,6 +257,7 @@
             if (settings.TryGetValue("IngestionMode", out var mode)) _ingestionMode = mode;
             if (settings.TryGetValue("OpenAIApiKey", out var openai)) _openAiKey = openai;
             if (settings.TryGetValue("GoogleBooksApiKey", out var gbooks)) _googleBooksKey = gbooks;
+            if (settings.TryGetValue("HardcoverApiKey", out var hardcover)) _hardcoverKey = hardcover;
             if (settings.TryGetValue("WhisperModelPath", out var whisper)) _whisperModelPath = whisper;
             if (settings.TryGetValue("WhisperMode", out var wMode)) _whisperMode = wMode;
             if (settings.TryGetValue("OpenAIEndpoint", out var wEndpoint)) _openAiEndpoint = wEndpoint;
@@ -303,6 +310,7 @@
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "IngestionMode", Value = _ingestionMode });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "OpenAIApiKey", Value = _openAiKey });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "GoogleBooksApiKey", Value = _googleBooksKey });
+            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "HardcoverApiKey", Value = _hardcoverKey });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "WhisperModelPath", Value = _whisperModelPath });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "WhisperMode", Value = _whisperMode });
             await ApiClient.SaveSettingAsync(new SystemSetting { Key = "OpenAIEndpoint", Value = _openAiEndpoint });
