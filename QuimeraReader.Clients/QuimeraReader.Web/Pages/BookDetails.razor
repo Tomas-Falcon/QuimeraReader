@@ -121,11 +121,11 @@ else
                         <button class="btn btn-lg btn-outline-light px-4 py-3 rounded-pill fw-bold shadow-sm" @onclick="FetchSingleMetadataAsync" disabled="@_isFetchingMetadata" style="transition: transform 0.2s;">
                             @if (_isFetchingMetadata)
                             {
-                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Buscando...
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> <span>Buscando...</span>
                             }
                             else
                             {
-                                <i class="bi bi-cloud-download me-2 fs-5"></i> Buscar metadatos
+                                <i class="bi bi-cloud-download me-2 fs-5"></i> <span>Buscar metadatos</span>
                             }
                         </button>
                     </div>
