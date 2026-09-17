@@ -355,7 +355,15 @@ public class BooksController : ControllerBase
             // Pasar el nombre original para que lo use de fallback si no hay título en el metadata interno
             var book = await scannerService.ScanEpubAsync(tempPath, "GoogleBooks", file.FileName);
             
-            _dbContext.Books.Add(book);
+            if (book.Id == 0)
+            {
+                _dbContext.Books.Add(book);
+            }
+            else
+            {
+                _dbContext.Books.Update(book);
+            }
+            
             await _dbContext.SaveChangesAsync();
 
             return Ok(book);

@@ -19,7 +19,17 @@
         <h3 class="book-title" title="@Book?.Title">@Book?.Title</h3>
         @if (Book != null && Book.Authors.Any())
         {
-            <p class="book-author text-muted" style="font-size: 0.9em; margin-bottom: 0;">@string.Join(", ", Book.Authors)</p>
+            <p class="book-author text-muted mb-1" style="font-size: 0.85em;">@string.Join(", ", Book.Authors)</p>
+        }
+        @if (Book != null && !string.IsNullOrEmpty(Book.Series))
+        {
+            <p class="book-series text-warning mb-1" style="font-size: 0.8em; font-weight: bold;">@Book.Series</p>
+        }
+        @if (Book != null && Book.AverageRating.HasValue && Book.AverageRating.Value > 0)
+        {
+            <div class="book-rating text-warning" style="font-size: 0.8em; margin-bottom: 4px;">
+                <i class="bi bi-star-fill"></i> @Book.AverageRating.Value.ToString("0.0")
+            </div>
         }
         @if (Book != null && Book.PercentageCompleted.HasValue && Book.PercentageCompleted.Value > 0)
         {

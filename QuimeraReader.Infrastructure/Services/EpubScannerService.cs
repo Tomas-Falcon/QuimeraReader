@@ -29,7 +29,21 @@ public class EpubScannerService
     public async Task<Book> ScanEpubAsync(string sourceFilePath, string preferredProviderName, string? originalFileName = null)
     {
         EpubBook epubBook = await EpubReader.ReadBookAsync(sourceFilePath);
-        var book = new Book { Title = epubBook.Title ?? "" };
+        string bookTitle = string.IsNullOrWhiteSpace(epubBook.Title) && !string.IsNullOrWhiteSpace(originalFileName) 
+            ? Path.GetFileNameWithoutExtension(originalFileName) 
+            : (epubBook.Title ?? "Sin Título");
+            
+        var book = await _dbContext.Books
+            .Include(b => b.Authors)
+            .Include(b => b.Categories)
+            .FirstOrDefaultAsync(b => b.Title == bookTitle) 
+            ?? new Book { Title = bookTitle };
+            
+        // Si el libro ya existe, limpiamos los autores para volver a procesarlos (o podríamos saltarlo)
+        if (book.Id > 0)
+        {
+            book.Authors.Clear();
+        }
 
         if (epubBook.AuthorList != null)
         {
