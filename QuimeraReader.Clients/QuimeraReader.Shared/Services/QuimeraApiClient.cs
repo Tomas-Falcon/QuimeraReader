@@ -17,7 +17,7 @@ public class ScanStatus
 
 public interface IQuimeraApiClient
 {
-    Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50);
+    Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null);
     Task<Book?> GetBookAsync(int id);
     Task<IEnumerable<Category>> GetCategoriesAsync();
     Task<IEnumerable<Author>> GetAuthorsAsync();
@@ -51,10 +51,14 @@ public class QuimeraApiClient : IQuimeraApiClient
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50)
+    public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null)
     {
-        // Esto reemplaza al listBooks de RTK Query y maneja la paginación que antes estaba en transformResponse
-        var response = await _httpClient.GetFromJsonAsync<PaginatedResult<Book>>($"api/Books?page={page}&pageSize={pageSize}");
+        var url = $"api/Books?page={page}&pageSize={pageSize}";
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            url += $"&search={Uri.EscapeDataString(search)}";
+        }
+        var response = await _httpClient.GetFromJsonAsync<PaginatedResult<Book>>(url);
         return response ?? new PaginatedResult<Book> { Page = page, PageSize = pageSize, Total = 0, Data = [] };
     }
 

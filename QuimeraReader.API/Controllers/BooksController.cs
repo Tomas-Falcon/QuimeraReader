@@ -30,25 +30,53 @@ public class BooksController : ControllerBase
     }
 
     [HttpGet("categories")]
-    public async Task<ActionResult<IEnumerable<Category>>> GetCategories()
+    public async Task<IActionResult> GetCategories()
     {
-        return await _dbContext.Categories.OrderBy(c => c.Name).ToListAsync();
+        var categories = await _dbContext.Categories
+            .OrderBy(c => c.Name)
+            .Select(c => new { c.Id, c.Name, c.IsUserGenerated })
+            .ToListAsync();
+        return Ok(categories);
     }
 
     [HttpGet("authors")]
-    public async Task<ActionResult<IEnumerable<Author>>> GetAuthors()
+    public async Task<IActionResult> GetAuthors()
     {
-        return await _dbContext.Authors.OrderBy(a => a.Name).ToListAsync();
+        // Avoid loading the huge Books navigation property
+        var authors = await _dbContext.Authors
+            .OrderBy(a => a.Name)
+            .Select(a => new { a.Id, a.Name, a.ProfileImageUrl })
+            .ToListAsync();
+            
+        // Eliminar duplicados en memoria si la BD todavÃ­a tiene problemas
+        var uniqueAuthors = authors
+            .GroupBy(a => a.Name)
+            .Select(g => g.First())
+            .ToList();
+            
+        return Ok(uniqueAuthors);
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50)
+    public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 50;
         if (pageSize > 100) pageSize = 100;
 
         var query = _dbContext.Books.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var searchLower = search.ToLower();
+            query = query.Where(b => 
+                b.Title.ToLower().Contains(searchLower) ||
+                b.Authors.Any(ba => ba.Author.Name.ToLower().Contains(searchLower)) ||
+                b.Categories.Any(bc => bc.Category.Name.ToLower().Contains(searchLower)) ||
+                (b.Series != null && b.Series.Name.ToLower().Contains(searchLower))
+            );
+        }
+
         var totalBooks = await query.CountAsync();
 
         var books = await query
