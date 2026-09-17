@@ -97,13 +97,12 @@ else
                         <p class="text-white-50 fst-italic mb-4">No hay sinopsis disponible para este libro.</p>
                     }
                     
-                    <div class="actions mt-4">
+                    <div class="actions mt-4 d-flex gap-3 flex-wrap">
                         @if (!_book.HasEpub && !_book.HasAudio)
                         {
                             <button class="btn btn-lg btn-secondary px-5 py-3 rounded-pill fw-bold" disabled>
                                 <i class="bi bi-slash-circle me-2"></i> Archivo no disponible
                             </button>
-                            <p class="text-white-50 mt-2 small">Este libro no tiene un archivo asociado para leer o escuchar.</p>
                         }
                         else
                         {
@@ -118,6 +117,17 @@ else
                                 }
                             </button>
                         }
+                        
+                        <button class="btn btn-lg btn-outline-light px-4 py-3 rounded-pill fw-bold shadow-sm" @onclick="FetchSingleMetadataAsync" disabled="@_isFetchingMetadata" style="transition: transform 0.2s;">
+                            @if (_isFetchingMetadata)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Buscando...
+                            }
+                            else
+                            {
+                                <i class="bi bi-cloud-download me-2 fs-5"></i> Buscar metadatos
+                            }
+                        </button>
                     </div>
                 </div>
             </div>
@@ -158,11 +168,41 @@ else
     
     private Book? _book;
     private bool _isLoading = true;
+    private bool _isFetchingMetadata = false;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadBookAsync();
+    }
+    
+    private async Task LoadBookAsync()
+    {
+        _isLoading = true;
         _book = await ApiClient.GetBookAsync(Id);
         _isLoading = false;
+        StateHasChanged();
+    }
+    
+    private async Task FetchSingleMetadataAsync()
+    {
+        _isFetchingMetadata = true;
+        StateHasChanged();
+        
+        try
+        {
+            await ApiClient.RescanSingleBookMetadataAsync(Id);
+            // Refresh book details to show the new metadata
+            await LoadBookAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al buscar metadatos: {ex.Message}");
+        }
+        finally
+        {
+            _isFetchingMetadata = false;
+            StateHasChanged();
+        }
     }
     
     private void GoToRead()

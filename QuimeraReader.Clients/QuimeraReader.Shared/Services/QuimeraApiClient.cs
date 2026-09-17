@@ -32,6 +32,7 @@ public interface IQuimeraApiClient
     Task UpdatePositionAsync(int bookId, string? epubCfi = null, double? audioPosition = null, double? percentage = null);
     Task<List<Book>> GetRecommendationsAsync();
     Task RescanMetadataAsync();
+    Task RescanSingleBookMetadataAsync(int bookId);
     Task MergeDuplicatesAsync();
 }
 
@@ -165,6 +166,12 @@ public class QuimeraApiClient : IQuimeraApiClient
     public async Task RescanMetadataAsync()
     {
         var response = await _httpClient.PostAsync("api/Books/scan/metadata", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task RescanSingleBookMetadataAsync(int bookId)
+    {
+        var response = await _httpClient.PostAsync($"api/Books/{bookId}/scan/metadata", null);
         response.EnsureSuccessStatusCode();
     }
 }

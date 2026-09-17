@@ -255,6 +255,30 @@ public class BooksController : ControllerBase
         return Ok(new { Message = "Búsqueda de metadatos programada." });
     }
 
+    [HttpPost("{id}/scan/metadata")]
+    public async Task<IActionResult> RescanSingleBookMetadata(int id)
+    {
+        var book = await _dbContext.Books
+            .Include(b => b.Authors)
+            .ThenInclude(ba => ba.Author)
+            .Include(b => b.Categories)
+            .ThenInclude(bc => bc.Category)
+            .FirstOrDefaultAsync(b => b.Id == id);
+            
+        if (book == null) return NotFound();
+
+        try
+        {
+            await _scannerService.EnrichMetadataAsync(book, "GoogleBooks");
+            await _dbContext.SaveChangesAsync();
+            return Ok(new { Message = "Metadatos actualizados." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Error interno: {ex.Message}");
+        }
+    }
+
     [HttpPost("maintenance/merge-duplicates")]
     public async Task<IActionResult> MergeDuplicates()
     {
