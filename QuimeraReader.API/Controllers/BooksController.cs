@@ -54,7 +54,7 @@ public class BooksController : ControllerBase
             .Select(a => new {
                 a.Id,
                 a.Name,
-                a.ProfileImageUrl,
+                ProfileImageUrl = (string?)null,
                 BookCount = a.Books.Count,
                 SampleCoverUrl = a.Books.Where(b => b.Book.CoverImagePath != null)
                                         .Select(b => "/api/media/books/" + b.Book.Id + "/cover")

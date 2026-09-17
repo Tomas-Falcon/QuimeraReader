@@ -12,5 +12,8 @@ public class Author
     public int BookCount { get; set; }
 
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string? ProfileImageUrl { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public string? SampleCoverUrl { get; set; }
 }

@@ -7,13 +7,7 @@ using System.Linq;
 
 namespace QuimeraReader.Shared.Services;
 
-public class ScanStatus
-{
-    public bool IsScanning { get; set; }
-    public int TotalFilesFound { get; set; }
-    public int FilesProcessed { get; set; }
-    public string CurrentFile { get; set; } = string.Empty;
-}
+
 
 public interface IQuimeraApiClient
 {

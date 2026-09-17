@@ -193,7 +193,11 @@ public class EpubScannerService
         string newEpubPath = Path.Combine(bookSubDir, $"{safeTitle}.epub");
         settingsDict.TryGetValue("IngestionMode", out var ingestionMode);
         
-        if (ingestionMode == "LeaveInPlace")
+        if (string.Equals(Path.GetFullPath(sourceFilePath), Path.GetFullPath(newEpubPath), StringComparison.OrdinalIgnoreCase))
+        {
+            book.EpubFilePath = newEpubPath;
+        }
+        else if (ingestionMode == "LeaveInPlace")
         {
             try
             {
@@ -205,12 +209,13 @@ public class EpubScannerService
                 Console.WriteLine($"Error creando Symlink, cayendo de nuevo a Copy: {ex.Message}");
                 File.Copy(sourceFilePath, newEpubPath, overwrite: true);
             }
+            book.EpubFilePath = newEpubPath;
         }
         else
         {
             File.Copy(sourceFilePath, newEpubPath, overwrite: true);
+            book.EpubFilePath = newEpubPath;
         }
-        book.EpubFilePath = newEpubPath;
 
         // Mover Audio (si existe)
         string sourceDir = Path.GetDirectoryName(sourceFilePath)!;
@@ -224,7 +229,11 @@ public class EpubScannerService
             if (File.Exists(possibleAudioPath))
             {
                 string newAudioPath = Path.Combine(bookSubDir, $"{safeTitle}{ext}");
-                if (ingestionMode == "LeaveInPlace")
+                if (string.Equals(Path.GetFullPath(possibleAudioPath), Path.GetFullPath(newAudioPath), StringComparison.OrdinalIgnoreCase))
+                {
+                    hasAudio = true;
+                }
+                else if (ingestionMode == "LeaveInPlace")
                 {
                     try
                     {
@@ -236,6 +245,7 @@ public class EpubScannerService
                         Console.WriteLine($"Error creando Symlink Audio: {ex.Message}");
                         File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
                     }
+                    hasAudio = true;
                 }
                 else
                 {

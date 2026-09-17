@@ -63,3 +63,10 @@ public record Author
     public string? SampleCoverUrl { get; init; }
 }
 
+public record ScanStatus
+{
+    public bool IsScanning { get; set; }
+    public int TotalFilesFound { get; set; }
+    public int FilesProcessed { get; set; }
+    public string CurrentFile { get; set; } = string.Empty;
+}

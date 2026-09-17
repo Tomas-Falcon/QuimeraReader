@@ -85,7 +85,11 @@ public class LibraryScanBackgroundService : BackgroundService
             try
             {
                 var book = await scannerService.ScanEpubAsync(file, "GoogleBooks");
-                dbContext.Books.Add(book);
+                if (book.Id == 0)
+                {
+                    dbContext.Books.Add(book);
+                }
+                await dbContext.SaveChangesAsync(stoppingToken);
                 _logger.LogInformation($"Libro importado y organizado: {book.Title}");
             }
             catch (Exception ex)
@@ -97,8 +101,6 @@ public class LibraryScanBackgroundService : BackgroundService
                 _scanState.FilesProcessed++;
             }
         }
-
-        await dbContext.SaveChangesAsync(stoppingToken);
         
         if (_scanState.FilesProcessed >= _scanState.TotalFilesFound)
         {

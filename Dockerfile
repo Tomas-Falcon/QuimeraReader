@@ -6,7 +6,7 @@ COPY ["QuimeraReader.Clients/QuimeraReader.Shared/QuimeraReader.Shared.csproj", 
 RUN dotnet restore "QuimeraReader.Clients/QuimeraReader.Web/QuimeraReader.Web.csproj"
 COPY QuimeraReader.Clients/ QuimeraReader.Clients/
 WORKDIR "/src/QuimeraReader.Clients/QuimeraReader.Web"
-RUN dotnet publish "QuimeraReader.Web.csproj" -c Release -o /app/web
+RUN dotnet publish "QuimeraReader.Web.csproj" -c Release -p:PublishTrimmed=false -o /app/web
 
 # Etapa 2: Construir el Backend API
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build-api
