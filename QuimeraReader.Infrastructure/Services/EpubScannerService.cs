@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using VersOne.Epub;
 using QuimeraReader.Domain.Entities;
 using QuimeraReader.Domain.Interfaces;
@@ -17,13 +18,15 @@ public class EpubScannerService
     private readonly HttpClient _httpClient;
     private readonly AppDbContext _dbContext;
     private readonly AudioAlignmentQueue _queue;
+    private readonly ILogger<EpubScannerService> _logger;
 
-    public EpubScannerService(IEnumerable<IMetadataProvider> providers, HttpClient httpClient, AppDbContext dbContext, AudioAlignmentQueue queue)
+    public EpubScannerService(IEnumerable<IMetadataProvider> providers, HttpClient httpClient, AppDbContext dbContext, AudioAlignmentQueue queue, ILogger<EpubScannerService> logger)
     {
         _providers = providers;
         _httpClient = httpClient;
         _dbContext = dbContext;
         _queue = queue;
+        _logger = logger;
     }
 
     public async Task<Book> ScanEpubAsync(string sourceFilePath, string preferredProviderName, string? originalFileName = null)
@@ -203,7 +206,7 @@ public class EpubScannerService
                 {
                     apiCoverBytes = await _httpClient.GetByteArrayAsync(metadata.CoverImageUri);
                 }
-                catch { /* Ignorar si falla la descarga */ }
+                catch (Exception ex) { _logger.LogWarning(ex, "Error descargando portada previa al enriquecimiento"); }
             }
         }
 
@@ -252,7 +255,7 @@ public class EpubScannerService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error creando Symlink, cayendo de nuevo a Copy: {ex.Message}");
+                _logger.LogWarning(ex, "Error creando Symlink, cayendo de nuevo a Copia para: {File}", sourceFilePath);
                 File.Copy(sourceFilePath, newEpubPath, overwrite: true);
             }
             book.EpubFilePath = newEpubPath;
@@ -260,7 +263,7 @@ public class EpubScannerService
         else
         {
             File.Copy(sourceFilePath, newEpubPath, overwrite: true);
-            try { File.Delete(sourceFilePath); } catch { }
+            try { File.Delete(sourceFilePath); } catch (Exception ex) { _logger.LogWarning(ex, "No se pudo borrar el archivo original: {File}", sourceFilePath); }
             book.EpubFilePath = newEpubPath;
         }
 
@@ -289,7 +292,7 @@ public class EpubScannerService
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error creando Symlink Audio: {ex.Message}");
+                        _logger.LogWarning(ex, "Error creando Symlink Audio, usando copia para: {File}", possibleAudioPath);
                         File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
                     }
                     hasAudio = true;
@@ -297,7 +300,7 @@ public class EpubScannerService
                 else
                 {
                     File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
-                    try { File.Delete(possibleAudioPath); } catch { }
+                    try { File.Delete(possibleAudioPath); } catch (Exception ex) { _logger.LogWarning(ex, "No se pudo borrar el audio original: {File}", possibleAudioPath); }
                 }
                 
                 book.AudioFilePath = newAudioPath;
@@ -449,7 +452,7 @@ public class EpubScannerService
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error descargando carátula de {metadata.CoverImageUri}: {ex.Message}");
+                    _logger.LogWarning(ex, "Error descargando carátula de {CoverUri}", metadata.CoverImageUri);
                 }
             }
         }

@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using QuimeraReader.Domain.Interfaces;
 
 namespace QuimeraReader.Infrastructure.Providers;
@@ -11,12 +12,14 @@ namespace QuimeraReader.Infrastructure.Providers;
 public class GoogleBooksMetadataProvider : IMetadataProvider
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger<GoogleBooksMetadataProvider> _logger;
 
     public string ProviderName => "GoogleBooks";
 
-    public GoogleBooksMetadataProvider(HttpClient httpClient)
+    public GoogleBooksMetadataProvider(HttpClient httpClient, ILogger<GoogleBooksMetadataProvider> logger)
     {
         _httpClient = httpClient;
+        _logger = logger;
     }
 
     public async Task<BookMetadata?> GetMetadataAsync(string query, IEnumerable<string>? isbns = null, Dictionary<string, string>? settings = null)
@@ -64,8 +67,9 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
                 AverageRating = firstItem.AverageRating
             };
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Google Books: error buscando '{Query}'", searchString);
             return null;
         }
     }

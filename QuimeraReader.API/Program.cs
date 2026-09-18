@@ -9,8 +9,18 @@ using QuimeraReader.Infrastructure.Providers;
 using QuimeraReader.Domain.Interfaces;
 
 using QuimeraReader.API.BackgroundServices;
+using QuimeraReader.API.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configurar logging: JSON para producción (Docker), texto simple para desarrollo
+if (builder.Environment.IsProduction())
+{
+    builder.Logging.AddJsonConsole(options =>
+    {
+        options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
+    });
+}
 
 var dbPath = Environment.GetEnvironmentVariable("QUIMERA_DB_PATH") ?? "quimerareader.db";
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -57,6 +67,10 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 app.UseCors("AllowAll");
+
+// Middleware de logging y manejo de errores
+app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseMiddleware<RequestLoggingMiddleware>();
 
 // Asegurar que la BD se migra correctamente en cada arranque
 using (var scope = app.Services.CreateScope())

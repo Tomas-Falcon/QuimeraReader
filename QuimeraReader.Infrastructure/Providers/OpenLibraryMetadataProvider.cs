@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using QuimeraReader.Domain.Interfaces;
 
 namespace QuimeraReader.Infrastructure.Providers;
@@ -11,17 +12,18 @@ namespace QuimeraReader.Infrastructure.Providers;
 public class OpenLibraryMetadataProvider : IMetadataProvider
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger<OpenLibraryMetadataProvider> _logger;
 
     public string ProviderName => "OpenLibrary";
 
-    public OpenLibraryMetadataProvider(HttpClient httpClient)
+    public OpenLibraryMetadataProvider(HttpClient httpClient, ILogger<OpenLibraryMetadataProvider> logger)
     {
         _httpClient = httpClient;
+        _logger = logger;
     }
 
     public async Task<BookMetadata?> GetMetadataAsync(string query, IEnumerable<string>? isbns = null, Dictionary<string, string>? settings = null)
     {
-        // Intento 1: Por ISBN si existen
         if (isbns != null && isbns.Any())
         {
             foreach (var isbn in isbns)
@@ -32,7 +34,6 @@ public class OpenLibraryMetadataProvider : IMetadataProvider
             }
         }
 
-        // Intento 2: Por título (Fallback o si no hay ISBN)
         return await FetchFromOpenLibrary($"title={Uri.EscapeDataString(query)}");
     }
 
@@ -61,8 +62,9 @@ public class OpenLibraryMetadataProvider : IMetadataProvider
                 Categories = firstDoc.Subject ?? new List<string>()
             };
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "OpenLibrary: error buscando '{Query}'", queryParams);
             return null;
         }
     }

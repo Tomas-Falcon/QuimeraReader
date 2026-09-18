@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using QuimeraReader.Domain.Interfaces;
 
 namespace QuimeraReader.Infrastructure.Providers;
@@ -12,12 +13,14 @@ namespace QuimeraReader.Infrastructure.Providers;
 public class HardcoverMetadataProvider : IMetadataProvider
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger<HardcoverMetadataProvider> _logger;
 
     public string ProviderName => "Hardcover";
 
-    public HardcoverMetadataProvider(HttpClient httpClient)
+    public HardcoverMetadataProvider(HttpClient httpClient, ILogger<HardcoverMetadataProvider> logger)
     {
         _httpClient = httpClient;
+        _logger = logger;
     }
 
     public async Task<BookMetadata?> GetMetadataAsync(string query, IEnumerable<string>? isbns = null, Dictionary<string, string>? settings = null)
@@ -90,8 +93,9 @@ public class HardcoverMetadataProvider : IMetadataProvider
                 AverageRating = bookNode.Rating
             };
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Hardcover: error buscando '{Query}'", query);
             return null;
         }
     }

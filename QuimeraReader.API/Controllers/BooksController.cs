@@ -276,7 +276,7 @@ public class BooksController : ControllerBase
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error enriqueciendo libro {book.Id}: {ex.Message}");
+                        _logger.LogError(ex, "Error enriqueciendo metadatos del libro {BookId}", book.Id);
                     }
                     scanState.FilesProcessed++;
                 }
@@ -306,7 +306,7 @@ public class BooksController : ControllerBase
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("Error en la limpieza de huérfanos post-escaneo: " + ex.Message);
+                    _logger.LogError(ex, "Error en la limpieza de huérfanos post-escaneo");
                 }
 
                 try
@@ -317,7 +317,7 @@ public class BooksController : ControllerBase
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("Error en la sincronización con Hardcover: " + ex.Message);
+                    _logger.LogError(ex, "Error en la sincronización con Hardcover");
                 }
 
                 scanState.IsScanning = false;
@@ -433,7 +433,7 @@ public class BooksController : ControllerBase
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error en UploadEpub: {ex}");
+            _logger.LogError(ex, "Error en UploadEpub");
             return StatusCode(500, $"Error interno: {ex.Message}");
         }
         finally
@@ -601,7 +601,7 @@ public class BooksController : ControllerBase
             } 
             catch (Exception ex) 
             { 
-                Console.WriteLine($"Error limpiando directorios del libro: {ex.Message}"); 
+                _logger.LogError(ex, "Error limpiando directorios del libro"); 
             }
         }
     }

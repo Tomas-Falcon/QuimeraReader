@@ -6,6 +6,7 @@ using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using QuimeraReader.Infrastructure;
 
 namespace QuimeraReader.Infrastructure.Services;
@@ -14,11 +15,13 @@ public class HardcoverSyncService
 {
     private readonly HttpClient _httpClient;
     private readonly AppDbContext _dbContext;
+    private readonly ILogger<HardcoverSyncService> _logger;
 
-    public HardcoverSyncService(HttpClient httpClient, AppDbContext dbContext)
+    public HardcoverSyncService(HttpClient httpClient, AppDbContext dbContext, ILogger<HardcoverSyncService> logger)
     {
         _httpClient = httpClient;
         _dbContext = dbContext;
+        _logger = logger;
     }
 
     /// <summary>
@@ -103,11 +106,12 @@ public class HardcoverSyncService
             if (updatedCount > 0)
             {
                 await _dbContext.SaveChangesAsync();
+                _logger.LogInformation("Sincronización con Hardcover completada: {Count} libros marcados como leídos", updatedCount);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error sincronizando progreso de Hardcover: {ex.Message}");
+            _logger.LogError(ex, "Error sincronizando progreso de Hardcover");
         }
 
         return updatedCount;

@@ -2,6 +2,7 @@ using System.IO;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using QuimeraReader.Infrastructure;
 using QuimeraReader.Domain.Entities;
 using System.Threading.Tasks;
@@ -13,10 +14,12 @@ namespace QuimeraReader.API.Controllers;
 public class SettingsController : ControllerBase
 {
     private readonly AppDbContext _dbContext;
+    private readonly ILogger<SettingsController> _logger;
 
-    public SettingsController(AppDbContext dbContext)
+    public SettingsController(AppDbContext dbContext, ILogger<SettingsController> logger)
     {
         _dbContext = dbContext;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -39,6 +42,7 @@ public class SettingsController : ControllerBase
                 }
                 catch (System.Exception ex)
                 {
+                    _logger.LogWarning(ex, "No se pudo crear la carpeta de biblioteca: {Path}", setting.Value);
                     return BadRequest(new { Error = $"No se pudo crear la carpeta: {ex.Message}" });
                 }
             }
@@ -80,6 +84,7 @@ public class SettingsController : ControllerBase
         }
         catch (System.Exception ex)
         {
+            _logger.LogError(ex, "Error al descargar el modelo Whisper");
             return StatusCode(500, new { Message = "Error al descargar el modelo: " + ex.Message });
         }
     }
