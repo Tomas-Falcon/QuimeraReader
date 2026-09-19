@@ -23,52 +23,65 @@ public class HardcoverMetadataProvider : IMetadataProvider
         _logger = logger;
     }
 
-    public async Task<BookMetadata?> GetMetadataAsync(string query, IEnumerable<string>? isbns = null, Dictionary<string, string>? settings = null)
+    public async Task<BookMetadata?> GetMetadataAsync(string query, IEnumerable<string>? isbns = null, Dictionary<string, string>? settings = null, string? authorHint = null)
     {
         string? apiKey = null;
         settings?.TryGetValue("HardcoverApiKey", out apiKey);
 
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            // Hardcover requires an API Key
             return null;
         }
 
-        // Prepare GraphQL Request
+        // Si tenemos un autor, intentamos primero filtrando por autor en GraphQL
+        if (!string.IsNullOrWhiteSpace(authorHint))
+        {
+            var resultWithAuthor = await FetchFromHardcoverAsync(query, apiKey, authorHint);
+            if (resultWithAuthor != null) return resultWithAuthor;
+        }
+
+        // Fallback: solo título
+        return await FetchFromHardcoverAsync(query, apiKey, null);
+    }
+
+    private async Task<BookMetadata?> FetchFromHardcoverAsync(string query, string apiKey, string? authorHint)
+    {
         var request = new HttpRequestMessage(HttpMethod.Post, "https://api.hardcover.app/v1/graphql");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
-        // Intento 1: Por título (Hardcover GraphQL)
-        // Hardcover API documentation typically requires GraphQL queries. 
-        // A generic title query sorting by users_count to get the most relevant book:
+        // Si hay autor, agregamos una condición a Contributions
+        string authorCondition = string.IsNullOrWhiteSpace(authorHint) 
+            ? "" 
+            : @", contributions: { author: { name: { _ilike: $author } } }";
+
         var graphqlQuery = new
         {
-            query = @"
-            query SearchBook($title: String!) {
+            query = $@"
+            query SearchBook($title: String!, $author: String!) {{
               books(
-                where: { title: { _ilike: $title } }
+                where: {{ title: {{ _ilike: $title }} {authorCondition} }}
                 limit: 1
-                order_by: { users_count: desc }
-              ) {
+                order_by: {{ users_count: desc }}
+              ) {{
                 title
                 description
                 rating
-                contributions {
-                  author {
+                contributions {{
+                  author {{
                     name
-                  }
-                }
-                image {
+                  }}
+                }}
+                image {{
                   url
-                }
-                tags {
-                  tag {
+                }}
+                tags {{
+                  tag {{
                     name
-                  }
-                }
-              }
-            }",
-            variables = new { title = $"%{query}%" }
+                  }}
+                }}
+              }}
+            }}",
+            variables = new { title = $"%{query}%", author = $"%{authorHint}%" }
         };
 
         request.Content = JsonContent.Create(graphqlQuery);
@@ -95,7 +108,7 @@ public class HardcoverMetadataProvider : IMetadataProvider
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Hardcover: error buscando '{Query}'", query);
+            _logger.LogWarning(ex, "Hardcover: error buscando '{Query}' (Author: '{Author}')", query, authorHint);
             return null;
         }
     }

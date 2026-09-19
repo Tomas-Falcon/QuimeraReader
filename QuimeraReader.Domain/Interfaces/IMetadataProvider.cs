@@ -17,5 +17,5 @@ public class BookMetadata
 public interface IMetadataProvider
 {
     string ProviderName { get; }
-    Task<BookMetadata?> GetMetadataAsync(string query, IEnumerable<string>? isbns = null, Dictionary<string, string>? settings = null);
+    Task<BookMetadata?> GetMetadataAsync(string query, IEnumerable<string>? isbns = null, Dictionary<string, string>? settings = null, string? authorHint = null);
 }

@@ -22,7 +22,7 @@ public class OpenLibraryMetadataProvider : IMetadataProvider
         _logger = logger;
     }
 
-    public async Task<BookMetadata?> GetMetadataAsync(string query, IEnumerable<string>? isbns = null, Dictionary<string, string>? settings = null)
+    public async Task<BookMetadata?> GetMetadataAsync(string query, IEnumerable<string>? isbns = null, Dictionary<string, string>? settings = null, string? authorHint = null)
     {
         if (isbns != null && isbns.Any())
         {
@@ -32,6 +32,12 @@ public class OpenLibraryMetadataProvider : IMetadataProvider
                 var result = await FetchFromOpenLibrary($"isbn:{isbn}");
                 if (result != null) return result;
             }
+        }
+
+        if (!string.IsNullOrWhiteSpace(authorHint))
+        {
+            var resultWithAuthor = await FetchFromOpenLibrary($"title={Uri.EscapeDataString(query)}&author={Uri.EscapeDataString(authorHint)}");
+            if (resultWithAuthor != null) return resultWithAuthor;
         }
 
         return await FetchFromOpenLibrary($"title={Uri.EscapeDataString(query)}");

@@ -22,7 +22,7 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
         _logger = logger;
     }
 
-    public async Task<BookMetadata?> GetMetadataAsync(string query, IEnumerable<string>? isbns = null, Dictionary<string, string>? settings = null)
+    public async Task<BookMetadata?> GetMetadataAsync(string query, IEnumerable<string>? isbns = null, Dictionary<string, string>? settings = null, string? authorHint = null)
     {
         string? apiKey = null;
         settings?.TryGetValue("GoogleBooksApiKey", out apiKey);
@@ -38,8 +38,15 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
             }
         }
 
-        // Intento 2: Por Título (Fallback o si no había ISBN)
-        return await FetchFromGoogleBooks($"intitle:{query}", apiKey);
+        // Intento 2: Por Título + Autor (Si hay autor disponible)
+        if (!string.IsNullOrWhiteSpace(authorHint))
+        {
+            var resultWithAuthor = await FetchFromGoogleBooks($"intitle:\"{query}\"+inauthor:\"{authorHint}\"", apiKey);
+            if (resultWithAuthor != null) return resultWithAuthor;
+        }
+
+        // Intento 3: Por Título solamente (Fallback final)
+        return await FetchFromGoogleBooks($"intitle:\"{query}\"", apiKey);
     }
 
     private async Task<BookMetadata?> FetchFromGoogleBooks(string searchString, string? apiKey)

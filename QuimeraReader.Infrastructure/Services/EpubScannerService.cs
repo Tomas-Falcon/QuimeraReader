@@ -114,6 +114,51 @@ public class EpubScannerService
             }
         }
 
+        // Extraer la sinopsis directamente del EPUB (dc:description)
+        if (string.IsNullOrWhiteSpace(book.Description) && epubBook.Schema?.Package?.Metadata?.Descriptions != null)
+        {
+            var epubDescription = epubBook.Schema.Package.Metadata.Descriptions.FirstOrDefault()?.Description;
+            if (!string.IsNullOrWhiteSpace(epubDescription))
+            {
+                // Limpiar etiquetas HTML si las tiene
+                book.Description = System.Text.RegularExpressions.Regex.Replace(epubDescription, "<.*?>", " ").Trim();
+                _logger.LogInformation("Sinopsis extraída directamente del EPUB para '{Title}'", book.Title);
+            }
+        }
+
+        // Extraer categorías/subjects directamente del EPUB (dc:subject)
+        if (epubBook.Schema?.Package?.Metadata?.Subjects != null)
+        {
+            foreach (var subjectRaw in epubBook.Schema.Package.Metadata.Subjects)
+            {
+                if (string.IsNullOrWhiteSpace(subjectRaw?.Subject)) continue;
+                // Algunos EPUBs ponen "Novela, Fantástico" en un solo subject, separado por comas
+                var parts = subjectRaw.Subject.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                foreach (var catName in parts)
+                {
+                    if (string.IsNullOrWhiteSpace(catName)) continue;
+                    if (book.Categories.Any(c => c.Category?.Name == catName)) continue;
+
+                    var category = _dbContext.ChangeTracker.Entries<Category>()
+                        .Select(e => e.Entity)
+                        .FirstOrDefault(c => c.Name == catName)
+                        ?? await _dbContext.Set<Category>().FirstOrDefaultAsync(c => c.Name == catName);
+
+                    if (category == null)
+                    {
+                        category = new Category { Name = catName, IsUserGenerated = false };
+                        _dbContext.Add(category);
+                    }
+                    book.Categories.Add(new BookCategory { Category = category });
+                }
+            }
+            if (book.Categories.Any())
+            {
+                _logger.LogInformation("Categorías extraídas del EPUB para '{Title}': {Categories}", 
+                    book.Title, string.Join(", ", book.Categories.Select(c => c.Category?.Name)));
+            }
+        }
+
         bool hasTitle = !string.IsNullOrWhiteSpace(book.Title);
         bool hasAuthor = book.Authors.Any();
         bool hasSynopsis = !string.IsNullOrWhiteSpace(book.Description);
@@ -121,13 +166,29 @@ public class EpubScannerService
 
         var fallbackName = originalFileName ?? Path.GetFileNameWithoutExtension(sourceFilePath);
         var query = hasTitle ? book.Title : Path.GetFileNameWithoutExtension(fallbackName);
+        var authorHint = book.Authors.FirstOrDefault()?.Author?.Name;
+        
         var orderedProviders = _providers.OrderByDescending(p => p.ProviderName == preferredProviderName);
 
         BookMetadata? metadata = null;
         foreach (var provider in orderedProviders)
         {
-            metadata = await provider.GetMetadataAsync(query, isbns: extractedIsbns, settings: settingsDict);
-            if (metadata != null) break;
+            _logger.LogInformation("Buscando metadatos en {Provider} para '{Title}' (Autor: {AuthorHint}, ISBNs: {Isbns})", 
+                provider.ProviderName, query, authorHint ?? "N/A", extractedIsbns.Any() ? string.Join(",", extractedIsbns) : "Ninguno");
+                
+            metadata = await provider.GetMetadataAsync(query, isbns: extractedIsbns, settings: settingsDict, authorHint: authorHint);
+            
+            if (metadata != null)
+            {
+                _logger.LogInformation("Metadatos obtenidos de {ProviderName} para '{Title}' (Rating: {HasRating})", 
+                    provider.ProviderName, book.Title, metadata.AverageRating.HasValue);
+                break;
+            }
+        }
+        
+        if (metadata == null)
+        {
+            _logger.LogWarning("Ningún proveedor devolvió metadatos para '{Title}'", book.Title);
         }
 
         byte[]? apiCoverBytes = null;
@@ -359,14 +420,31 @@ public class EpubScannerService
         var settingsDict = await _dbContext.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
 
         var query = !string.IsNullOrWhiteSpace(book.Title) ? book.Title : Path.GetFileNameWithoutExtension(book.EpubFilePath);
+        var authorHint = book.Authors.FirstOrDefault()?.Author?.Name;
+        
         var orderedProviders = _providers.OrderByDescending(p => p.ProviderName == preferredProviderName);
 
         BookMetadata? metadata = null;
         foreach (var provider in orderedProviders)
         {
             var isbnsList = !string.IsNullOrWhiteSpace(book.Isbn) ? new List<string> { book.Isbn } : null;
-            metadata = await provider.GetMetadataAsync(query, isbns: isbnsList, settings: settingsDict);
-            if (metadata != null) break;
+            
+            _logger.LogInformation("Enriqueciendo metadatos con {Provider} para '{Title}' (Autor: {AuthorHint}, ISBN: {Isbn})", 
+                provider.ProviderName, query, authorHint ?? "N/A", book.Isbn ?? "Ninguno");
+                
+            metadata = await provider.GetMetadataAsync(query, isbns: isbnsList, settings: settingsDict, authorHint: authorHint);
+            
+            if (metadata != null)
+            {
+                _logger.LogInformation("Metadatos obtenidos de {ProviderName} para '{Title}' (Rating: {HasRating})", 
+                    provider.ProviderName, book.Title, metadata.AverageRating.HasValue);
+                break;
+            }
+        }
+        
+        if (metadata == null)
+        {
+            _logger.LogWarning("Ningún proveedor devolvió metadatos adicionales para '{Title}'", book.Title);
         }
 
         if (metadata != null)
