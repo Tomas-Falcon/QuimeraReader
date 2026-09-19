@@ -1,12 +1,12 @@
-﻿# QuimeraReader
+# QuimeraReader
 
 QuimeraReader is a comprehensive, self-hosted platform (Homelab) designed for managing massive ebook (EPUB) and audiobook libraries. It features artificial intelligence synchronization and provides a seamless read-along experience across web and mobile platforms.
 
 ## Architecture Overview
 
-The project is built entirely on a 100% C# .NET ecosystem, eliminating the need for Node.js or JavaScript frameworks.
+The project is built entirely on a 100% C# **.NET 10** ecosystem, eliminating the need for Node.js or JavaScript frameworks.
 
-1. **QuimeraReader.API (Backend):** A .NET ASP.NET Core REST API following Clean Architecture principles. It handles media streaming, background processing (Whisper.net audio alignment, metadata scraping), and serves the static WebAssembly frontend.
+1. **QuimeraReader.API (Backend):** A .NET 10 ASP.NET Core REST API following Clean Architecture principles. It handles media streaming, background processing (Whisper.net audio alignment, metadata scraping), and serves the static WebAssembly frontend.
 2. **QuimeraReader.Clients (Frontend):** 
    - **Shared UI:** A Razor class library (QuimeraReader.Shared) containing all UI components, logic, and HTTP client services.
    - **Web:** A Blazor WebAssembly application (QuimeraReader.Web) that runs natively in the browser.
@@ -85,4 +85,3 @@ To build and run the project locally without Docker:
 
 3. **Run the API (Backend & Web):**
    Set `QuimeraReader.API` as the startup project. The API will automatically host the Blazor WebAssembly frontend and create the local SQLite database.
-
