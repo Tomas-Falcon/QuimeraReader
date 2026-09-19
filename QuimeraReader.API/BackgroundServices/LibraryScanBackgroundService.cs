@@ -73,7 +73,6 @@ public class LibraryScanBackgroundService : BackgroundService
 
         if (allFiles.Length == 0)
         {
-            _scanState.IsScanning = false;
             return;
         }
 
@@ -81,38 +80,41 @@ public class LibraryScanBackgroundService : BackgroundService
         _scanState.TotalFilesFound = allFiles.Length;
         _scanState.FilesProcessed = 0;
 
-        var batchSizeSetting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "ScanBatchSize", stoppingToken);
-        int batchSize = int.TryParse(batchSizeSetting?.Value, out int parsedSize) ? parsedSize : 100;
-
-        var files = allFiles.Take(batchSize).ToList();
-
-        foreach (var file in files)
+        try
         {
-            if (stoppingToken.IsCancellationRequested) break;
+            var batchSizeSetting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "ScanBatchSize", stoppingToken);
+            int batchSize = int.TryParse(batchSizeSetting?.Value, out int parsedSize) ? parsedSize : 100;
 
-            _scanState.CurrentFile = Path.GetFileName(file);
-            try
+            var files = allFiles.Take(batchSize).ToList();
+
+            foreach (var file in files)
             {
-                var book = await scannerService.ScanEpubAsync(file, "GoogleBooks");
-                if (book.Id == 0)
+                if (stoppingToken.IsCancellationRequested) break;
+
+                _scanState.CurrentFile = Path.GetFileName(file);
+                try
                 {
-                    dbContext.Books.Add(book);
+                    var book = await scannerService.ScanEpubAsync(file, "GoogleBooks");
+                    if (book.Id == 0)
+                    {
+                        dbContext.Books.Add(book);
+                    }
+                    await dbContext.SaveChangesAsync(stoppingToken);
+                    _logger.LogInformation($"Libro importado y organizado: {book.Title}");
                 }
-                await dbContext.SaveChangesAsync(stoppingToken);
-                _logger.LogInformation($"Libro importado y organizado: {book.Title}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error escaneando el archivo {file}");
-            }
-            finally
-            {
-                _scanState.FilesProcessed++;
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error escaneando el archivo {file}");
+                }
+                finally
+                {
+                    _scanState.FilesProcessed++;
+                }
             }
         }
-        
-        if (_scanState.FilesProcessed >= _scanState.TotalFilesFound)
+        finally
         {
+            // Siempre liberar el cerrojo de escaneo al terminar el bache
             _scanState.IsScanning = false;
         }
     }
