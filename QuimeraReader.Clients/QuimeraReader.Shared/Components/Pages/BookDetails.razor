@@ -137,7 +137,7 @@ else
                                 {
                                     @TranslationService["Action_ReadAgain"]
                                 }
-                                else if (_book.PercentageCompleted.HasValue && _book.PercentageCompleted.Value > 0 || _book.ReadingStatus == "Reading")
+                                else if ((_book.PercentageCompleted.HasValue && _book.PercentageCompleted.Value > 0) || !string.IsNullOrEmpty(_book.CurrentEpubCfi) || _book.ReadingStatus == "Reading")
                                 {
                                     @TranslationService["Action_ContinueReading"]
                                 }
