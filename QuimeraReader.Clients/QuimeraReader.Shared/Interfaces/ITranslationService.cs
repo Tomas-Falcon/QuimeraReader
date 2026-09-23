@@ -1,4 +1,4 @@
-﻿namespace QuimeraReader.Shared.Intetfaces;
+﻿namespace QuimeraReader.Shared.Interfaces;
 
 public interface ITranslationService
 {

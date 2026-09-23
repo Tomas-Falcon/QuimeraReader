@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Microsoft.Extensions.Logging;
-using QuimeraReader.Shared.Intetfaces;
+using QuimeraReader.Shared.Interfaces;
 using System.Net.Http.Json;
 
 namespace QuimeraReader.Shared.Services;

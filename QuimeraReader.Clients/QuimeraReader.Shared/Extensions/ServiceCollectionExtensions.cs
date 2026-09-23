@@ -1,5 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using QuimeraReader.Shared.Intetfaces;
+using QuimeraReader.Shared.Interfaces;
 using QuimeraReader.Shared.Services;
 
 namespace QuimeraReader.Shared.Extensions;

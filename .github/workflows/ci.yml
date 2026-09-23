@@ -18,6 +18,9 @@ jobs:
       with:
         dotnet-version: '10.0.x'
         
+    - name: Restore Workloads
+      run: dotnet workload restore QuimeraReader.slnx
+      
     - name: Restore dependencies
       run: dotnet restore QuimeraReader.slnx
       
