@@ -168,12 +168,13 @@
     public void OnEpubLocationChanged(string cfi, double percentage)
     {
         // Guardar el CFI y el porcentaje
-        double scaledPercentage = percentage * 100.0;
+        double? scaledPercentage = percentage >= 0 ? (percentage * 100.0) : null;
         
         if (Book != null)
         {
             Book.CurrentEpubCfi = cfi;
-            Book.PercentageCompleted = scaledPercentage;
+            if (scaledPercentage.HasValue) 
+                Book.PercentageCompleted = scaledPercentage.Value;
             StateHasChanged();
         }
 

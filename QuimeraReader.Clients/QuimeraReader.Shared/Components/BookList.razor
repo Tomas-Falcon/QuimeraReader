@@ -46,7 +46,7 @@
             <div class="netflix-row mb-5">
                 @foreach (var book in _readingBooks)
                 {
-                    <BookCard Book="book" />
+                    <div class="col"><BookCard Book="book" /></div>
                 }
             </div>
         }
@@ -57,7 +57,7 @@
             <div class="netflix-row mb-5">
                 @foreach (var book in _recommendations)
                 {
-                    <BookCard Book="book" />
+                    <div class="col"><BookCard Book="book" /></div>
                 }
             </div>
         }
@@ -77,10 +77,7 @@
         <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-5 g-4">
             @foreach (var book in _books)
             {
-                <BookCard Book="book" 
-                          SelectionMode="_selectionMode" 
-                          IsSelected="_selectedBookIds.Contains(book.Id)"
-                          IsSelectedChanged="@(isSelected => OnBookSelectionChanged(book.Id, isSelected))" />
+                <div class="col"><BookCard Book="book" SelectionMode="_selectionMode" IsSelected="_selectedBookIds.Contains(book.Id)" IsSelectedChanged="@(isSelected => OnBookSelectionChanged(book.Id, isSelected))" /></div>
             }
         </div>
         
