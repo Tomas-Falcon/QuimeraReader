@@ -1,4 +1,4 @@
-# QuimeraReader
+﻿# QuimeraReader
 
 QuimeraReader is a comprehensive, self-hosted platform (Homelab) designed for managing massive ebook (EPUB) and audiobook libraries. It features artificial intelligence synchronization and provides a seamless read-along experience across web and mobile platforms.
 
