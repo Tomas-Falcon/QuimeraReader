@@ -8,6 +8,7 @@
 @inject ToastService ToastService
 @inject IJSRuntime JS
 @inject Radzen.DialogService DialogService
+@inject QuimeraReader.Shared.Interfaces.ITranslationService Translation
 
 <PageTitle>Detalles del Libro</PageTitle>
 
@@ -135,15 +136,15 @@ else
                             <RadzenButton ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Large" class="px-5 py-3 rounded-pill fw-bold shadow-sm" Click="@GoToRead" style="transition: transform 0.2s;" Icon="play_circle">
                                 @if (_book.PercentageCompleted.HasValue && _book.PercentageCompleted.Value >= 100 || _book.ReadingStatus == "Read")
                                 {
-                                    @TranslationService["Action_ReadAgain"]
+                                    @Translation["Action_ReadAgain"]
                                 }
                                 else if ((_book.PercentageCompleted.HasValue && _book.PercentageCompleted.Value > 0) || !string.IsNullOrEmpty(_book.CurrentEpubCfi) || _book.ReadingStatus == "Reading")
                                 {
-                                    @TranslationService["Action_ContinueReading"]
+                                    @Translation["Action_ContinueReading"]
                                 }
                                 else
                                 {
-                                    @TranslationService["Action_StartReading"]
+                                    @Translation["Action_StartReading"]
                                 }
                             </RadzenButton>
                         }
