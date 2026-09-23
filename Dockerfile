@@ -1,4 +1,4 @@
-# Etapa 1: Construir el Frontend WebAssembly
+﻿# Etapa 1: Construir el Frontend WebAssembly
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build-web
 WORKDIR /src
 COPY ["QuimeraReader.Clients/QuimeraReader.Web/QuimeraReader.Web.csproj", "QuimeraReader.Clients/QuimeraReader.Web/"]
@@ -38,6 +38,10 @@ RUN mkdir -p /media /library /config
 
 # Copiar el binario del backend
 COPY --from=build-api /app/api .
+
+# Copiar el script de actualizacion
+COPY update_container.sh /app/update_container.sh
+RUN chmod +x /app/update_container.sh
 
 # Copiar el frontend dentro de la carpeta wwwroot del backend
 COPY --from=build-web /app/web/wwwroot ./wwwroot
