@@ -49,7 +49,7 @@
             <div class="netflix-row mb-5">
                 @foreach (var book in _readingBooks)
                 {
-                    <div class="col"><BookCard Book="book" /></div>
+                    <div class="netflix-item"><BookCard Book="book" /></div>
                 }
             </div>
         }
@@ -60,7 +60,17 @@
             <div class="netflix-row mb-5">
                 @foreach (var book in _nextToReadBooks)
                 {
-                    <div class="col"><BookCard Book="book" /></div>
+                    <div class="netflix-item"><BookCard Book="book" /></div>
+                }
+            </div>
+        }
+                @if (_readBooks != null && _readBooks.Any())
+        {
+            <h3 class="rz-color-primary rz-mt-4 mb-3">@TranslationService["Status_Read"]</h3>
+            <div class="netflix-row mb-5">
+                @foreach (var book in _readBooks)
+                {
+                    <div class="netflix-item"><BookCard Book="book" /></div>
                 }
             </div>
         }
@@ -70,7 +80,7 @@
             <div class="netflix-row mb-5">
                 @foreach (var book in _recommendations)
                 {
-                    <div class="col"><BookCard Book="book" /></div>
+                    <div class="netflix-item"><BookCard Book="book" /></div>
                 }
             </div>
         }
@@ -115,7 +125,7 @@
         padding-bottom: 1rem;
         padding-top: 0.5rem;
     }
-    .netflix-row > * {
+    .netflix-item {
         flex: 0 0 auto;
         scroll-snap-align: start;
         width: 220px;
@@ -138,6 +148,7 @@
 
     private List<Book> _books = new();
     private IEnumerable<Book> _recommendations = Array.Empty<Book>();
+    private IEnumerable<Book> _readBooks = Array.Empty<Book>();
     private IEnumerable<Book> _readingBooks = Array.Empty<Book>();
     private ElementReference _loadMoreElement;
     private DotNetObjectReference<BookList>? _objRef;
@@ -295,9 +306,10 @@
         
         try
         {
-            var initialBooks = await BookService.GetBooksAsync(1, 100, "");
-            _readingBooks = initialBooks.Data.Where(b => b.ReadingStatus == "Reading" || (b.PercentageCompleted > 0 && b.PercentageCompleted < 100) || (!string.IsNullOrEmpty(b.CurrentEpubCfi) && b.PercentageCompleted != 100 && b.ReadingStatus != "Read")).OrderByDescending(b => b.LastReadAt).Take(10).ToList();
-            _nextToReadBooks = initialBooks.Data.Where(b => b.ReadingStatus == "NextToRead").OrderByDescending(b => b.LastReadAt).Take(10).ToList();
+            var initialBooks = await BookService.GetBooksAsync(1, 1000, "");
+            _readingBooks = initialBooks.Data.Where(b => b.ReadingStatus == "Reading" || (b.PercentageCompleted > 0 && b.PercentageCompleted < 100) || (!string.IsNullOrEmpty(b.CurrentEpubCfi) && b.PercentageCompleted != 100 && b.ReadingStatus != "Read")).OrderByDescending(b => b.LastReadAt).Take(30).ToList();
+                        _nextToReadBooks = initialBooks.Data.Where(b => b.ReadingStatus == "NextToRead").OrderByDescending(b => b.LastReadAt).Take(30).ToList();
+            _readBooks = initialBooks.Data.Where(b => b.ReadingStatus == "Read").OrderByDescending(b => b.LastReadAt).Take(30).ToList();
         }
         catch { }
 
@@ -396,7 +408,7 @@
 
         try
         {
-            var result = await BookService.GetBooksAsync(_currentPage, 20, _searchQuery);
+            var result = await BookService.GetBooksAsync(_currentPage, 20, _searchQuery, _selectedCategories?.ToArray());
             
             if (result.Data.Length > 0)
             {
