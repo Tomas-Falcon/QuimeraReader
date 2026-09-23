@@ -155,6 +155,7 @@
             // EPUB Reader Initialization
             if (Book.HasEpub)
             {
+                if (_dotNetRef == null) _dotNetRef = DotNetObjectReference.Create(this);
                 _epubJsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/QuimeraReader.Shared/epubInterop.js");
                 // Construct the absolute URL to the EPUB file via API
                 var baseUrl = BookService.BaseAddress.TrimEnd('/');
