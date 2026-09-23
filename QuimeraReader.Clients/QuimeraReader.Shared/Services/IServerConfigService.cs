@@ -1,4 +1,4 @@
-namespace QuimeraReader.Shared.Services;
+﻿namespace QuimeraReader.Shared.Services;
 
 public interface IServerConfigService
 {

@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Domain.Entities;
 using QuimeraReader.Application.Interfaces;
 
@@ -21,9 +21,17 @@ public class AppDbContext : DbContext, IAppDbContext
     {
     }
 
+    public DbSet<BookAudioTrack> BookAudioTracks { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        
+        modelBuilder.Entity<BookAudioTrack>()
+            .HasOne(t => t.Book)
+            .WithMany(b => b.AudioTracks)
+            .HasForeignKey(t => t.BookId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         // Many-to-Many configuration for Book and Author
         modelBuilder.Entity<BookAuthor>()

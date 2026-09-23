@@ -1,6 +1,8 @@
-@using QuimeraReader.Shared.Models
+﻿@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
-@inject IQuimeraApiClient ApiClient
+@inject QuimeraReader.Shared.Services.IBookService BookService
+@inject QuimeraReader.Shared.Services.IScanService ScanService
+@inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject ToastService ToastService
 @namespace QuimeraReader.Shared.Components
 
@@ -171,7 +173,7 @@
         {
             try
             {
-                await ApiClient.DeleteEpubAsync(id);
+                await BookService.DeleteEpubAsync(id);
                 _books.RemoveAll(b => b.Id == id);
             }
             catch (Exception ex)
@@ -201,7 +203,7 @@
             {
                 try
                 {
-                    await ApiClient.UploadEpubAsync(file.OpenReadStream(maxAllowedSize: 104857600), file.Name);
+                    await BookService.UploadEpubAsync(file.OpenReadStream(maxAllowedSize: 104857600), file.Name);
                     successCount++;
                 }
                 catch (Exception fileEx)
@@ -233,7 +235,7 @@
     protected override async Task OnInitializedAsync()
     {
         _objRef = DotNetObjectReference.Create(this);
-        var fetchRecs = ApiClient.GetRecommendationsAsync();
+        var fetchRecs = BookService.GetRecommendationsAsync();
         
         _debounceTimer = new System.Timers.Timer(500);
         _debounceTimer.AutoReset = false;
@@ -315,7 +317,7 @@
                     // Solo check si hay nuevos libros en el backend
                     try
                     {
-                        var result = await ApiClient.GetBooksAsync(1, 1);
+                        var result = await BookService.GetBooksAsync(1, 1);
                         if (result.Data.Length > 0 && result.Data[0].Id > _books[0].Id)
                         {
                             _currentPage = 1;
@@ -340,7 +342,7 @@
 
         try
         {
-            var result = await ApiClient.GetBooksAsync(_currentPage, 20, _searchQuery);
+            var result = await BookService.GetBooksAsync(_currentPage, 20, _searchQuery);
             
             if (result.Data.Length > 0)
             {

@@ -10,4 +10,5 @@
     <Project Path="QuimeraReader.Clients/QuimeraReader.Shared/QuimeraReader.Shared.csproj" />
     <Project Path="QuimeraReader.Clients/QuimeraReader.Web/QuimeraReader.Web.csproj" />
   </Folder>
+  <Project Path="QuimeraReader.Tests/QuimeraReader.Tests.csproj" />
 </Solution>

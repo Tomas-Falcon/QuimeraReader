@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Components;
+﻿using Microsoft.AspNetCore.Components;
 using QuimeraReader.Shared.Services;
 
 namespace QuimeraReader.Web.Services;

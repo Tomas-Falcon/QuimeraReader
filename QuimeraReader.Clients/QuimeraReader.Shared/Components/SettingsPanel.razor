@@ -1,6 +1,8 @@
-@using QuimeraReader.Shared.Models
+﻿@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
-@inject IQuimeraApiClient ApiClient
+@inject QuimeraReader.Shared.Services.IBookService BookService
+@inject QuimeraReader.Shared.Services.IScanService ScanService
+@inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject ToastService ToastService
 @namespace QuimeraReader.Shared.Components
 
@@ -259,7 +261,7 @@
     {
         try
         {
-            var settings = await ApiClient.GetSettingsAsync();
+            var settings = await SettingsService.GetSettingsAsync();
             if (settings.TryGetValue("IncomingScanFolder", out var incoming)) _libraryRootPath = incoming;
             if (settings.TryGetValue("LibraryRootPath", out var outgoing)) _outgoingLibraryPath = outgoing;
             if (settings.TryGetValue("IngestionMode", out var mode)) _ingestionMode = mode;
@@ -292,7 +294,7 @@
                 await Task.Delay(2000, _cts.Token);
                 if (ActiveTab == "tasks")
                 {
-                    _scanStatus = await ApiClient.GetScanStatusAsync();
+                    _scanStatus = await ScanService.GetScanStatusAsync();
                     StateHasChanged();
                 }
             }
@@ -314,16 +316,16 @@
 
         try
         {
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "IncomingScanFolder", Value = _libraryRootPath });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "LibraryRootPath", Value = _outgoingLibraryPath });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "IngestionMode", Value = _ingestionMode });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "OpenAIApiKey", Value = _openAiKey });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "GoogleBooksApiKey", Value = _googleBooksKey });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "HardcoverApiKey", Value = _hardcoverKey });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "HardcoverSyncEnabled", Value = _hardcoverSyncEnabled.ToString() });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "WhisperModelPath", Value = _whisperModelPath });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "WhisperMode", Value = _whisperMode });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "OpenAIEndpoint", Value = _openAiEndpoint });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "IncomingScanFolder", Value = _libraryRootPath });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "LibraryRootPath", Value = _outgoingLibraryPath });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "IngestionMode", Value = _ingestionMode });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "OpenAIApiKey", Value = _openAiKey });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "GoogleBooksApiKey", Value = _googleBooksKey });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "HardcoverApiKey", Value = _hardcoverKey });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "HardcoverSyncEnabled", Value = _hardcoverSyncEnabled.ToString() });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "WhisperModelPath", Value = _whisperModelPath });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "WhisperMode", Value = _whisperMode });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "OpenAIEndpoint", Value = _openAiEndpoint });
             
             ShowMessage("Ajustes guardados correctamente.", true);
         }
@@ -346,7 +348,7 @@
         
         try
         {
-            await ApiClient.DownloadWhisperModelAsync();
+            await SettingsService.DownloadWhisperModelAsync();
             ShowMessage("Modelo descargado con éxito.", true);
         }
         catch (Exception ex)
@@ -368,7 +370,7 @@
 
         try
         {
-            var response = await ApiClient.TriggerScanAsync(new { FolderPath = _libraryRootPath });
+            var response = await ScanService.TriggerScanAsync(new { FolderPath = _libraryRootPath });
             ShowMessage("El escáner se ha iniciado en segundo plano. Los libros aparecerán pronto en la biblioteca.", true);
         }
         catch (Exception ex)
@@ -386,7 +388,7 @@
     {
         try
         {
-            await ApiClient.CancelScanAsync();
+            await ScanService.CancelScanAsync();
             ShowMessage("Escaneo cancelado.", true);
             if (_scanStatus != null) _scanStatus.IsScanning = false;
             _isScanning = false;
@@ -401,7 +403,7 @@
     {
         try
         {
-            await ApiClient.RescanMetadataAsync();
+            await ScanService.RescanMetadataAsync();
             ShowMessage("Se ha iniciado la búsqueda de metadatos en segundo plano.", true);
         }
         catch (Exception ex)
@@ -414,7 +416,7 @@
     {
         try
         {
-            await ApiClient.MergeDuplicatesAsync();
+            await ScanService.MergeDuplicatesAsync();
             ShowMessage("Mantenimiento de duplicados completado exitosamente.", true);
         }
         catch (Exception ex)

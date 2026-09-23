@@ -1,4 +1,4 @@
-using MediatR;
+﻿using MediatR;
 using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Application.Interfaces;
 using QuimeraReader.Application.Books.DTOs;
@@ -25,7 +25,7 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
         var query = _dbContext.Books.AsQueryable();
 
         // Ocultar libros "fantasma" que no tienen archivo asociado (ni EPUB ni Audio)
-        query = query.Where(b => !string.IsNullOrEmpty(b.EpubFilePath) || !string.IsNullOrEmpty(b.AudioFilePath));
+        query = query.Where(b => !string.IsNullOrEmpty(b.EpubFilePath) || b.AudioTracks.Any());
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
@@ -63,7 +63,7 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
             Universe = b.Series?.Universe?.Name,
             HasCover = !string.IsNullOrEmpty(b.CoverImagePath),
             HasEpub = !string.IsNullOrEmpty(b.EpubFilePath),
-            HasAudio = !string.IsNullOrEmpty(b.AudioFilePath),
+            HasAudio = b.AudioTracks.Any(),
             IsAligned = b.ProcessingStatus == "SYNCED",
             LastReadAt = b.LastReadAt,
             CurrentEpubCfi = b.CurrentEpubCfi,

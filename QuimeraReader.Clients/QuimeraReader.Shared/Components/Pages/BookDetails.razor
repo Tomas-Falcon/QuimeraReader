@@ -1,7 +1,9 @@
-@page "/book/{Id:int}"
+﻿@page "/book/{Id:int}"
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
-@inject IQuimeraApiClient ApiClient
+@inject QuimeraReader.Shared.Services.IBookService BookService
+@inject QuimeraReader.Shared.Services.IScanService ScanService
+@inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject NavigationManager NavManager
 @inject ToastService ToastService
 @inject IJSRuntime JS
@@ -27,7 +29,7 @@ else
 {
     <div class="book-details-hero">
         <!-- Background Blur effect similar to Spotify/Reader -->
-        <div class="hero-bg" style="background-image: url('@(ApiClient.BaseAddress + _book.CoverUrl)');"></div>
+        <div class="hero-bg" style="background-image: url('@(BookService.BaseAddress + _book.CoverUrl)');"></div>
         <div class="hero-overlay"></div>
 
         <div class="container position-relative" style="z-index: 10; padding-top: 2rem; padding-bottom: 3rem;">
@@ -40,7 +42,7 @@ else
             <div class="d-flex flex-column flex-md-row gap-5 align-items-center align-items-md-start">
                 <!-- Cover -->
                 <div class="cover-section" style="flex: 0 0 auto; width: 100%; max-width: 300px;">
-                    <img src="@(ApiClient.BaseAddress + @_book.CoverUrl)" alt="Portada" class="img-fluid rounded shadow-lg" style="width: 100%;" onerror="this.outerHTML='<div class=\'placeholder-cover shadow-lg rounded d-flex align-items-center justify-content-center\' style=\'width:100%;aspect-ratio:2/3;background:#2a2a2a;color:#888;\'><span>Sin Portada</span></div>'" />
+                    <img src="@(BookService.BaseAddress + @_book.CoverUrl)" alt="Portada" class="img-fluid rounded shadow-lg" style="width: 100%;" onerror="this.outerHTML='<div class=\'placeholder-cover shadow-lg rounded d-flex align-items-center justify-content-center\' style=\'width:100%;aspect-ratio:2/3;background:#2a2a2a;color:#888;\'><span>Sin Portada</span></div>'" />
                 </div>
                 
                 <!-- Metadata -->
@@ -218,7 +220,7 @@ else
     private async Task LoadBookAsync()
     {
         _isLoading = true;
-        _book = await ApiClient.GetBookAsync(Id);
+        _book = await BookService.GetBookAsync(Id);
         _isLoading = false;
         StateHasChanged();
     }
@@ -230,7 +232,7 @@ else
         
         try
         {
-            await ApiClient.RescanSingleBookMetadataAsync(Id);
+            await ScanService.RescanSingleBookMetadataAsync(Id);
             // Refresh book details to show the new metadata
             await LoadBookAsync();
             ToastService.ShowSuccess("Metadatos actualizados correctamente");
@@ -259,7 +261,7 @@ else
 
         try
         {
-            await ApiClient.DeleteEpubAsync(Id);
+            await BookService.DeleteEpubAsync(Id);
             ToastService.ShowSuccess("Archivo EPUB eliminado.");
             
             try 
@@ -290,7 +292,7 @@ else
 
         try
         {
-            await ApiClient.DeleteAudioAsync(Id);
+            await BookService.DeleteAudioAsync(Id);
             ToastService.ShowSuccess("Audiolibro eliminado.");
             
             try 

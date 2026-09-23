@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Domain.Entities;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,6 +11,7 @@ public interface IAppDbContext
     DbSet<Author> Authors { get; }
     DbSet<BookAuthor> BookAuthors { get; }
     DbSet<SyncMap> SyncMaps { get; }
+    DbSet<BookAudioTrack> BookAudioTracks { get; }
     DbSet<SystemSetting> SystemSettings { get; }
 
     DbSet<Universe> Universes { get; }

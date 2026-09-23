@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
@@ -43,16 +43,23 @@ builder.Services.AddSingleton<LibraryScanState>();
 builder.Services.AddSingleton<AudioAlignmentQueue>();
 builder.Services.AddScoped<EpubScannerService>();
 builder.Services.AddScoped<AudioAlignmentService>();
+builder.Services.AddScoped<AudioMatchingService>();
+builder.Services.AddScoped<DeepLibraryScannerService>();
 builder.Services.AddScoped<MediaPackagerService>();
 builder.Services.AddScoped<QuimeraReader.Infrastructure.Services.HardcoverSyncService>();
 
 // Registrar el Background Service
 builder.Services.AddHostedService<LibraryScanBackgroundService>();
 builder.Services.AddHostedService<AudioAlignmentBackgroundService>();
+builder.Services.AddHostedService<MaintenanceBackgroundService>();
 
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(QuimeraReader.Application.Interfaces.IAppDbContext).Assembly));
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddCors(options =>
 {

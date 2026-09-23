@@ -1,8 +1,10 @@
-@inherits LayoutComponentBase
+﻿@inherits LayoutComponentBase
 @inject IJSRuntime JSRuntime
 @inject QuimeraReader.Shared.Services.IServerConfigService ServerConfig
 @inject NavigationManager NavManager
-@inject QuimeraReader.Shared.Services.IQuimeraApiClient ApiClient
+@inject QuimeraReader.Shared.Services.IBookService BookService
+@inject QuimeraReader.Shared.Services.IScanService ScanService
+@inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @namespace QuimeraReader.Shared.Components.Layout
 
 @if (ServerConfig.NeedsConfiguration)
@@ -102,7 +104,7 @@ else
             {
                 if (!IsReadingMode)
                 {
-                    _scanStatus = await ApiClient.GetScanStatusAsync();
+                    _scanStatus = await ScanService.GetScanStatusAsync();
                     StateHasChanged();
                 }
             }
@@ -123,7 +125,7 @@ else
         
         try
         {
-            await ApiClient.RescanMetadataAsync();
+            await ScanService.RescanMetadataAsync();
             // Mostrar notificación global? Wait, ToastService is not injected in MainLayout yet. 
         }
         catch (Exception ex)
@@ -150,6 +152,7 @@ else
     {
         if (firstRender)
         {
+            await TranslationService.InitializeAsync();
             var theme = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "theme");
             if (theme == "light")
             {

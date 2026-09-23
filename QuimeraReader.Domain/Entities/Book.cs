@@ -1,4 +1,4 @@
-namespace QuimeraReader.Domain.Entities;
+﻿namespace QuimeraReader.Domain.Entities;
 
 public class Book
 {
@@ -13,7 +13,6 @@ public class Book
     // Local File Paths
     public string EpubFilePath { get; set; } = string.Empty;
     public string? SourceFilePath { get; set; } // Tracks original path for LeaveInPlace mode
-    public string? AudioFilePath { get; set; }
     public string? CoverImagePath { get; set; }
     
     // Reading Progress
@@ -36,5 +35,6 @@ public class Book
     // Relations
     public ICollection<BookAuthor> Authors { get; set; } = new List<BookAuthor>();
     public ICollection<BookCategory> Categories { get; set; } = new List<BookCategory>();
+    public ICollection<BookAudioTrack> AudioTracks { get; set; } = new List<BookAudioTrack>();
     public SyncMap? SyncMap { get; set; }
 }

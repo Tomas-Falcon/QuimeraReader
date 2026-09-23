@@ -28,6 +28,11 @@ RUN dotnet publish "QuimeraReader.API.csproj" -c Release -o /app/api
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
+# Instalar FFmpeg para el procesamiento de audio de Whisper
+RUN apt-get update && \
+    apt-get install -y ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+
 # Crear carpetas requeridas
 RUN mkdir -p /media /library /config
 

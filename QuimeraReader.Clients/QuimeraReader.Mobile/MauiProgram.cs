@@ -1,4 +1,5 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
+using Radzen;
 
 namespace QuimeraReader.Mobile;
 
@@ -16,8 +17,12 @@ public static class MauiProgram
 
 		builder.Services.AddMauiBlazorWebView();
 
+
+        builder.Services.AddRadzenComponents();
+
+
 #if DEBUG
-		builder.Services.AddBlazorWebViewDeveloperTools();
+        builder.Services.AddBlazorWebViewDeveloperTools();
 		builder.Logging.AddDebug();
 #endif
 		
@@ -30,7 +35,10 @@ public static class MauiProgram
             return new HttpClient { BaseAddress = new Uri(url) };
         });
 
-        builder.Services.AddScoped<QuimeraReader.Shared.Services.IQuimeraApiClient, QuimeraReader.Shared.Services.QuimeraApiClient>();
+        builder.Services.AddScoped<QuimeraReader.Shared.Services.IBookService, QuimeraReader.Shared.Services.BookService>();
+        builder.Services.AddScoped<QuimeraReader.Shared.Services.ISettingsService, QuimeraReader.Shared.Services.SettingsService>();
+        builder.Services.AddScoped<QuimeraReader.Shared.Services.IScanService, QuimeraReader.Shared.Services.ScanService>();
+        builder.Services.AddScoped<QuimeraReader.Shared.Intetfaces.ITranslationService, QuimeraReader.Shared.Services.TranslationService>();
         builder.Services.AddScoped<QuimeraReader.Shared.Services.ToastService>();
 
 		return builder.Build();

@@ -1,7 +1,9 @@
-@page "/author/{AuthorName}"
+﻿@page "/author/{AuthorName}"
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Components
-@inject QuimeraReader.Shared.Services.IQuimeraApiClient ApiClient
+@inject QuimeraReader.Shared.Services.IBookService BookService
+@inject QuimeraReader.Shared.Services.IScanService ScanService
+@inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject NavigationManager NavManager
 
 <PageTitle>@AuthorName - QuimeraReader</PageTitle>

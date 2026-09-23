@@ -1,4 +1,4 @@
-namespace QuimeraReader.Shared.Models;
+﻿namespace QuimeraReader.Shared.Models;
 
 public record Book
 {
@@ -28,6 +28,13 @@ public record Book
     public string EpubUrl => $"api/media/books/{Id}/file.epub";
     public string AudioUrl => $"api/media/books/{Id}/audio";
     public string PackageUrl => $"api/media/books/{Id}/package?format=audiobook";
+}
+
+public class UpdatePositionRequest
+{
+    public string? CurrentEpubCfi { get; set; }
+    public double? CurrentAudioPosition { get; set; }
+    public double? PercentageCompleted { get; set; }
 }
 
 public record PaginatedResult<T>
@@ -70,3 +77,4 @@ public record ScanStatus
     public int FilesProcessed { get; set; }
     public string CurrentFile { get; set; } = string.Empty;
 }
+

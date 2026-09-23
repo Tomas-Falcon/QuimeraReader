@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Infrastructure;
 using QuimeraReader.Infrastructure.Services;
 using Microsoft.Extensions.Hosting;
@@ -76,9 +76,13 @@ public class AudioAlignmentBackgroundService : BackgroundService
 
         var bookToSync = await dbContext.Books
             .Include(b => b.SyncMap)
+            .Include(b => b.AudioTracks)
             .FirstOrDefaultAsync(b => b.Id == bookId, stoppingToken);
 
-        if (bookToSync == null || string.IsNullOrEmpty(bookToSync.AudioFilePath) || string.IsNullOrEmpty(bookToSync.EpubFilePath))
+        var audioTrack = bookToSync.AudioTracks.OrderBy(t => t.TrackNumber).FirstOrDefault();
+        var audioFilePath = audioTrack?.FilePath;
+
+        if (bookToSync == null || string.IsNullOrEmpty(audioFilePath) || string.IsNullOrEmpty(bookToSync.EpubFilePath))
         {
             _logger.LogWarning("El libro {Id} no es válido para sincronización.", bookId);
             return;
@@ -106,7 +110,7 @@ public class AudioAlignmentBackgroundService : BackgroundService
         }
 
         // Invocar Whisper (bloqueante, sincrónico en este hilo para cumplir la regla FIFO 1x1)
-        var alignmentResult = await alignmentService.GenerateSyncMapAsync(bookToSync.AudioFilePath, textContent);
+        var alignmentResult = await alignmentService.GenerateSyncMapAsync(audioFilePath, textContent);
 
         if (!alignmentResult.Success)
         {

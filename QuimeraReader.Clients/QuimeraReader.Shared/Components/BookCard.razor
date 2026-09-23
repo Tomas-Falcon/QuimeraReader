@@ -1,6 +1,8 @@
-@using QuimeraReader.Shared.Models
+﻿@using QuimeraReader.Shared.Models
 @inject NavigationManager NavManager
-@inject QuimeraReader.Shared.Services.IQuimeraApiClient ApiClient
+@inject QuimeraReader.Shared.Services.IBookService BookService
+@inject QuimeraReader.Shared.Services.IScanService ScanService
+@inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @namespace QuimeraReader.Shared.Components
 
 <div class="book-card @(IsSelected ? "selected" : "")" @onclick="HandleCardClick">
@@ -13,7 +15,7 @@
     <div class="cover-container">
         @if (!string.IsNullOrEmpty(Book?.CoverUrl))
         {
-            <img src="@(ApiClient.BaseAddress + @Book.CoverUrl)" alt="Portada de @Book.Title" class="cover-image" loading="lazy" onerror="this.outerHTML='<div class=\'placeholder-cover\'><span>Sin Portada</span></div>'" />
+            <img src="@(BookService.BaseAddress + @Book.CoverUrl)" alt="Portada de @Book.Title" class="cover-image" loading="lazy" onerror="this.outerHTML='<div class=\'placeholder-cover\'><span>Sin Portada</span></div>'" />
         }
         else
         {

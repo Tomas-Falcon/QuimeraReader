@@ -1,4 +1,4 @@
-using MediatR;
+﻿using MediatR;
 using System.Collections.Generic;
 
 namespace QuimeraReader.Application.Books.Commands.MergeDuplicates;
