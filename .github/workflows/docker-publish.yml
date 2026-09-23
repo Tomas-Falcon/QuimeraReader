@@ -1,12 +1,12 @@
-name: Docker Build and Publish
+﻿name: Docker Build and Publish
 
 on:
   push:
-    branches: [ "main" ]
-    # Opcional: También puedes hacer que se construya cuando crees un "Release" o un "Tag" (v1.0, v2.0)
+    branches: [ "main", "dev" ]
+    # Opcional: TambiÃ©n puedes hacer que se construya cuando crees un "Release" o un "Tag" (v1.0, v2.0)
     tags: [ 'v*.*.*' ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
 
 env:
   REGISTRY: ghcr.io
@@ -41,6 +41,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
             type=semver,pattern={{version}}
 
       - name: Build and push Docker image
@@ -52,3 +53,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
