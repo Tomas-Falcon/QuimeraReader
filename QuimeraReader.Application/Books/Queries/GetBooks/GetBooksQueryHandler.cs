@@ -31,7 +31,7 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
         {
             var s = request.Search.ToLower();
             query = query.Where(b => b.Title.ToLower().Contains(s) || 
-                                     b.Authors.Any(a => a.Author!.Name.ToLower().Contains(s)));
+                                     b.Authors.Any(a => a.Author!.Name.ToLower().Contains(s)) || b.Categories.Any(c => c.Category!.Name.ToLower().Contains(s)));
         }
 
         if (request.CategoryIds != null && request.CategoryIds.Any())

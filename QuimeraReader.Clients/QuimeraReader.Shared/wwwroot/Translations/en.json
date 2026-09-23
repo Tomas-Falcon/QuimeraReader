@@ -10,7 +10,7 @@
   "Library_Categories_Select": "Categories",
   "Status_NextToRead": "Next to Read",
   "Status_Reading": "Continue Reading",
-  "Status_Read": "Read",
+  "Status_Read": "Read",`r`n  "Nav_Library": "Library",`r`n  "Nav_Authors": "Authors",`r`n  "Nav_Genres": "Genres",`r`n  "Nav_Settings": "Settings",`r`n  "Action_BackToAuthors": "Back to Authors",`r`n  "Action_BackToCategories": "Back to Genres",
   "Status_Unread": "Unread",
   "Action_StartReading": "Start reading",
   "Action_ContinueReading": "Continue reading",
