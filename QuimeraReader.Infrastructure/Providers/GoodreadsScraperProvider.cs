@@ -59,8 +59,8 @@ public class GoodreadsScraperProvider : IMetadataProvider
                             // For example: https://images.gr-assets.com/books/1361039443s/41865.jpg
                             // Actually it's often easiest to replace 's' or 'i' with 'l' for large, but it depends.
                             // Let's just grab the src.
-                            if (src.Contains("s/")) src = src.Replace("s/", "l/");
-                            else if (src.Contains("i/")) src = src.Replace("i/", "l/");
+                            src = System.Text.RegularExpressions.Regex.Replace(src, @"(books/\d+)[siml]/", "$1l/");
+                            // Safely upscale Goodreads images to large without corrupting the URL structure
                             
                             // Remove Amazon scaling suffixes
                             src = System.Text.RegularExpressions.Regex.Replace(src, @"\._[A-Z0-9]+_\.", ".");
