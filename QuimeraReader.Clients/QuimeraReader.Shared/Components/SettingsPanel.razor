@@ -1,4 +1,4 @@
-@using QuimeraReader.Shared.Models
+﻿@using QuimeraReader.Shared.Models
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @using QuimeraReader.Shared.Services
 
@@ -150,6 +150,28 @@
                                 <p class="mb-0 text-white-50 small">@TranslationService["Settings_DuplicateCleanupDesc"]</p>
                             </div>
                             <RadzenButton Text="@TranslationService["Settings_Merge"]" Icon="auto_fix_high" Click="MergeDuplicatesAsync" ButtonStyle="Radzen.ButtonStyle.Light" Variant="Radzen.Variant.Outlined" />
+                        </div>
+                    </RadzenCard>
+                </RadzenTabsItem>
+                <RadzenTabsItem Text="@TranslationService["Settings_System"]" Icon="settings_applications">
+                    <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
+                        <h4 class="text-primary"><RadzenIcon Icon="memory" /> Sistema y Contenedor</h4>
+                        <p class="text-white-50 small mb-4">Opciones para administrar la instancia del servidor o contenedor Docker.</p>
+                        
+                        <div class="d-flex justify-content-between align-items-center border-bottom border-secondary py-3">
+                            <div>
+                                <h6 class="mb-1 fw-bold text-warning">Reiniciar Servidor</h6>
+                                <p class="mb-0 text-white-50 small">Reinicia de forma segura la aplicación. Si estás usando Docker, el contenedor debería volver a arrancar automáticamente (requiere restart:always).</p>
+                            </div>
+                            <RadzenButton Text="Reiniciar" Icon="restart_alt" Click="RestartContainerAsync" ButtonStyle="Radzen.ButtonStyle.Warning" />
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center py-3">
+                            <div>
+                                <h6 class="mb-1 fw-bold text-danger">Actualizar Contenedor y Reiniciar</h6>
+                                <p class="mb-0 text-white-50 small">Ejecuta el script de actualización local (/app/update_container.sh si existe) y luego reinicia el servidor para aplicar la nueva imagen Docker.</p>
+                            </div>
+                            <RadzenButton Text="Actualizar y Reiniciar" Icon="system_update_alt" Click="UpdateContainerAsync" ButtonStyle="Radzen.ButtonStyle.Danger" />
                         </div>
                     </RadzenCard>
                 </RadzenTabsItem>

@@ -1,4 +1,4 @@
-{
+﻿{
   "App_Title": "QuimeraReader",
   "Filter_Placeholder": "Seleccionar filtro...",
   "Filter_RecentlyAdded": "Añadido recientemente",
@@ -70,5 +70,6 @@
   "Settings_DuplicateCleanup": "Limpieza de Duplicados",
   "Settings_DuplicateCleanupDesc": "Fusiona autores y categorías que se hayan guardado múltiples veces.",
   "Settings_Merge": "Fusionar",
-  "Settings_SaveAllChanges": "Guardar Todos los Cambios"
+  "Settings_SaveAllChanges": "Guardar Todos los Cambios",
+  "Settings_System": "Sistema"
 }

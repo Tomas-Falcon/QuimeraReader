@@ -226,4 +226,29 @@ public partial class SettingsPanel : ComponentBase
         }
     }
 
+    private async Task RestartContainerAsync()
+    {
+        try
+        {
+            await SettingsService.RestartServerAsync();
+            ShowMessage("Se ha enviado la señal de reinicio.", true);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage("Error al reiniciar: " + ex.Message, false);
+        }
+    }
+
+    private async Task UpdateContainerAsync()
+    {
+        try
+        {
+            await SettingsService.UpdateContainerAsync();
+            ShowMessage("Se ha enviado la señal de actualización y reinicio.", true);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage("Error al actualizar: " + ex.Message, false);
+        }
+    }
 }
