@@ -76,6 +76,11 @@ public class MediaController : ControllerBase
         var book = await _dbContext.Books.FindAsync(id);
         if (book == null) return NotFound();
 
+        if (!string.IsNullOrEmpty(book.CoverImagePath) && book.CoverImagePath.StartsWith("http"))
+        {
+            return Redirect(book.CoverImagePath);
+        }
+
         var resolvedPath = await GetResolvedPathAsync(book.CoverImagePath);
         if (resolvedPath == null) return NotFound();
 
