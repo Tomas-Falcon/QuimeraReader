@@ -1,4 +1,4 @@
-using QuimeraReader.Shared.Services;
+﻿using QuimeraReader.Shared.Services;
 
 namespace QuimeraReader.Mobile.Services;
 

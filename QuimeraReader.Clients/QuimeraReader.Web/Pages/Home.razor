@@ -5,8 +5,13 @@
 
 <div class="home-header mb-4 mt-2">
     <h1>Tu Biblioteca</h1>
-    <p class="text-muted">Explora tus libros, continÃºa leyendo donde lo dejaste y descubre nuevas recomendaciones.</p>
+    <p class="text-muted">Explora tus libros, continúa leyendo donde lo dejaste y descubre nuevas recomendaciones.</p>
 </div>
 
 <BookList QueryParam="@Q" />
 
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Q { get; set; }
+}

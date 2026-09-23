@@ -1,4 +1,4 @@
-namespace QuimeraReader.Domain.Entities;
+﻿namespace QuimeraReader.Domain.Entities;
 
 public class Book
 {

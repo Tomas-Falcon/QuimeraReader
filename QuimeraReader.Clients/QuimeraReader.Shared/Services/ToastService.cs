@@ -1,4 +1,4 @@
-using QuimeraReader.Shared.Models;
+﻿using QuimeraReader.Shared.Models;
 
 namespace QuimeraReader.Shared.Services;
 

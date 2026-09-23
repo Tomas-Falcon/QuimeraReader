@@ -1,4 +1,4 @@
-namespace QuimeraReader.Infrastructure.Services;
+﻿namespace QuimeraReader.Infrastructure.Services;
 
 public class LibraryScanState
 {

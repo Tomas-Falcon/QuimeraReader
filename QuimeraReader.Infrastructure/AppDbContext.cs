@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Domain.Entities;
 using QuimeraReader.Application.Interfaces;
 

@@ -1,4 +1,4 @@
-namespace QuimeraReader.Shared.Models;
+﻿namespace QuimeraReader.Shared.Models;
 
 public record Book
 {

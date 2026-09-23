@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Domain.Entities;
 using System.Threading;
 using System.Threading.Tasks;

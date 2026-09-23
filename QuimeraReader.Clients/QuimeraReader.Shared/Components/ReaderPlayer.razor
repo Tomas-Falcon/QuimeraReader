@@ -45,7 +45,7 @@
                     <div class="reading-progress text-center py-2" style="background: var(--bg-card); font-size: 0.85rem; color: var(--text-muted);">
                         @if (Book.PercentageCompleted.HasValue)
                         {
-                            <span>@($"{Math.Round(Book.PercentageCompleted.Value, 1)}% leÃ­do")</span>
+                            <span>@($"{Math.Round(Book.PercentageCompleted.Value, 1)}% leído")</span>
                         }
                     </div>
                 }
@@ -68,7 +68,7 @@
                     <div class="no-sync-map text-center pt-5" style="flex: 1;">
                         <img src="@(BookService.BaseAddress + @Book.CoverUrl)" class="fallback-cover mb-4" style="max-width: 200px; border-radius: 8px;" />
                         <h3>Modo Audiolibro Puro</h3>
-                        <p class="text-muted">No se encontraron transcripciones o texto para este tÃ­tulo.</p>
+                        <p class="text-muted">No se encontraron transcripciones o texto para este título.</p>
                     </div>
                 }
             </div>
@@ -205,7 +205,7 @@
         {
             _lastSavedTime = time;
             // Solo mandamos el audioPosition, dejamos el epubCfi intacto o null. 
-            // Percentage se podrÃ­a calcular si tuviÃ©ramos el total duration.
+            // Percentage se podría calcular si tuviéramos el total duration.
             _ = BookService.UpdatePositionAsync(BookId, audioPosition: time);
         }
 

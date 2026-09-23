@@ -79,7 +79,7 @@ else
                     <div class="badges mb-4 d-flex gap-2 flex-wrap align-items-center">
                         @if (_book.AverageRating.HasValue && _book.AverageRating.Value > 0)
                         {
-                            <span class="badge bg-warning text-dark fs-6" title="PuntuaciÃ³n Media">
+                            <span class="badge bg-warning text-dark fs-6" title="Puntuación Media">
                                 <i class="bi bi-star-fill"></i> @_book.AverageRating.Value.ToString("0.0")
                             </span>
                         }
@@ -155,7 +155,7 @@ else
                     </div>
 
                     <div class="mt-4 pt-4" style="border-top: 1px solid rgba(255,255,255,0.1);">
-                        <h6 class="text-white-50 mb-3"><i class="bi bi-gear me-2"></i> GestiÃ³n de archivos</h6>
+                        <h6 class="text-white-50 mb-3"><i class="bi bi-gear me-2"></i> Gestión de archivos</h6>
                         <div class="d-flex gap-2 flex-wrap">
                             @if (_book.HasEpub)
                             {
@@ -256,7 +256,7 @@ else
 
     private async Task DeleteEpubAsync()
     {
-        bool confirmed = await JS.InvokeAsync<bool>("confirm", "Â¿Seguro que deseas borrar el archivo EPUB de este libro?");
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", "¿Seguro que deseas borrar el archivo EPUB de este libro?");
         if (!confirmed) return;
 
         try
@@ -287,7 +287,7 @@ else
 
     private async Task DeleteAudioAsync()
     {
-        bool confirmed = await JS.InvokeAsync<bool>("confirm", "Â¿Seguro que deseas borrar el Audiolibro de este libro?");
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", "¿Seguro que deseas borrar el Audiolibro de este libro?");
         if (!confirmed) return;
 
         try
