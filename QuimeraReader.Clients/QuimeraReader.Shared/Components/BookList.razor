@@ -1,105 +1,80 @@
 ﻿@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
+@using Radzen
+@using Radzen.Blazor
+@implements IDisposable
 @inject QuimeraReader.Shared.Services.IBookService BookService
 @inject QuimeraReader.Shared.Services.IScanService ScanService
 @inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject ToastService ToastService
+@inject IJSRuntime JSRuntime
 @namespace QuimeraReader.Shared.Components
 
 <div class="library-container">
     <div class="library-toolbar d-flex justify-content-between align-items-center mb-4">
         <div class="search-box" style="flex: 0 0 300px;">
-            <input type="text" class="form-control" placeholder="Buscar libros, autores..." value="@_searchQuery" @oninput="OnSearchInput" />
+            <RadzenTextBox Placeholder="Buscar libros, autores..." Value="@_searchQuery" Change="OnSearchInput" class="w-100" />
         </div>
         <div class="filters d-flex gap-2 align-items-center">
             @if (_selectionMode)
             {
                 <span class="text-primary fw-bold me-2">@_selectedBookIds.Count seleccionados</span>
-                <button class="btn btn-outline-secondary btn-sm" @onclick="ToggleSelectionMode">Cancelar Selección</button>
-                <button class="btn btn-danger btn-sm" @onclick="DeleteSelected" disabled="@(_selectedBookIds.Count == 0)">
-                    <i class="bi bi-trash"></i> Borrar
-                </button>
+                <RadzenButton Text="Cancelar Selección" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Size="ButtonSize.Small" />
+                <RadzenButton Text="Borrar" Click="DeleteSelected" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Icon="delete" Disabled="@(_selectedBookIds.Count == 0)" />
             }
             else
             {
-                <button class="btn btn-outline-secondary" @onclick="ToggleSelectionMode">
-                    <i class="bi bi-check-square"></i> Seleccionar
-                </button>
+                <RadzenButton Text="Seleccionar" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Icon="check_box" />
                 @if (_isUploading)
                 {
-                    <span class="text-muted small"><i class="bi bi-arrow-repeat spin"></i> Subiendo...</span>
+                    <span class="text-muted small"><RadzenIcon Icon="refresh" class="rz-spin" /> Subiendo...</span>
                 }
-                <label class="btn btn-primary m-0 d-flex align-items-center gap-2" style="cursor: pointer;">
-                    <i class="bi bi-cloud-arrow-up"></i> Subir EPUB
+                <label class="rz-button rz-button-md rz-variant-filled rz-primary rz-shade-default m-0 d-flex align-items-center gap-2" style="cursor: pointer;">
+                    <RadzenIcon Icon="cloud_upload" /> Subir EPUB
                     <InputFile OnChange="HandleFileUpload" accept=".epub" class="d-none" multiple />
                 </label>
-                <select class="form-select" style="width: auto;">
-                    <option>Añadidos recientemente</option>
-                    <option>Título (A-Z)</option>
-                    <option>Autor (A-Z)</option>
-                </select>
+                <RadzenDropDown TValue="string" Data="@_sortOptions" @bind-Value="_selectedSort" Style="width: auto;" />
             }
         </div>
     </div>
 
-    @{
-        var continueReading = _books.Where(b => b.LastReadAt.HasValue).OrderByDescending(b => b.LastReadAt).Take(4).ToList();
-        
-        if (continueReading.Any())
+    @if (string.IsNullOrWhiteSpace(_searchQuery))
+    {
+        @if (_readingBooks != null && _readingBooks.Any())
         {
-            <div class="mb-5 continue-reading-section">
-                <h4 class="mb-3 d-flex align-items-center">
-                    <span class="bi bi-clock-history me-2 text-primary"></span>
-                    Seguir leyendo
-                </h4>
-                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
-                    @foreach (var book in continueReading)
-                    {
-                        <div class="col">
-                            <BookCard Book="book" IsCompact="true"
-                                      SelectionMode="_selectionMode" 
-                                      IsSelected="_selectedBookIds.Contains(book.Id)"
-                                      IsSelectedChanged="@(isSelected => OnBookSelectionChanged(book.Id, isSelected))" />
-                        </div>
-                    }
-                </div>
+            <h3 class="rz-color-primary rz-mt-4 mb-3">Continuar Leyendo</h3>
+            <div class="netflix-row mb-5">
+                @foreach (var book in _readingBooks)
+                {
+                    <BookCard Book="book" />
+                }
+            </div>
+        }
+
+        @if (_recommendations != null && _recommendations.Any())
+        {
+            <h3 class="rz-color-primary rz-mt-4 mb-3">Recomendados para ti</h3>
+            <div class="netflix-row mb-5">
+                @foreach (var book in _recommendations)
+                {
+                    <BookCard Book="book" />
+                }
             </div>
         }
     }
 
+    <h3 class="rz-color-primary rz-mt-4 mb-3">@(string.IsNullOrWhiteSpace(_searchQuery) ? "Toda la biblioteca" : "Resultados de búsqueda")</h3>
+    
     @if (_books.Count == 0 && !_isLoading)
     {
-        <div class="empty-state text-center py-5">
-            @if (string.IsNullOrWhiteSpace(_searchQuery))
-            {
-                <i class="bi bi-bookshelf" style="font-size: 4rem; color: var(--text-muted);"></i>
-                <h3 class="mt-3">Tu biblioteca está vacía</h3>
-                <p class="text-muted">No se encontraron libros en la base de datos.</p>
-                <div class="mt-4">
-                    <label class="btn btn-outline-primary mt-3 @(_isUploading ? "disabled" : "")">
-                        @if (_isUploading)
-                        {
-                            <i class="bi bi-arrow-repeat spin me-2"></i> <span>Subiendo...</span>
-                        }
-                        else
-                        {
-                            <span>Subir mi primer EPUB</span>
-                        }
-                        <InputFile OnChange="HandleFileUpload" accept=".epub" class="d-none" multiple />
-                    </label>
-                </div>
-            }
-            else
-            {
-                <i class="bi bi-search" style="font-size: 4rem; color: var(--text-muted);"></i>
-                <h3 class="mt-3">Sin resultados</h3>
-                <p class="text-muted">No se encontraron libros para "@_searchQuery".</p>
-            }
+        <div class="text-center p-5">
+            <RadzenIcon Icon="library_books" Style="font-size: 3rem; color: var(--rz-text-disabled-color);" />
+            <p class="text-muted mt-2">No hay libros en la biblioteca.</p>
         </div>
     }
     else
     {
-        <div class="books-grid">
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-5 g-4">
             @foreach (var book in _books)
             {
                 <BookCard Book="book" 
@@ -114,17 +89,38 @@
             <div @ref="_loadMoreElement" class="load-more-trigger mt-4 text-center p-3">
                 @if (_isLoading)
                 {
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Cargando...</span>
-                    </div>
+                    <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Medium" />
                 }
             </div>
         }
     }
 </div>
 
-@implements IDisposable
-@inject IJSRuntime JSRuntime
+<style>
+    .netflix-row {
+        display: flex;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        gap: 1.5rem;
+        padding-bottom: 1rem;
+        padding-top: 0.5rem;
+    }
+    .netflix-row > * {
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+        width: 220px;
+    }
+    .netflix-row::-webkit-scrollbar {
+        height: 8px;
+    }
+    .netflix-row::-webkit-scrollbar-thumb {
+        background-color: var(--rz-primary-light);
+        border-radius: 4px;
+    }
+    .netflix-row::-webkit-scrollbar-track {
+        background-color: transparent;
+    }
+</style>
 
 @code {
     [Parameter]
@@ -132,6 +128,7 @@
 
     private List<Book> _books = new();
     private IEnumerable<Book> _recommendations = Array.Empty<Book>();
+    private IEnumerable<Book> _readingBooks = Array.Empty<Book>();
     private ElementReference _loadMoreElement;
     private DotNetObjectReference<BookList>? _objRef;
     
@@ -146,6 +143,9 @@
 
     private bool _selectionMode = false;
     private HashSet<int> _selectedBookIds = new();
+
+    private List<string> _sortOptions = new List<string> { "Añadidos recientemente", "Título (A-Z)", "Autor (A-Z)" };
+    private string _selectedSort = "Añadidos recientemente";
 
     private void ToggleSelectionMode()
     {
@@ -168,7 +168,6 @@
     {
         if (_selectedBookIds.Count == 0) return;
         
-        // TODO: En producción, añadir un confirm modal
         foreach (var id in _selectedBookIds.ToList())
         {
             try
@@ -251,6 +250,14 @@
         };
         
         _recommendations = await fetchRecs;
+        
+        try
+        {
+            var initialBooks = await BookService.GetBooksAsync(1, 100, "");
+            _readingBooks = initialBooks.Data.Where(b => b.PercentageCompleted > 0 && b.PercentageCompleted < 100).OrderByDescending(b => b.LastReadAt).Take(10).ToList();
+        }
+        catch { }
+
         _ = PollNewBooksAsync();
     }
 
@@ -266,14 +273,13 @@
         }
         else if (string.IsNullOrWhiteSpace(QueryParam) && _books.Count == 0 && !_isLoading)
         {
-            // Initial load
             await LoadBooksAsync();
         }
     }
 
-    private void OnSearchInput(ChangeEventArgs e)
+    private void OnSearchInput(string value)
     {
-        _searchQuery = e.Value?.ToString() ?? string.Empty;
+        _searchQuery = value ?? string.Empty;
         if (_debounceTimer != null)
         {
             _debounceTimer.Stop();
@@ -314,7 +320,6 @@
                 
                 if (_books.Count > 0 && _currentPage > 1)
                 {
-                    // Solo check si hay nuevos libros en el backend
                     try
                     {
                         var result = await BookService.GetBooksAsync(1, 1);
