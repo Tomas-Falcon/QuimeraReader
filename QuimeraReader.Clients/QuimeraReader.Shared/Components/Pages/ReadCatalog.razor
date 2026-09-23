@@ -22,7 +22,7 @@
     {
         <div class="text-center p-5">
             <RadzenIcon Icon="done_all" Style="font-size: 3rem; color: var(--rz-text-disabled-color);" />
-            <p class="text-muted mt-2">Aún no has terminado ningún libro.</p>
+            <p class="text-muted mt-2">Aún no has marcado ningún libro como leído.</p>
         </div>
     }
     else
@@ -44,22 +44,11 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // STRICT CONDITION: Only fetch books explicitly marked as 'Read'
         var result = await BookService.GetBooksAsync(1, 1000, readingStatus: "Read");
         if (result != null && result.Data != null)
         {
             _books = result.Data.ToList();
-        }
-        
-        // Also fetch those with PercentageCompleted >= 100 just in case
-        var extraResult = await BookService.GetBooksAsync(1, 1000, "");
-        if (extraResult != null && extraResult.Data != null)
-        {
-            var extraBooks = extraResult.Data.Where(b => b.PercentageCompleted >= 100 && b.ReadingStatus != "Read").ToList();
-            foreach(var e in extraBooks) 
-            {
-                if (!_books.Any(b => b.Id == e.Id))
-                    _books.Add(e);
-            }
         }
         
         _isLoading = false;
