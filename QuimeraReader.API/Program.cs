@@ -37,6 +37,8 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<IMetadataProvider, GoogleBooksMetadataProvider>();
 builder.Services.AddScoped<IMetadataProvider, OpenLibraryMetadataProvider>();
 builder.Services.AddScoped<IMetadataProvider, HardcoverMetadataProvider>();
+builder.Services.AddScoped<IMetadataProvider, GoodreadsScraperProvider>();
+builder.Services.AddScoped<IMetadataProvider, StoryGraphScraperProvider>();
 
 // Registrar servicios de infraestructura
 builder.Services.AddSingleton<LibraryScanState>();

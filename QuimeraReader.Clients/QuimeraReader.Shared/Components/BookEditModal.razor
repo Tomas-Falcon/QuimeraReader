@@ -24,6 +24,18 @@
             </div>
             @if (!string.IsNullOrEmpty(Book?.CoverUrl))
             {
+                            <div class="mb-3 d-flex align-items-center justify-content-between">
+                <RadzenButton Text="Buscar portadas online" Icon="search" ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Small" Click="SearchCoversAsync" IsBusy="@_isSearchingCovers" />
+            </div>
+            @if (_suggestedCovers.Any())
+            {
+                <div class="d-flex flex-wrap gap-2 mb-3" style="max-height: 250px; overflow-y: auto; background: var(--rz-base-background-color); padding: 10px; border-radius: 8px;">
+                    @foreach (var cover in _suggestedCovers)
+                    {
+                        <img src="@cover" alt="Cover Option" style="width: 90px; height: 130px; object-fit: cover; cursor: pointer; border: @(cover == _coverUrl ? "3px solid var(--rz-primary)" : "1px solid #ccc"); border-radius: 4px; transition: transform 0.2s;" @onclick="() => SelectCover(cover)" />
+                    }
+                </div>
+            }
                 <div class="text-center mt-3">
                     <img src="@(BookService.BaseAddress + Book.CoverUrl)" alt="Cover" style="max-height: 200px; object-fit: contain;" />
                 </div>

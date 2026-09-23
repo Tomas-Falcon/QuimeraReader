@@ -20,8 +20,10 @@ public class BooksController : ControllerBase
     private readonly AudioAlignmentQueue _queue;
     private readonly LibraryScanState _scanState;
     private readonly ILogger<BooksController> _logger;
+    private readonly IEnumerable<QuimeraReader.Domain.Interfaces.IMetadataProvider> _metadataProviders;
 
     public BooksController(
+        IEnumerable<QuimeraReader.Domain.Interfaces.IMetadataProvider> metadataProviders,
         AppDbContext dbContext, 
         EpubScannerService scannerService, 
         AudioAlignmentService alignmentService, 
@@ -35,6 +37,7 @@ public class BooksController : ControllerBase
         _queue = queue;
         _scanState = scanState;
         _logger = logger;
+        _metadataProviders = metadataProviders;
     }
 
     [HttpGet("categories")]
@@ -769,6 +772,30 @@ public class BooksController : ControllerBase
 
         await _dbContext.SaveChangesAsync();
         return Ok();
+    }
+
+    [HttpGet("{bookId}/cover/search")]
+    public async Task<IActionResult> SearchCovers(int bookId)
+    {
+        var book = await _dbContext.Books.Include(b => b.Authors).ThenInclude(ba => ba.Author).FirstOrDefaultAsync(b => b.Id == bookId);
+        if (book == null) return NotFound();
+
+        var author = book.Authors.FirstOrDefault()?.Author?.Name;
+        
+        Dictionary<string, string>? settings = null; // No need for settings for Goodreads/Storygraph right now
+
+        var allCovers = new List<string>();
+        foreach (var provider in _metadataProviders)
+        {
+            var covers = await provider.SearchCoversAsync(book.Title, author, settings);
+            if (covers != null)
+            {
+                allCovers.AddRange(covers);
+            }
+        }
+
+        var uniqueCovers = allCovers.Where(c => !string.IsNullOrWhiteSpace(c)).Distinct().Take(20).ToList();
+        return Ok(uniqueCovers);
     }
 
     [HttpPut("{bookId}/cover")]

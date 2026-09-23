@@ -1,4 +1,5 @@
-﻿@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Models
+@inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @using QuimeraReader.Shared.Services
 
 
@@ -8,64 +9,64 @@
 
 <div class="container mt-4 mb-5">
     <RadzenCard class="mb-4 rz-background-color-transparent rz-border-radius-0" style="padding:0; border: none; background: transparent;">
-        <h2 class="text-light fw-bold mb-0">Configuración del Servidor</h2>
+        <h2 class="text-light fw-bold mb-0">@TranslationService["Settings_ServerConfig"]</h2>
     </RadzenCard>
 
     @if (_isLoading)
     {
         <div class="d-flex justify-content-center align-items-center py-5">
             <RadzenProgressBar Value="100" ShowValue="false" Mode="Radzen.ProgressBarMode.Indeterminate" Style="width: 200px" />
-            <span class="ms-3 text-muted">Cargando preferencias...</span>
+            <span class="ms-3 text-muted">@TranslationService["Settings_LoadingPreferences"]</span>
         </div>
     }
     else
     {
         <RadzenTabs>
             <Tabs>
-                <RadzenTabsItem Text="General" Icon="settings">
+                <RadzenTabsItem Text="@TranslationService["Settings_General"]" Icon="settings">
                     <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
-                        <h4 class="text-primary"><RadzenIcon Icon="folder" /> Carpetas del Servidor</h4>
-                        <p class="text-white-50 small mb-4">Define dónde buscará QuimeraReader los libros y cómo los importará.</p>
+                        <h4 class="text-primary"><RadzenIcon Icon="folder" /> @TranslationService["Settings_ServerFolders"]</h4>
+                        <p class="text-white-50 small mb-4">@TranslationService["Settings_ServerFoldersDesc"]</p>
 
                         <div class="mb-4">
-                            <RadzenLabel Text="Directorio de Origen (Descargas/Media)" class="fw-bold mb-2 d-block" />
+                            <RadzenLabel Text="@TranslationService["Settings_SourceDirectory"]" class="fw-bold mb-2 d-block" />
                             <RadzenTextBox @bind-Value="_libraryRootPath" class="w-100 bg-secondary text-light border-0" />
-                            <div class="form-text text-white-50 mt-1">Ruta donde caen los EPUBs o MP3 sueltos (Volumen montado en Docker).</div>
+                            <div class="form-text text-white-50 mt-1">@TranslationService["Settings_SourceDirectoryDesc"]</div>
                         </div>
 
                         <div class="mb-4">
-                            <RadzenLabel Text="Directorio de Salida (Librería Organizada)" class="fw-bold mb-2 d-block" />
+                            <RadzenLabel Text="@TranslationService["Settings_OutputDirectory"]" class="fw-bold mb-2 d-block" />
                             <RadzenTextBox @bind-Value="_outgoingLibraryPath" class="w-100 bg-secondary text-light border-0" />
-                            <div class="form-text text-white-50 mt-1">Ruta donde se guardarán y organizarán los libros y carátulas.</div>
+                            <div class="form-text text-white-50 mt-1">@TranslationService["Settings_OutputDirectoryDesc"]</div>
                         </div>
 
                         <div class="mb-2">
-                            <RadzenLabel Text="Modo de Importación" class="fw-bold mb-2 d-block" />
+                            <RadzenLabel Text="@TranslationService["Settings_ImportMode"]" class="fw-bold mb-2 d-block" />
                             <RadzenDropDown @bind-Value="_ingestionMode" Data="@_ingestionModes" TextProperty="Text" ValueProperty="Value" class="w-100 bg-secondary text-light border-0" />
-                            <div class="form-text text-white-50 mt-1">Mover y organizar o Dejar en lugar original.</div>
+                            <div class="form-text text-white-50 mt-1">@TranslationService["Settings_ImportModeDesc"]</div>
                         </div>
                     </RadzenCard>
                 </RadzenTabsItem>
 
-                <RadzenTabsItem Text="Integraciones (API)" Icon="api">
+                <RadzenTabsItem Text="@TranslationService["Settings_IntegrationsAPI"]" Icon="api">
                     <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
-                        <h4 class="text-primary"><RadzenIcon Icon="smart_toy" /> Inteligencia Artificial y Transcripción</h4>
-                        <p class="text-white-50 small mb-4">Configura cómo deseas ejecutar los modelos de IA para sincronizar texto y audio.</p>
+                        <h4 class="text-primary"><RadzenIcon Icon="smart_toy" /> @TranslationService["Settings_AIAndTranscription"]</h4>
+                        <p class="text-white-50 small mb-4">@TranslationService["Settings_AIAndTranscriptionDesc"]</p>
 
                         <div class="mb-4">
-                            <RadzenLabel Text="Modo de Ejecución de Whisper" class="fw-bold mb-2 d-block" />
+                            <RadzenLabel Text="@TranslationService["Settings_WhisperExecutionMode"]" class="fw-bold mb-2 d-block" />
                             <RadzenDropDown @bind-Value="_whisperMode" Data="@_whisperModes" TextProperty="Text" ValueProperty="Value" class="w-100 mb-3 bg-secondary text-light border-0" />
 
                             @if (_whisperMode == "LocalServer")
                             {
                                 <div class="p-3 bg-secondary rounded mt-2">
-                                    <h6 class="fw-bold"><RadzenIcon Icon="dns" /> Configuración Local (Whisper.net)</h6>
-                                    <p class="text-white-50 small">Se descargarán los pesos del modelo directamente al contenedor. Depende del CPU/GPU del servidor.</p>
+                                    <h6 class="fw-bold"><RadzenIcon Icon="dns" /> @TranslationService["Settings_LocalConfigWhisper"]</h6>
+                                    <p class="text-white-50 small">@TranslationService["Settings_LocalConfigWhisperDesc"]</p>
                                     <div class="mb-3">
-                                        <RadzenLabel Text="Ruta del Modelo Base (.bin)" class="small d-block mb-1" />
+                                        <RadzenLabel Text="@TranslationService["Settings_BaseModelPath"]" class="small d-block mb-1" />
                                         <div class="d-flex gap-2">
                                             <RadzenTextBox @bind-Value="_whisperModelPath" class="flex-grow-1 bg-dark text-light border-0" />
-                                            <RadzenButton Text="Descargar Ahora" Click="DownloadWhisperModelAsync" IsBusy="@_isDownloadingWhisper" ButtonStyle="Radzen.ButtonStyle.Primary" Variant="Radzen.Variant.Outlined" />
+                                            <RadzenButton Text="@TranslationService["Settings_DownloadNow"]" Click="DownloadWhisperModelAsync" IsBusy="@_isDownloadingWhisper" ButtonStyle="Radzen.ButtonStyle.Primary" Variant="Radzen.Variant.Outlined" />
                                         </div>
                                     </div>
                                 </div>
@@ -73,14 +74,14 @@
                             else
                             {
                                 <div class="p-3 bg-secondary rounded mt-2">
-                                    <h6 class="fw-bold"><RadzenIcon Icon="cloud" /> Configuración API Externa</h6>
-                                    <p class="text-white-50 small">Conecta QuimeraReader a OpenAI o a un modelo alojado en otro servidor (ej. Ollama).</p>
+                                    <h6 class="fw-bold"><RadzenIcon Icon="cloud" /> @TranslationService["Settings_ExternalAPIConfig"]</h6>
+                                    <p class="text-white-50 small">@TranslationService["Settings_ExternalAPIConfigDesc"]</p>
                                     <div class="mb-3">
-                                        <RadzenLabel Text="Endpoint URL" class="small d-block mb-1" />
+                                        <RadzenLabel Text="@TranslationService["Settings_EndpointURL"]" class="small d-block mb-1" />
                                         <RadzenTextBox @bind-Value="_openAiEndpoint" class="w-100 bg-dark text-light border-0" />
                                     </div>
                                     <div class="mb-3">
-                                        <RadzenLabel Text="API Key" class="small d-block mb-1" />
+                                        <RadzenLabel Text="@TranslationService["Settings_APIKey"]" class="small d-block mb-1" />
                                         <RadzenPassword @bind-Value="_openAiKey" class="w-100 bg-dark text-light border-0" />
                                     </div>
                                 </div>
@@ -89,66 +90,66 @@
                     </RadzenCard>
 
                     <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
-                        <h4 class="text-primary"><RadzenIcon Icon="auto_awesome" /> Metadatos y Portadas</h4>
-                        <p class="text-white-50 small mb-4">Mejora la calidad de la biblioteca conectando con bases de datos externas.</p>
+                        <h4 class="text-primary"><RadzenIcon Icon="auto_awesome" /> @TranslationService["Settings_MetadataAndCovers"]</h4>
+                        <p class="text-white-50 small mb-4">@TranslationService["Settings_MetadataAndCoversDesc"]</p>
                         
                         <div class="mb-4">
-                            <RadzenLabel Text="Google Books API Key" class="fw-bold mb-2 d-block" />
+                            <RadzenLabel Text="@TranslationService["Settings_GoogleBooksAPIKey"]" class="fw-bold mb-2 d-block" />
                             <RadzenPassword @bind-Value="_googleBooksKey" class="w-100 bg-secondary text-light border-0" />
                         </div>
                         
                         <div class="mb-3">
-                            <RadzenLabel Text="Hardcover API Key" class="fw-bold mb-2 d-block" />
+                            <RadzenLabel Text="@TranslationService["Settings_HardcoverAPIKey"]" class="fw-bold mb-2 d-block" />
                             <RadzenPassword @bind-Value="_hardcoverKey" class="w-100 mb-2 bg-secondary text-light border-0" />
                             
                             <div class="d-flex align-items-center mt-3">
                                 <RadzenSwitch @bind-Value="_hardcoverSyncEnabled" Name="hardcoverSyncCheck" />
-                                <RadzenLabel Text="Sincronización de mi contenido (Hardcover)" Component="hardcoverSyncCheck" class="ms-2 fw-bold" />
+                                <RadzenLabel Text="@TranslationService["Settings_HardcoverSync"]" Component="hardcoverSyncCheck" class="ms-2 fw-bold" />
                             </div>
                         </div>
                     </RadzenCard>
                 </RadzenTabsItem>
 
-                <RadzenTabsItem Text="Tareas y Escaneo" Icon="checklist">
+                <RadzenTabsItem Text="@TranslationService["Settings_TasksAndScanning"]" Icon="checklist">
                     <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
-                        <h4 class="text-primary"><RadzenIcon Icon="build" /> Sincronización Manual</h4>
-                        <p class="text-white-50 small mb-4">Fuerza a los Background Workers a ejecutar tareas de mantenimiento ahora mismo.</p>
+                        <h4 class="text-primary"><RadzenIcon Icon="build" /> @TranslationService["Settings_ManualSync"]</h4>
+                        <p class="text-white-50 small mb-4">@TranslationService["Settings_ManualSyncDesc"]</p>
                         
                         @if (_scanStatus != null && _scanStatus.IsScanning)
                         {
                             var progress = _scanStatus.TotalFilesFound > 0 ? (int)((_scanStatus.FilesProcessed * 100.0) / _scanStatus.TotalFilesFound) : 0;
                             <div class="alert alert-primary mb-4" style="border-radius: 8px; border: 1px solid var(--bs-primary);">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h5 class="mb-0 fw-bold"><RadzenIcon Icon="search" /> Escaneo en progreso...</h5>
-                                    <RadzenButton Text="Cancelar" Click="CancelScanAsync" ButtonStyle="Radzen.ButtonStyle.Danger" Size="Radzen.ButtonSize.Small" Variant="Radzen.Variant.Outlined" />
+                                    <h5 class="mb-0 fw-bold"><RadzenIcon Icon="search" /> @TranslationService["Settings_ScanInProgress"]</h5>
+                                    <RadzenButton Text="@TranslationService["Button_Cancel"]" Click="CancelScanAsync" ButtonStyle="Radzen.ButtonStyle.Danger" Size="Radzen.ButtonSize.Small" Variant="Radzen.Variant.Outlined" />
                                 </div>
-                                <p class="mb-3 text-truncate small">Procesando: <strong>@_scanStatus.CurrentFile</strong></p>
+                                <p class="mb-3 text-truncate small">@TranslationService["Settings_Processing"] <strong>@_scanStatus.CurrentFile</strong></p>
                                 <RadzenProgressBar Value="@progress" ShowValue="true" />
                             </div>
                         }
 
                         <div class="d-flex justify-content-between align-items-center border-bottom border-secondary py-3">
                             <div>
-                                <h6 class="mb-1 fw-bold">Escanear Directorio Base</h6>
-                                <p class="mb-0 text-white-50 small">Busca nuevos archivos EPUB y MP3 en el volumen montado.</p>
+                                <h6 class="mb-1 fw-bold">@TranslationService["Settings_ScanBaseDirectory"]</h6>
+                                <p class="mb-0 text-white-50 small">@TranslationService["Settings_ScanBaseDirectoryDesc"]</p>
                             </div>
-                            <RadzenButton Text="Iniciar" Icon="play_arrow" Click="TriggerScanAsync" Disabled="@(_scanStatus?.IsScanning == true || _isScanning)" ButtonStyle="Radzen.ButtonStyle.Primary" />
+                            <RadzenButton Text="@TranslationService["Settings_Start"]" Icon="play_arrow" Click="TriggerScanAsync" Disabled="@(_scanStatus?.IsScanning == true || _isScanning)" ButtonStyle="Radzen.ButtonStyle.Primary" />
                         </div>
 
                         <div class="d-flex justify-content-between align-items-center border-bottom border-secondary py-3">
                             <div>
-                                <h6 class="mb-1 fw-bold">Reparación de Metadatos</h6>
-                                <p class="mb-0 text-white-50 small">Busca portadas y sinopsis faltantes en Google Books y OpenLibrary.</p>
+                                <h6 class="mb-1 fw-bold">@TranslationService["Settings_MetadataRepair"]</h6>
+                                <p class="mb-0 text-white-50 small">@TranslationService["Settings_MetadataRepairDesc"]</p>
                             </div>
-                            <RadzenButton Text="Completar" Icon="cloud_download" Click="RescanMetadataAsync" ButtonStyle="Radzen.ButtonStyle.Light" Variant="Radzen.Variant.Outlined" />
+                            <RadzenButton Text="@TranslationService["Settings_Complete"]" Icon="cloud_download" Click="RescanMetadataAsync" ButtonStyle="Radzen.ButtonStyle.Light" Variant="Radzen.Variant.Outlined" />
                         </div>
 
                         <div class="d-flex justify-content-between align-items-center border-bottom border-secondary py-3">
                             <div>
-                                <h6 class="mb-1 fw-bold">Limpieza de Duplicados</h6>
-                                <p class="mb-0 text-white-50 small">Fusiona autores y categorías que se hayan guardado múltiples veces.</p>
+                                <h6 class="mb-1 fw-bold">@TranslationService["Settings_DuplicateCleanup"]</h6>
+                                <p class="mb-0 text-white-50 small">@TranslationService["Settings_DuplicateCleanupDesc"]</p>
                             </div>
-                            <RadzenButton Text="Fusionar" Icon="auto_fix_high" Click="MergeDuplicatesAsync" ButtonStyle="Radzen.ButtonStyle.Light" Variant="Radzen.Variant.Outlined" />
+                            <RadzenButton Text="@TranslationService["Settings_Merge"]" Icon="auto_fix_high" Click="MergeDuplicatesAsync" ButtonStyle="Radzen.ButtonStyle.Light" Variant="Radzen.Variant.Outlined" />
                         </div>
                     </RadzenCard>
                 </RadzenTabsItem>
@@ -156,7 +157,7 @@
         </RadzenTabs>
 
         <div class="d-flex justify-content-end mt-4">
-            <RadzenButton Text="Guardar Todos los Cambios" Icon="save" Click="SaveSettingsAsync" IsBusy="@_isSaving" ButtonStyle="Radzen.ButtonStyle.Success" Size="Radzen.ButtonSize.Large" class="px-5 shadow" />
+            <RadzenButton Text="@TranslationService["Settings_SaveAllChanges"]" Icon="save" Click="SaveSettingsAsync" IsBusy="@_isSaving" ButtonStyle="Radzen.ButtonStyle.Success" Size="Radzen.ButtonSize.Large" class="px-5 shadow" />
         </div>
     }
 </div>

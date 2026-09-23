@@ -23,6 +23,14 @@ public class HardcoverMetadataProvider : IMetadataProvider
         _logger = logger;
     }
 
+        public async Task<List<string>> SearchCoversAsync(string title, string? author, Dictionary<string, string>? settings = null)
+    {
+        // For simplicity, Hardcover search might be complex via GraphQL for multiple generic covers, 
+        // we'll just return an empty list or implement it if easy.
+        // Returning empty list for now since Google Books and OpenLibrary will provide enough.
+        return await Task.FromResult(new List<string>());
+    }
+
     public async Task<BookMetadata?> GetMetadataAsync(string query, IEnumerable<string>? isbns = null, Dictionary<string, string>? settings = null, string? authorHint = null)
     {
         string? apiKey = null;

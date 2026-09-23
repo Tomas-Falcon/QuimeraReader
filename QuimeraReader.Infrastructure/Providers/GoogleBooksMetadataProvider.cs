@@ -22,6 +22,40 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
         _logger = logger;
     }
 
+        public async Task<List<string>> SearchCoversAsync(string title, string? author, Dictionary<string, string>? settings = null)
+    {
+        var covers = new List<string>();
+        string? apiKey = null;
+        settings?.TryGetValue("GoogleBooksApiKey", out apiKey);
+        
+        string query = $"intitle:\"{title}\"";
+        if (!string.IsNullOrWhiteSpace(author)) query += $"+inauthor:\"{author}\"";
+        
+        string url = $"https://www.googleapis.com/books/v1/volumes?q={Uri.EscapeDataString(query)}&maxResults=10";
+        if (!string.IsNullOrWhiteSpace(apiKey)) url += $"&key={apiKey}";
+
+        try
+        {
+            var response = await _httpClient.GetFromJsonAsync<GoogleBooksResponse>(url);
+            if (response?.Items != null)
+            {
+                foreach (var item in response.Items)
+                {
+                    var thumb = item.VolumeInfo?.ImageLinks?.Thumbnail;
+                    if (!string.IsNullOrWhiteSpace(thumb))
+                    {
+                        covers.Add(thumb.Replace("http:", "https:"));
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Google Books: error buscando covers para '{Title}'", title);
+        }
+        return covers;
+    }
+
     public async Task<BookMetadata?> GetMetadataAsync(string query, IEnumerable<string>? isbns = null, Dictionary<string, string>? settings = null, string? authorHint = null)
     {
         string? apiKey = null;
