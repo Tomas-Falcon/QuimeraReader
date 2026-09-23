@@ -34,7 +34,7 @@ else
     <main class="@(IsReadingMode ? "p-0" : "")">
         @if (!IsReadingMode)
         {
-            <div class="top-row px-4" style="justify-content: flex-end; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border-color); background-color: var(--bg-card);">
+            <div class="top-row px-4 py-2" style="justify-content: flex-end; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--border-color); background-color: var(--bg-card);">
                 
                 @if (_scanStatus != null && _scanStatus.IsScanning)
                 {
@@ -46,6 +46,7 @@ else
                     </div>
                 }
 
+                                <Radzen.Blazor.RadzenDropDown TValue="string" Value="@_currentLang" Data="@_languages" ValueProperty="Code" TextProperty="Name" Change="OnLanguageChanged" Style="width: 130px;" />
                 <button class="btn btn-outline-secondary metadata-btn" @onclick="FetchMissingMetadata" disabled="@_isFetchingMetadata" style="border-radius: 20px; display: flex; align-items: center; gap: 6px;">
                     @if (_isFetchingMetadata)
                     {
@@ -77,10 +78,27 @@ else
     </main>
 </div>
 <QuimeraReader.Shared.Components.ToastContainer />
+<Radzen.Blazor.RadzenDialog />
 }
 
 @code {
     private bool isDarkTheme = true;
+    private string _currentLang = "es";
+    private List<dynamic> _languages = new List<dynamic>
+    {
+        new { Code = "es", Name = "Español" },
+        new { Code = "en", Name = "English" }
+    };
+
+    private async Task OnLanguageChanged(object value)
+    {
+        if (value != null)
+        {
+            _currentLang = value.ToString()!;
+            await TranslationService.LoadLanguageAsync(_currentLang);
+            NavManager.NavigateTo(NavManager.Uri, forceLoad: true);
+        }
+    }
     private string _serverInput = "http://";
     private bool _isFetchingMetadata = false;
     private bool IsReadingMode => NavManager.Uri.Contains("/read/", StringComparison.OrdinalIgnoreCase);
@@ -154,6 +172,9 @@ else
         if (firstRender)
         {
             await TranslationService.InitializeAsync();
+            var storedLang = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "preferredLanguage");
+            if (!string.IsNullOrEmpty(storedLang)) _currentLang = storedLang;
+            StateHasChanged();
             var theme = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "theme");
             if (theme == "light")
             {

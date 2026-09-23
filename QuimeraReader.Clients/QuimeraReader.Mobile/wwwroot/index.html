@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -51,6 +51,18 @@
             }
         };
         window.themeManager.initTheme();
+        window.netflixScroll = {
+            initialize: function () {
+                document.addEventListener('wheel', function(e) {
+                    const row = e.target.closest('.netflix-row');
+                    if (row && Math.abs(e.deltaY) > 0) {
+                        e.preventDefault();
+                        row.scrollLeft += e.deltaY;
+                    }
+                }, { passive: false });
+            }
+        };
+        window.netflixScroll.initialize();
 
         window.infiniteScroll = {
             initialize: function (element, dotnetHelper) {

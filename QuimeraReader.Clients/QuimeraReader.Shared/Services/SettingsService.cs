@@ -10,6 +10,7 @@ public interface ISettingsService
     Task SaveSettingAsync(SystemSetting setting);
     Task DownloadWhisperModelAsync();
     Task RestartServerAsync();
+    Task UpdateContainerAsync();
 }
 
 public class SettingsService : ISettingsService
@@ -78,6 +79,19 @@ public class SettingsService : ISettingsService
         catch (Exception ex)
         {
             _logger.LogError(ex, "[SettingsService] Error al intentar reiniciar el servidor.");
+            throw;
+        }
+    }
+    public async Task UpdateContainerAsync()
+    {
+        try
+        {
+            _logger.LogInformation("[SettingsService] Solicitando actualización y reinicio del contenedor.");
+            await _httpClient.PostAsync("api/settings/update-container", null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[SettingsService] Error al intentar actualizar el contenedor.");
             throw;
         }
     }

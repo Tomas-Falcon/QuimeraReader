@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -102,5 +102,63 @@ public class SettingsController : ControllerBase
         });
 
         return Ok(new { Message = "Reiniciando servidor..." });
+    }
+    [HttpPost("update-container")]
+    public IActionResult UpdateContainer([FromServices] Microsoft.Extensions.Hosting.IHostApplicationLifetime appLifetime)
+    {
+        _logger.LogWarning("Se recibió comando de ACTUALIZACIÓN de contenedor desde los ajustes.");
+        
+        // Ejecutamos en un hilo separado
+        _ = Task.Run(async () =>
+        {
+            bool watchtowerTriggered = false;
+            try
+            {
+                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "quimera");
+                var response = await httpClient.PostAsync("http://watchtower:8080/v1/update", null);
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("Actualización solicitada con éxito a Watchtower HTTP API.");
+                    watchtowerTriggered = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogInformation("No se detectó servicio Watchtower HTTP API ({Message}), intentando script local...", ex.Message);
+            }
+
+            try 
+            {
+                // Si existe un script de actualización (ej. un webhook local o script de watchtower), intentamos ejecutarlo
+                if (System.IO.File.Exists("/app/update_container.sh"))
+                {
+                    var process = new System.Diagnostics.Process()
+                    {
+                        StartInfo = new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = "/bin/bash",
+                            Arguments = "/app/update_container.sh",
+                            RedirectStandardOutput = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                        }
+                    };
+                    process.Start();
+                }
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "Error al ejecutar script de actualización");
+            }
+
+            if (!watchtowerTriggered)
+            {
+                await Task.Delay(1000);
+                appLifetime.StopApplication(); // Esto detiene el contenedor, permitiendo que Watchtower o el host lo reinicie/actualice
+            }
+        });
+
+        return Ok(new { Message = "Iniciando proceso de actualización y reinicio..." });
     }
 }

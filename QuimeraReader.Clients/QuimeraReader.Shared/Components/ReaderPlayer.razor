@@ -4,6 +4,7 @@
 @using System.Text.Json
 @using System.Text.Json.Serialization
 @inject QuimeraReader.Shared.Services.IBookService BookService
+@inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @inject QuimeraReader.Shared.Services.IScanService ScanService
 @inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject IJSRuntime JS
@@ -154,13 +155,24 @@
             // EPUB Reader Initialization
             if (Book.HasEpub)
             {
+                if (_dotNetRef == null) _dotNetRef = DotNetObjectReference.Create(this);
                 _epubJsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/QuimeraReader.Shared/epubInterop.js");
                 // Construct the absolute URL to the EPUB file via API
                 var baseUrl = BookService.BaseAddress.TrimEnd('/');
                 var epubApiUrl = $"{baseUrl}/{Book.EpubUrl}";
                 
-                await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubApiUrl, _dotNetRef, Book.CurrentEpubCfi);
+                await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubApiUrl, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache);
             }
+        }
+    }
+
+        [JSInvokable]
+    public async Task SaveLocationsCache(string locationsJson)
+    {
+        if (Book != null)
+        {
+            Book.EpubLocationsCache = locationsJson;
+            await BookService.SaveEpubLocationsAsync(BookId, locationsJson);
         }
     }
 
@@ -168,12 +180,13 @@
     public void OnEpubLocationChanged(string cfi, double percentage)
     {
         // Guardar el CFI y el porcentaje
-        double scaledPercentage = percentage * 100.0;
+        double? scaledPercentage = percentage >= 0 ? (percentage * 100.0) : null;
         
         if (Book != null)
         {
             Book.CurrentEpubCfi = cfi;
-            Book.PercentageCompleted = scaledPercentage;
+            if (scaledPercentage.HasValue) 
+                Book.PercentageCompleted = scaledPercentage.Value;
             StateHasChanged();
         }
 

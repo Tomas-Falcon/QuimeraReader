@@ -7,6 +7,8 @@
 @inject NavigationManager NavManager
 @inject ToastService ToastService
 @inject IJSRuntime JS
+@inject Radzen.DialogService DialogService
+@inject QuimeraReader.Shared.Interfaces.ITranslationService Translation
 
 <PageTitle>Detalles del Libro</PageTitle>
 
@@ -22,7 +24,7 @@ else if (_book == null)
     <div class="empty-state text-center py-5">
         <i class="bi bi-exclamation-circle text-danger mb-3" style="font-size: 3rem;"></i>
         <p>No se pudo encontrar el libro.</p>
-        <button class="btn btn-primary mt-3" @onclick="GoBack">Volver a la Biblioteca</button>
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" class="mt-3" Click="@GoBack" Text="Volver a la Biblioteca" />
     </div>
 }
 else
@@ -34,9 +36,7 @@ else
 
         <div class="container position-relative" style="z-index: 10; padding-top: 2rem; padding-bottom: 3rem;">
             <div class="mb-4">
-                <button class="btn btn-link text-white text-decoration-none px-0" @onclick="GoBack" style="font-size: 1.1rem; opacity: 0.9;">
-                    <i class="bi bi-arrow-left me-2"></i> Volver a la Biblioteca
-                </button>
+                <RadzenButton ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" class="text-white text-decoration-none px-0" Click="@GoBack" style="font-size: 1.1rem; opacity: 0.9;" Icon="arrow_back" Text="Volver a la Biblioteca" />
             </div>
 
             <div class="d-flex flex-column flex-md-row gap-5 align-items-center align-items-md-start">
@@ -47,7 +47,10 @@ else
                 
                 <!-- Metadata -->
                 <div class="info-section text-white mt-3 mt-md-0" style="flex: 1;">
-                    <h1 class="display-5 fw-bold mb-2">@_book.Title</h1>
+                    <div class="d-flex align-items-center mb-2">
+                        <h1 class="display-5 fw-bold mb-0 me-3">@_book.Title</h1>
+                        <RadzenButton Icon="edit" ButtonStyle="Radzen.ButtonStyle.Light" Size="Radzen.ButtonSize.Medium" Click="@OpenEditModal" />
+                    </div>
                     
                     @if (_book.Authors.Any())
                     {
@@ -71,7 +74,9 @@ else
                         <div class="mb-4 d-flex gap-2 flex-wrap">
                             @foreach(var cat in _book.Categories)
                             {
-                                <a href="/?q=@(Uri.EscapeDataString(cat))" class="badge bg-secondary rounded-pill px-3 py-2 text-decoration-none text-white">@cat</a>
+                                <a href="/?q=@(Uri.EscapeDataString(cat))" class="text-decoration-none">
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Secondary" class="rounded-pill px-3 py-2 text-white">@cat</RadzenBadge>
+                                </a>
                             }
                         </div>
                     }
@@ -79,21 +84,21 @@ else
                     <div class="badges mb-4 d-flex gap-2 flex-wrap align-items-center">
                         @if (_book.AverageRating.HasValue && _book.AverageRating.Value > 0)
                         {
-                            <span class="badge bg-warning text-dark fs-6" title="Puntuación Media">
+                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" class="text-dark fs-6" title="Puntuación Media">
                                 <i class="bi bi-star-fill"></i> @_book.AverageRating.Value.ToString("0.0")
-                            </span>
+                            </RadzenBadge>
                         }
                         @if (_book.HasEpub)
                         {
-                            <span class="badge bg-primary fs-6"><i class="bi bi-book"></i> Ebook</span>
+                            <RadzenBadge BadgeStyle="BadgeStyle.Primary" class="fs-6"><i class="bi bi-book"></i> Ebook</RadzenBadge>
                         }
                         @if (_book.HasAudio)
                         {
-                            <span class="badge bg-success fs-6"><i class="bi bi-headphones"></i> Audiobook</span>
+                            <RadzenBadge BadgeStyle="BadgeStyle.Success" class="fs-6"><i class="bi bi-headphones"></i> Audiobook</RadzenBadge>
                         }
                         @if (_book.IsAligned)
                         {
-                            <span class="badge bg-info text-dark fs-6"><i class="bi bi-stars"></i> Sincronizado</span>
+                            <RadzenBadge BadgeStyle="BadgeStyle.Info" class="text-dark fs-6"><i class="bi bi-stars"></i> Sincronizado</RadzenBadge>
                         }
                     </div>
                     
@@ -124,34 +129,36 @@ else
                     <div class="actions mt-3 d-flex gap-3 flex-wrap">
                         @if (!_book.HasEpub && !_book.HasAudio)
                         {
-                            <button class="btn btn-lg btn-secondary px-5 py-3 rounded-pill fw-bold" disabled>
-                                <i class="bi bi-slash-circle me-2"></i> Archivo no disponible
-                            </button>
+                            <RadzenButton ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Large" class="px-5 py-3 rounded-pill fw-bold" Disabled="true" Icon="block" Text="Archivo no disponible" />
                         }
                         else
                         {
-                            <button class="btn btn-lg btn-primary px-5 py-3 rounded-pill fw-bold shadow-sm" @onclick="GoToRead" style="transition: transform 0.2s;">
-                                @if (_book.PercentageCompleted.HasValue && _book.PercentageCompleted.Value > 0)
+                            <RadzenButton ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Large" class="px-5 py-3 rounded-pill fw-bold shadow-sm" Click="@GoToRead" style="transition: transform 0.2s;" Icon="play_circle">
+                                @if (_book.PercentageCompleted.HasValue && _book.PercentageCompleted.Value >= 100 || _book.ReadingStatus == "Read")
                                 {
-                                    <i class="bi bi-play-circle-fill me-2 fs-5"></i> @("Continuar lectura")
+                                    @Translation["Action_ReadAgain"]
+                                }
+                                else if ((_book.PercentageCompleted.HasValue && _book.PercentageCompleted.Value > 0) || !string.IsNullOrEmpty(_book.CurrentEpubCfi) || _book.ReadingStatus == "Reading")
+                                {
+                                    @Translation["Action_ContinueReading"]
                                 }
                                 else
                                 {
-                                    <i class="bi bi-play-circle-fill me-2 fs-5"></i> @("Empezar a leer")
+                                    @Translation["Action_StartReading"]
                                 }
-                            </button>
+                            </RadzenButton>
                         }
                         
-                        <button class="btn btn-lg btn-outline-light px-4 py-3 rounded-pill fw-bold shadow-sm" @onclick="FetchSingleMetadataAsync" disabled="@_isFetchingMetadata" style="transition: transform 0.2s;">
+                        <RadzenButton ButtonStyle="ButtonStyle.Light" Variant="Variant.Outlined" Size="ButtonSize.Large" class="px-4 py-3 rounded-pill fw-bold shadow-sm" Click="@FetchSingleMetadataAsync" Disabled="@_isFetchingMetadata" style="transition: transform 0.2s;" Icon="@(_isFetchingMetadata ? "" : "cloud_download")">
                             @if (_isFetchingMetadata)
                             {
                                 <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> <span>Buscando...</span>
                             }
                             else
                             {
-                                <i class="bi bi-cloud-download me-2 fs-5"></i> <span>Buscar metadatos</span>
+                                <span>Buscar metadatos</span>
                             }
-                        </button>
+                        </RadzenButton>
                     </div>
 
                     <div class="mt-4 pt-4" style="border-top: 1px solid rgba(255,255,255,0.1);">
@@ -159,15 +166,11 @@ else
                         <div class="d-flex gap-2 flex-wrap">
                             @if (_book.HasEpub)
                             {
-                                <button class="btn btn-sm btn-outline-danger px-3 rounded-pill" @onclick="DeleteEpubAsync">
-                                    <i class="bi bi-trash me-1"></i> Borrar EPUB
-                                </button>
+                                <RadzenButton ButtonStyle="ButtonStyle.Danger" Variant="Variant.Outlined" Size="ButtonSize.Small" class="px-3 rounded-pill" Click="@DeleteEpubAsync" Icon="delete" Text="Borrar EPUB" />
                             }
                             @if (_book.HasAudio)
                             {
-                                <button class="btn btn-sm btn-outline-danger px-3 rounded-pill" @onclick="DeleteAudioAsync">
-                                    <i class="bi bi-trash me-1"></i> Borrar Audio
-                                </button>
+                                <RadzenButton ButtonStyle="ButtonStyle.Danger" Variant="Variant.Outlined" Size="ButtonSize.Small" class="px-3 rounded-pill" Click="@DeleteAudioAsync" Icon="delete" Text="Borrar Audio" />
                             }
                         </div>
                     </div>
@@ -319,6 +322,18 @@ else
     private void GoBack()
     {
         NavManager.NavigateTo("/");
+    }
+
+    private async Task OpenEditModal()
+    {
+        var result = await DialogService.OpenAsync<BookEditModal>("Editar Libro", 
+            new Dictionary<string, object?> { { "Book", _book } },
+            new Radzen.DialogOptions() { Width = "500px", Height = "450px" });
+        
+        if (result == true)
+        {
+            await LoadBookAsync();
+        }
     }
 }
 

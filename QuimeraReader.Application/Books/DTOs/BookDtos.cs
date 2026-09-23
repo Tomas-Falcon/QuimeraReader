@@ -26,6 +26,9 @@ public record BookDto
     public string? CurrentEpubCfi { get; init; }
     public double? CurrentAudioPosition { get; init; }
     public double? PercentageCompleted { get; init; }
+    public string? ReadingStatus { get; init; }
+    public string? EpubLocationsCache { get; init; }
+    public int? TotalPages { get; init; }
 }
 
 public record PaginatedListDto<T>

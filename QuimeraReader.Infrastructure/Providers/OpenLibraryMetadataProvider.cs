@@ -22,6 +22,35 @@ public class OpenLibraryMetadataProvider : IMetadataProvider
         _logger = logger;
     }
 
+        public async Task<List<string>> SearchCoversAsync(string title, string? author, Dictionary<string, string>? settings = null)
+    {
+        var covers = new List<string>();
+        string query = $"title={Uri.EscapeDataString(title)}";
+        if (!string.IsNullOrWhiteSpace(author)) query += $"&author={Uri.EscapeDataString(author)}";
+        
+        string url = $"https://openlibrary.org/search.json?{query}&limit=10";
+
+        try
+        {
+            var response = await _httpClient.GetFromJsonAsync<OpenLibraryResponse>(url);
+            if (response?.Docs != null)
+            {
+                foreach (var doc in response.Docs)
+                {
+                    if (doc.CoverI.HasValue)
+                    {
+                        covers.Add($"https://covers.openlibrary.org/b/id/{doc.CoverI.Value}-L.jpg");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "OpenLibrary: error buscando covers para '{Title}'", title);
+        }
+        return covers;
+    }
+
     public async Task<BookMetadata?> GetMetadataAsync(string query, IEnumerable<string>? isbns = null, Dictionary<string, string>? settings = null, string? authorHint = null)
     {
         if (isbns != null && isbns.Any())

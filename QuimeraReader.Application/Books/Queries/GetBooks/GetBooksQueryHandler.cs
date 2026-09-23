@@ -27,15 +27,16 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
         // Ocultar libros "fantasma" que no tienen archivo asociado (ni EPUB ni Audio)
         query = query.Where(b => !string.IsNullOrEmpty(b.EpubFilePath) || b.AudioTracks.Any());
 
-        if (!string.IsNullOrWhiteSpace(request.Search))
+                if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var searchLower = request.Search.ToLower();
-            query = query.Where(b => 
-                b.Title.ToLower().Contains(searchLower) ||
-                b.Authors.Any(ba => ba.Author.Name.ToLower().Contains(searchLower)) ||
-                b.Categories.Any(bc => bc.Category.Name.ToLower().Contains(searchLower)) ||
-                (b.Series != null && b.Series.Name.ToLower().Contains(searchLower))
-            );
+            var s = request.Search.ToLower();
+            query = query.Where(b => b.Title.ToLower().Contains(s) || 
+                                     b.Authors.Any(a => a.Author!.Name.ToLower().Contains(s)));
+        }
+
+        if (request.CategoryIds != null && request.CategoryIds.Any())
+        {
+            query = query.Where(b => b.Categories.Any(c => request.CategoryIds.Contains(c.CategoryId)));
         }
 
         var totalBooks = await query.CountAsync(cancellationToken);
@@ -68,7 +69,10 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
             LastReadAt = b.LastReadAt,
             CurrentEpubCfi = b.CurrentEpubCfi,
             CurrentAudioPosition = b.CurrentAudioPosition,
-            PercentageCompleted = b.PercentageCompleted
+            PercentageCompleted = b.PercentageCompleted,
+            ReadingStatus = b.ReadingStatus,
+            EpubLocationsCache = b.EpubLocationsCache,
+            TotalPages = b.TotalPages
         }).ToList();
 
         return new PaginatedListDto<BookDto>

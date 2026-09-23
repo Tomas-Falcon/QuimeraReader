@@ -20,8 +20,10 @@ public class BooksController : ControllerBase
     private readonly AudioAlignmentQueue _queue;
     private readonly LibraryScanState _scanState;
     private readonly ILogger<BooksController> _logger;
+    private readonly IEnumerable<QuimeraReader.Domain.Interfaces.IMetadataProvider> _metadataProviders;
 
     public BooksController(
+        IEnumerable<QuimeraReader.Domain.Interfaces.IMetadataProvider> metadataProviders,
         AppDbContext dbContext, 
         EpubScannerService scannerService, 
         AudioAlignmentService alignmentService, 
@@ -35,6 +37,7 @@ public class BooksController : ControllerBase
         _queue = queue;
         _scanState = scanState;
         _logger = logger;
+        _metadataProviders = metadataProviders;
     }
 
     [HttpGet("categories")]
@@ -89,7 +92,7 @@ public class BooksController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null)
+    public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null, [FromQuery] int[]? categoryIds = null)
     {
         try 
         {
@@ -98,7 +101,8 @@ public class BooksController : ControllerBase
             { 
                 Page = page, 
                 PageSize = pageSize, 
-                Search = search 
+                Search = search,
+                CategoryIds = categoryIds?.ToList() 
             });
             return Ok(result);
         }
@@ -139,7 +143,10 @@ public class BooksController : ControllerBase
             LastReadAt = book.LastReadAt,
             CurrentEpubCfi = book.CurrentEpubCfi,
             CurrentAudioPosition = book.CurrentAudioPosition,
-            PercentageCompleted = book.PercentageCompleted
+            PercentageCompleted = book.PercentageCompleted,
+            ReadingStatus = book.ReadingStatus,
+            EpubLocationsCache = book.EpubLocationsCache,
+            TotalPages = book.TotalPages
         });
     }
 
@@ -190,7 +197,10 @@ public class BooksController : ControllerBase
                 LastReadAt = b.LastReadAt,
                 CurrentEpubCfi = b.CurrentEpubCfi,
                 CurrentAudioPosition = b.CurrentAudioPosition,
-                PercentageCompleted = b.PercentageCompleted
+                PercentageCompleted = b.PercentageCompleted,
+                ReadingStatus = b.ReadingStatus,
+                EpubLocationsCache = b.EpubLocationsCache,
+                TotalPages = b.TotalPages
             })
             .ToListAsync();
 
@@ -524,6 +534,23 @@ public class BooksController : ControllerBase
         }
     }
 
+        public class BulkStatusUpdateRequest
+    {
+        public List<int> BookIds { get; set; } = new();
+        public string Status { get; set; } = string.Empty;
+    }
+
+    public class UpdateMetadataRequest
+    {
+        public string Title { get; set; } = string.Empty;
+        public string? ReadingStatus { get; set; }
+        public List<string> Categories { get; set; } = new();
+    }
+
+    public class UpdateCoverRequest
+    {
+        public string ImageUrl { get; set; } = string.Empty;
+    }
     public class UpdatePositionRequest
     {
         public string? CurrentEpubCfi { get; set; }
@@ -538,6 +565,7 @@ public class BooksController : ControllerBase
         if (book == null) return NotFound();
 
         book.LastReadAt = DateTime.UtcNow;
+        if (book.ReadingStatus != "Read") book.ReadingStatus = "Reading";
         if (request.CurrentEpubCfi != null) book.CurrentEpubCfi = request.CurrentEpubCfi;
         if (request.CurrentAudioPosition.HasValue) book.CurrentAudioPosition = request.CurrentAudioPosition;
         if (request.PercentageCompleted.HasValue) book.PercentageCompleted = request.PercentageCompleted;
@@ -702,8 +730,96 @@ public class BooksController : ControllerBase
 
         await _dbContext.SaveChangesAsync();
     }
-}
+    [HttpPut("bulk/status")]
+    public async Task<IActionResult> BulkUpdateStatus([FromBody] BulkStatusUpdateRequest request)
+    {
+        var books = await _dbContext.Books.Where(b => request.BookIds.Contains(b.Id)).ToListAsync();
+        foreach (var book in books)
+        {
+            book.ReadingStatus = request.Status;
+        }
+        await _dbContext.SaveChangesAsync();
+        return Ok();
+    }
 
+    [HttpPut("{bookId}/metadata")]
+    public async Task<IActionResult> UpdateMetadata(int bookId, [FromBody] UpdateMetadataRequest request)
+    {
+        var book = await _dbContext.Books.Include(b => b.Categories).ThenInclude(bc => bc.Category).FirstOrDefaultAsync(b => b.Id == bookId);
+        if (book == null) return NotFound();
+
+        book.Title = request.Title;
+        book.ReadingStatus = request.ReadingStatus;
+        
+        // Remove old categories not in new list
+        var toRemove = book.Categories.Where(c => !request.Categories.Contains(c.Category.Name)).ToList();
+        foreach (var r in toRemove) book.Categories.Remove(r);
+
+        // Add new categories
+        var existingNames = book.Categories.Select(c => c.Category.Name).ToList();
+        var toAdd = request.Categories.Where(c => !existingNames.Contains(c)).ToList();
+        foreach (var newCatName in toAdd)
+        {
+            var cat = await _dbContext.Categories.FirstOrDefaultAsync(c => c.Name == newCatName);
+            if (cat == null) 
+            {
+                cat = new Category { Name = newCatName };
+                _dbContext.Categories.Add(cat);
+                await _dbContext.SaveChangesAsync(); // save to get ID
+            }
+            book.Categories.Add(new BookCategory { BookId = book.Id, CategoryId = cat.Id });
+        }
+
+        await _dbContext.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpGet("{bookId}/cover/search")]
+    public async Task<IActionResult> SearchCovers(int bookId)
+    {
+        var book = await _dbContext.Books.Include(b => b.Authors).ThenInclude(ba => ba.Author).FirstOrDefaultAsync(b => b.Id == bookId);
+        if (book == null) return NotFound();
+
+        var author = book.Authors.FirstOrDefault()?.Author?.Name;
+        
+        Dictionary<string, string>? settings = null; // No need for settings for Goodreads/Storygraph right now
+
+        var allCovers = new List<string>();
+        foreach (var provider in _metadataProviders)
+        {
+            var covers = await provider.SearchCoversAsync(book.Title, author, settings);
+            if (covers != null)
+            {
+                allCovers.AddRange(covers);
+            }
+        }
+
+        var uniqueCovers = allCovers.Where(c => !string.IsNullOrWhiteSpace(c)).Distinct().Take(20).ToList();
+        return Ok(uniqueCovers);
+    }
+
+    [HttpPut("{bookId}/cover")]
+    public async Task<IActionResult> UpdateCover(int bookId, [FromBody] UpdateCoverRequest request)
+    {
+        var book = await _dbContext.Books.FindAsync(bookId);
+        if (book == null) return NotFound();
+        
+        book.CoverImagePath = request.ImageUrl; // For simplicity, using URL directly. In a real app we might download it to local storage.
+        await _dbContext.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpPost("{bookId}/epub-locations")]
+    public async Task<IActionResult> SaveEpubLocations(int bookId, [FromBody] string locationsJson)
+    {
+        var book = await _dbContext.Books.FindAsync(bookId);
+        if (book == null) return NotFound();
+        
+        book.EpubLocationsCache = locationsJson;
+        await _dbContext.SaveChangesAsync();
+        return Ok();
+    }
+}
 public class ScanRequest 
 { 
     public string FolderPath { get; set; } = string.Empty; 

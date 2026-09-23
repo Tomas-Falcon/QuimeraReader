@@ -6,7 +6,7 @@ namespace QuimeraReader.Shared.Services;
 
 public interface IBookService
 {
-    Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null);
+    Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null);
     Task<Book?> GetBookAsync(int id);
     Task<IEnumerable<Category>> GetCategoriesAsync();
     Task<IEnumerable<Author>> GetAuthorsAsync();
@@ -16,6 +16,10 @@ public interface IBookService
     Task<List<Book>> GetRecommendationsAsync();
     Task DeleteEpubAsync(int bookId);
     Task DeleteAudioAsync(int bookId);
+    Task BulkUpdateStatusAsync(List<int> bookIds, string status);
+    Task UpdateMetadataAsync(int bookId, UpdateMetadataRequest request);
+    Task UpdateCoverAsync(int bookId, string imageUrl);
+    Task SaveEpubLocationsAsync(int bookId, string locationsJson);
     string BaseAddress { get; }
 }
 
@@ -32,7 +36,7 @@ public class BookService : IBookService
 
     public string BaseAddress => _httpClient.BaseAddress?.ToString() ?? "";
 
-    public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null)
+    public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null)
     {
         try
         {
@@ -41,6 +45,10 @@ public class BookService : IBookService
             if (!string.IsNullOrWhiteSpace(search))
             {
                 url += $"&search={Uri.EscapeDataString(search)}";
+            }
+            if (categoryIds != null && categoryIds.Any())
+            {
+                foreach(var cid in categoryIds) url += $"&categoryIds={cid}";
             }
             var response = await _httpClient.GetFromJsonAsync<PaginatedResult<Book>>(url);
             return response ?? new PaginatedResult<Book> { Page = page, PageSize = pageSize, Total = 0, Data = [] };
@@ -188,5 +196,30 @@ public class BookService : IBookService
             _logger.LogError(ex, "[BookService] Error eliminando Audio del libro ID: {BookId}", bookId);
             throw;
         }
+    }
+    public async Task BulkUpdateStatusAsync(List<int> bookIds, string status)
+    {
+        var request = new BulkStatusUpdateRequest { BookIds = bookIds, Status = status };
+        var response = await _httpClient.PutAsJsonAsync("api/Books/bulk/status", request);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task UpdateMetadataAsync(int bookId, UpdateMetadataRequest request)
+    {
+        var response = await _httpClient.PutAsJsonAsync($"api/Books/{bookId}/metadata", request);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task UpdateCoverAsync(int bookId, string imageUrl)
+    {
+        var request = new UpdateCoverRequest { ImageUrl = imageUrl };
+        var response = await _httpClient.PutAsJsonAsync($"api/Books/{bookId}/cover", request);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task SaveEpubLocationsAsync(int bookId, string locationsJson)
+    {
+        var response = await _httpClient.PostAsJsonAsync($"api/Books/{bookId}/epub-locations", locationsJson);
+        response.EnsureSuccessStatusCode();
     }
 }
