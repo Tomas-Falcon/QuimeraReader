@@ -6,18 +6,19 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using QuimeraReader.Domain.Entities;
-using QuimeraReader.Infrastructure;
 
 namespace QuimeraReader.Infrastructure.Services;
 
 public class DeepLibraryScannerService
 {
     private readonly AppDbContext _dbContext;
+    private readonly AudioMatchingService _audioMatchingService;
     private readonly ILogger<DeepLibraryScannerService> _logger;
 
-    public DeepLibraryScannerService(AppDbContext dbContext, ILogger<DeepLibraryScannerService> logger)
+    public DeepLibraryScannerService(AppDbContext dbContext, AudioMatchingService audioMatchingService, ILogger<DeepLibraryScannerService> logger)
     {
         _dbContext = dbContext;
+        _audioMatchingService = audioMatchingService;
         _logger = logger;
     }
 
@@ -30,9 +31,7 @@ public class DeepLibraryScannerService
             return;
         }
 
-        var books = await _dbContext.Books.ToListAsync(cancellationToken);
         string[] audioExtensions = { ".mp3", ".m4a", ".m4b", ".wav", ".ogg" };
-
         var allAudioFiles = Directory.GetFiles(setting.Value, "*.*", SearchOption.AllDirectories)
                                      .Where(f => audioExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
                                      .ToList();
@@ -41,38 +40,45 @@ public class DeepLibraryScannerService
         {
             if (cancellationToken.IsCancellationRequested) break;
 
-            string directory = Path.GetDirectoryName(audioPath) ?? string.Empty;
+            // Check if this audio is already assigned to ANY book
+            bool alreadyAssigned = await _dbContext.BookAudioTracks.AnyAsync(t => t.FilePath == audioPath, cancellationToken);
+            if (alreadyAssigned) continue;
 
-            var matchingBook = books.FirstOrDefault(b => 
-                !string.IsNullOrEmpty(b.EpubFilePath) && 
-                Path.GetDirectoryName(b.EpubFilePath) == directory);
+            _logger.LogInformation("Deep Scan procesando audio huérfano: {Path}", audioPath);
 
-            if (matchingBook != null && !matchingBook.AudioTracks.Any(t => t.FilePath == audioPath))
+            var bookId = await _audioMatchingService.TryMatchAudioToBookAsync(audioPath, cancellationToken);
+            
+            if (bookId.HasValue)
             {
-                _logger.LogInformation("Deep Scan encontró un audio manualmente colocado para el libro {Id}: {Path}", matchingBook.Id, audioPath);
-                
-                string ext = Path.GetExtension(audioPath);
-                string newAudioPath = Path.Combine(directory, Path.GetFileNameWithoutExtension(matchingBook.EpubFilePath) + "_audio" + ext);
+                var book = await _dbContext.Books.Include(b => b.AudioTracks).FirstOrDefaultAsync(b => b.Id == bookId.Value, cancellationToken);
+                if (book != null)
+                {
+                    int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
+                    
+                    string directory = Path.GetDirectoryName(audioPath) ?? string.Empty;
+                    string ext = Path.GetExtension(audioPath);
+                    string safeTitle = string.Join("_", book.Title.Split(Path.GetInvalidFileNameChars()));
+                    
+                    string newAudioPath = Path.Combine(directory, $"{safeTitle} track {nextTrack}{ext}");
 
-                if (audioPath != newAudioPath)
-                {
-                    try 
+                    if (audioPath != newAudioPath)
                     {
-                        File.Move(audioPath, newAudioPath, true);
-                        matchingBook.AudioTracks.Clear();
-                        matchingBook.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = 1 });
-                    } 
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error al renombrar el audio colocado manualmente.");
-                        matchingBook.AudioTracks.Clear();
-                        matchingBook.AudioTracks.Add(new BookAudioTrack { FilePath = audioPath, TrackNumber = 1 });
+                        try 
+                        {
+                            File.Move(audioPath, newAudioPath, true);
+                            book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
+                            _logger.LogInformation("Asignado Track {Track} al libro '{Title}': {Path}", nextTrack, book.Title, newAudioPath);
+                        } 
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error al renombrar el audio colocado manualmente.");
+                            book.AudioTracks.Add(new BookAudioTrack { FilePath = audioPath, TrackNumber = nextTrack });
+                        }
                     }
-                }
-                else
-                {
-                    matchingBook.AudioTracks.Clear();
-                    matchingBook.AudioTracks.Add(new BookAudioTrack { FilePath = audioPath, TrackNumber = 1 });
+                    else
+                    {
+                        book.AudioTracks.Add(new BookAudioTrack { FilePath = audioPath, TrackNumber = nextTrack });
+                    }
                 }
             }
         }
