@@ -22,6 +22,7 @@ public class Book
     public string? CurrentEpubCfi { get; set; }
     public string? EpubLocationsCache { get; set; } // JSON cache of epub.js locations
     public double? CurrentAudioPosition { get; set; }
+    public int? CurrentAudioTrackNumber { get; set; }
     public double? PercentageCompleted { get; set; }
 
     // Series/Sagas

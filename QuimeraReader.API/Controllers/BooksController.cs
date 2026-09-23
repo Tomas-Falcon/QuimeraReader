@@ -143,6 +143,8 @@ public class BooksController : ControllerBase
             LastReadAt = book.LastReadAt,
             CurrentEpubCfi = book.CurrentEpubCfi,
             CurrentAudioPosition = book.CurrentAudioPosition,
+            CurrentAudioTrackNumber = book.CurrentAudioTrackNumber,
+            AudioTracks = book.AudioTracks.Select(t => new { t.Id, t.TrackNumber, t.FileName }).ToList(),
             PercentageCompleted = book.PercentageCompleted,
             ReadingStatus = book.ReadingStatus,
             EpubLocationsCache = book.EpubLocationsCache,
@@ -555,6 +557,7 @@ public class BooksController : ControllerBase
     {
         public string? CurrentEpubCfi { get; set; }
         public double? CurrentAudioPosition { get; set; }
+        public int? CurrentAudioTrackNumber { get; set; }
         public double? PercentageCompleted { get; set; }
     }
 
@@ -568,6 +571,7 @@ public class BooksController : ControllerBase
         if (book.ReadingStatus != "Read") book.ReadingStatus = "Reading";
         if (request.CurrentEpubCfi != null) book.CurrentEpubCfi = request.CurrentEpubCfi;
         if (request.CurrentAudioPosition.HasValue) book.CurrentAudioPosition = request.CurrentAudioPosition;
+            book.CurrentAudioTrackNumber = request.CurrentAudioTrackNumber;
         if (request.PercentageCompleted.HasValue) book.PercentageCompleted = request.PercentageCompleted;
 
         if (book.AudioTracks.Any() && 

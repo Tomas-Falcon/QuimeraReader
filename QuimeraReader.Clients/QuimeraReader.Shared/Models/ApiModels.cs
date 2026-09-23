@@ -21,6 +21,8 @@ public record Book
     public DateTime? LastReadAt { get; set; }
     public string? CurrentEpubCfi { get; set; }
     public double? CurrentAudioPosition { get; set; }
+    public int? CurrentAudioTrackNumber { get; set; }
+    public System.Collections.Generic.List<AudioTrackDto> AudioTracks { get; set; } = new();
     public double? PercentageCompleted { get; set; }
     public string? ReadingStatus { get; set; }
     public string? EpubLocationsCache { get; set; }
@@ -33,10 +35,19 @@ public record Book
     public string PackageUrl => $"api/media/books/{Id}/package?format=audiobook";
 }
 
+public class AudioTrackDto
+{
+    public int Id { get; set; }
+    public int TrackNumber { get; set; }
+    public string FileName { get; set; } = "";
+}
+
 public class UpdatePositionRequest
 {
     public string? CurrentEpubCfi { get; set; }
     public double? CurrentAudioPosition { get; set; }
+    public int? CurrentAudioTrackNumber { get; set; }
+    public System.Collections.Generic.List<AudioTrackDto> AudioTracks { get; set; } = new();
     public double? PercentageCompleted { get; set; }
     public string? ReadingStatus { get; set; }
     public string? EpubLocationsCache { get; set; }

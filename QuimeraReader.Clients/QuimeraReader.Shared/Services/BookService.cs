@@ -12,7 +12,7 @@ public interface IBookService
     Task<IEnumerable<Author>> GetAuthorsAsync();
     Task<string> GetSyncMapAsync(int id);
     Task<Book> UploadEpubAsync(Stream fileStream, string fileName);
-    Task UpdatePositionAsync(int bookId, string? epubCfi = null, double? audioPosition = null, double? percentage = null);
+    Task UpdatePositionAsync(int bookId, string? epubCfi = null, double? audioPosition = null, double? percentage = null, int? audioTrackNumber = null);
     Task<List<Book>> GetRecommendationsAsync();
     Task DeleteEpubAsync(int bookId);
     Task DeleteAudioAsync(int bookId);
@@ -135,16 +135,11 @@ public class BookService : IBookService
         }
     }
 
-    public async Task UpdatePositionAsync(int bookId, string? epubCfi = null, double? audioPosition = null, double? percentage = null)
+    public async Task UpdatePositionAsync(int bookId, string? epubCfi = null, double? audioPosition = null, double? percentage = null, int? audioTrackNumber = null)
     {
         try
         {
-            var request = new UpdatePositionRequest 
-            { 
-                CurrentEpubCfi = epubCfi, 
-                CurrentAudioPosition = audioPosition, 
-                PercentageCompleted = percentage 
-            };
+            var request = new UpdatePositionRequest { CurrentEpubCfi = epubCfi, CurrentAudioPosition = audioPosition, PercentageCompleted = percentage, CurrentAudioTrackNumber = audioTrackNumber };
             var response = await _httpClient.PostAsJsonAsync($"api/Books/{bookId}/positions", request);
             response.EnsureSuccessStatusCode();
         }

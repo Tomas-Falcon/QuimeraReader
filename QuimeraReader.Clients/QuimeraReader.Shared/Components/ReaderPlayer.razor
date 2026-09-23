@@ -1,4 +1,4 @@
-﻿@using QuimeraReader.Shared.Models
+﻿﻿@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @using Microsoft.JSInterop
 @using System.Text.Json
@@ -106,6 +106,30 @@
     private IJSObjectReference? _jsModule;
     private DotNetObjectReference<ReaderPlayer>? _dotNetRef;
     private double _currentTime = 0;
+    private int _currentTrackNumber = 1;
+    private bool _showPlaylist = false;
+
+    private void TogglePlaylist() => _showPlaylist = !_showPlaylist;
+
+    private string GetCurrentTrackUrl()
+    {
+        if (Book?.AudioTracks == null || Book.AudioTracks.Count == 0)
+            return $"{BookService.BaseAddress.TrimEnd('/')}/" + Book?.AudioUrl;
+
+        return $"{BookService.BaseAddress.TrimEnd('/')}/api/media/books/{BookId}/tracks/{_currentTrackNumber}";
+    }
+
+    private async Task ChangeTrackAsync(int trackNumber)
+    {
+        _currentTrackNumber = trackNumber;
+        _currentTime = 0;
+        _lastSavedTime = -1;
+        _showPlaylist = false;
+        StateHasChanged();
+        await Task.Delay(50);
+        if (_jsModule != null) await _jsModule.InvokeVoidAsync("playAudio", _audioElement);
+        _ = BookService.UpdatePositionAsync(BookId, audioPosition: 0, audioTrackNumber: _currentTrackNumber);
+    }
     private bool _isPlaying = false;
     private List<SyncSegment> _segments = new();
 
@@ -146,6 +170,9 @@
                 _dotNetRef = DotNetObjectReference.Create(this);
                 await _jsModule.InvokeVoidAsync("initializePlayer", _audioElement, _dotNetRef);
 
+                if (Book.CurrentAudioTrackNumber.HasValue) _currentTrackNumber = Book.CurrentAudioTrackNumber.Value;
+                StateHasChanged();
+                await Task.Delay(50);
                 if (Book.CurrentAudioPosition.HasValue && Book.CurrentAudioPosition.Value > 0)
                 {
                     await _jsModule.InvokeVoidAsync("seekAudio", _audioElement, Book.CurrentAudioPosition.Value);
@@ -219,7 +246,7 @@
             _lastSavedTime = time;
             // Solo mandamos el audioPosition, dejamos el epubCfi intacto o null. 
             // Percentage se podría calcular si tuviéramos el total duration.
-            _ = BookService.UpdatePositionAsync(BookId, audioPosition: time);
+            _ = BookService.UpdatePositionAsync(BookId, audioPosition: time, audioTrackNumber: _currentTrackNumber);
         }
 
         var currentIndex = _segments.FindIndex(s => time >= s.Start && time <= s.End);
@@ -236,6 +263,20 @@
         else
         {
             StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+        [JSInvokable]
+    public async Task OnAudioEnded()
+    {
+        if (Book?.AudioTracks != null && Book.AudioTracks.Count > 0)
+        {
+            var maxTrack = Book.AudioTracks.Max(t => t.TrackNumber);
+            if (_currentTrackNumber < maxTrack)
+            {
+                await ChangeTrackAsync(_currentTrackNumber + 1);
+            }
         }
     }
 
