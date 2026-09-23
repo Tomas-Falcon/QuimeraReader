@@ -10,7 +10,9 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 // Apuntar SIEMPRE a la API (puerto 5166) en vez de al servidor de desarrollo de Blazor
 var apiBaseUrl = builder.HostEnvironment.IsDevelopment() ? "http://localhost:5166/" : builder.HostEnvironment.BaseAddress;
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });
-builder.Services.AddScoped<IQuimeraApiClient, QuimeraApiClient>();
+builder.Services.AddScoped<QuimeraReader.Shared.Services.IBookService, QuimeraReader.Shared.Services.BookService>();
+builder.Services.AddScoped<QuimeraReader.Shared.Services.IScanService, QuimeraReader.Shared.Services.ScanService>();
+builder.Services.AddScoped<QuimeraReader.Shared.Services.ISettingsService, QuimeraReader.Shared.Services.SettingsService>();
 builder.Services.AddScoped<ToastService>();
 builder.Services.AddScoped<IServerConfigService, QuimeraReader.Web.Services.WebServerConfigService>();
 
