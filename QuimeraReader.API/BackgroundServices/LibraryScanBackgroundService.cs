@@ -46,7 +46,7 @@ public class LibraryScanBackgroundService : BackgroundService
         }
     }
 
-        private async Task ProcessScanBatchAsync(CancellationToken stoppingToken)
+        private async Task<bool> ProcessScanBatchAsync(CancellationToken stoppingToken)
     {
         using var scope = _serviceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -56,7 +56,7 @@ public class LibraryScanBackgroundService : BackgroundService
 
         var setting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "IncomingScanFolder", stoppingToken);
         if (setting == null || string.IsNullOrWhiteSpace(setting.Value) || !Directory.Exists(setting.Value))
-            return;
+            return false;
 
         string[] epubExtensions = { ".epub" };
         string[] audioExtensions = { ".mp3", ".m4b", ".m4a", ".wav" };
@@ -66,22 +66,24 @@ public class LibraryScanBackgroundService : BackgroundService
                                 .ToArray();
         
         // Excluir archivos que ya han sido procesados
-        var processedSources = await dbContext.Books.Where(b => b.SourceFilePath != null).Select(b => b.SourceFilePath).ToListAsync(stoppingToken);
-        var processedAudios = await dbContext.BookAudioTracks.Select(t => t.FilePath).ToListAsync(stoppingToken);
+        var processedSources = new HashSet<string>(await dbContext.Books.Where(b => b.SourceFilePath != null).Select(b => b.SourceFilePath).ToListAsync(stoppingToken));
+        var processedAudios = new HashSet<string>(await dbContext.BookAudioTracks.Select(t => t.FilePath).ToListAsync(stoppingToken));
 
         var allFiles = rawFiles.Where(f => !processedSources.Contains(f) && !processedAudios.Contains(f)).ToArray();
 
-        if (allFiles.Length == 0) return;
+        if (allFiles.Length == 0) return false;
 
         _scanState.IsScanning = true;
         _scanState.TotalFilesFound = allFiles.Length;
         _scanState.FilesProcessed = 0;
 
+        bool hasMore = false;
         try
         {
             var batchSizeSetting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "ScanBatchSize", stoppingToken);
             int batchSize = int.TryParse(batchSizeSetting?.Value, out int parsedSize) ? parsedSize : 100;
             var files = allFiles.Take(batchSize).ToList();
+            hasMore = allFiles.Length > batchSize;
 
             foreach (var file in files)
             {
@@ -166,5 +168,6 @@ public class LibraryScanBackgroundService : BackgroundService
         {
             _scanState.IsScanning = false;
         }
+        return hasMore;
     }
 }
