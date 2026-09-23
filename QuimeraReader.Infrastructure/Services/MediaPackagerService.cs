@@ -8,6 +8,32 @@ namespace QuimeraReader.Infrastructure.Services;
 
 public class MediaPackagerService
 {
+        public async Task<bool> NormalizeAudioAsync(string sourcePath, string destPath)
+    {
+        try
+        {
+            var processInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "ffmpeg",
+                // Convert to mp3 with reasonable quality for voice (approx 64-96 kbps VBR)
+                Arguments = $"-i \"{sourcePath}\" -c:a libmp3lame -q:a 5 -map 0:a:0 -y \"{destPath}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = System.Diagnostics.Process.Start(processInfo);
+            if (process != null)
+            {
+                await process.WaitForExitAsync();
+                return process.ExitCode == 0 && File.Exists(destPath);
+            }
+        }
+        catch { }
+        return false;
+    }
+
     public async Task<Stream> CreateAudiobookPackageAsync(Book book)
     {
         var audioTrack = book.AudioTracks.OrderBy(t => t.TrackNumber).FirstOrDefault();

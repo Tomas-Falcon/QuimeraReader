@@ -52,6 +52,7 @@ public class LibraryScanBackgroundService : BackgroundService
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var scannerService = scope.ServiceProvider.GetRequiredService<EpubScannerService>();
         var audioMatcher = scope.ServiceProvider.GetRequiredService<AudioMatchingService>();
+        var mediaPackager = scope.ServiceProvider.GetRequiredService<MediaPackagerService>();
 
         var setting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "IncomingScanFolder", stoppingToken);
         if (setting == null || string.IsNullOrWhiteSpace(setting.Value) || !Directory.Exists(setting.Value))
@@ -111,24 +112,33 @@ public class LibraryScanBackgroundService : BackgroundService
                                 
                                 string safeTitle = string.Join("_", book.Title.Split(Path.GetInvalidFileNameChars()));
                                 string bookDir = Path.GetDirectoryName(book.EpubFilePath ?? book.CoverImagePath) ?? setting.Value;
-                                string ext = Path.GetExtension(file);
-                                string newAudioPath = Path.Combine(bookDir, $"{safeTitle} track {nextTrack}{ext}");
+                                string newAudioPath = Path.Combine(bookDir, $"{safeTitle} track {nextTrack}.mp3");
 
                                 if (file != newAudioPath)
                                 {
                                     try 
                                     {
-                                        var modeSetting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "IngestionMode", stoppingToken);
-                                        if (modeSetting?.Value == "LeaveInPlace") {
-                                            File.Copy(file, newAudioPath, true);
-                                        } else {
-                                            File.Move(file, newAudioPath, true);
+                                        _logger.LogInformation($"Normalizando audio a MP3: {file}");
+                                        bool converted = await mediaPackager.NormalizeAudioAsync(file, newAudioPath);
+                                        
+                                        if (converted)
+                                        {
+                                            var modeSetting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "IngestionMode", stoppingToken);
+                                            if (modeSetting?.Value != "LeaveInPlace") {
+                                                try { File.Delete(file); } catch { }
+                                            }
+                                            book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
                                         }
-                                        book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
+                                        else
+                                        {
+                                            _logger.LogWarning("Falló la normalización de {File}. Copiando original.", file);
+                                            File.Copy(file, newAudioPath, true);
+                                            book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
+                                        }
                                     } 
                                     catch (Exception ex)
                                     {
-                                        _logger.LogError(ex, "Error al mover/renombrar el audio huérfano.");
+                                        _logger.LogError(ex, "Error al normalizar/mover el audio huérfano.");
                                         book.AudioTracks.Add(new BookAudioTrack { FilePath = file, TrackNumber = nextTrack });
                                     }
                                 }

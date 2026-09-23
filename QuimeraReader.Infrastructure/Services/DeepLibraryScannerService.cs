@@ -13,12 +13,14 @@ public class DeepLibraryScannerService
 {
     private readonly AppDbContext _dbContext;
     private readonly AudioMatchingService _audioMatchingService;
+    private readonly MediaPackagerService _mediaPackager;
     private readonly ILogger<DeepLibraryScannerService> _logger;
 
-    public DeepLibraryScannerService(AppDbContext dbContext, AudioMatchingService audioMatchingService, ILogger<DeepLibraryScannerService> logger)
+    public DeepLibraryScannerService(AppDbContext dbContext, AudioMatchingService audioMatchingService, MediaPackagerService mediaPackager, ILogger<DeepLibraryScannerService> logger)
     {
         _dbContext = dbContext;
         _audioMatchingService = audioMatchingService;
+        _mediaPackager = mediaPackager;
         _logger = logger;
     }
 
@@ -56,28 +58,34 @@ public class DeepLibraryScannerService
                     int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
                     
                     string directory = Path.GetDirectoryName(audioPath) ?? string.Empty;
-                    string ext = Path.GetExtension(audioPath);
                     string safeTitle = string.Join("_", book.Title.Split(Path.GetInvalidFileNameChars()));
                     
-                    string newAudioPath = Path.Combine(directory, $"{safeTitle} track {nextTrack}{ext}");
+                    string newAudioPath = Path.Combine(directory, $"{safeTitle} track {nextTrack}.mp3");
 
                     if (audioPath != newAudioPath)
                     {
                         try 
                         {
-                            File.Move(audioPath, newAudioPath, true);
-                            book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
-                            _logger.LogInformation("Asignado Track {Track} al libro '{Title}': {Path}", nextTrack, book.Title, newAudioPath);
+                            _logger.LogInformation($"Normalizando audio huérfano a MP3: {audioPath}");
+                            bool converted = await _mediaPackager.NormalizeAudioAsync(audioPath, newAudioPath);
+
+                            if (converted)
+                            {
+                                try { File.Delete(audioPath); } catch { }
+                                book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
+                                _logger.LogInformation("Asignado Track {Track} normalizado al libro '{Title}': {Path}", nextTrack, book.Title, newAudioPath);
+                            }
+                            else
+                            {
+                                File.Move(audioPath, newAudioPath, true);
+                                book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
+                            }
                         } 
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "Error al renombrar el audio colocado manualmente.");
+                            _logger.LogError(ex, "Error al renombrar o normalizar el audio colocado manualmente.");
                             book.AudioTracks.Add(new BookAudioTrack { FilePath = audioPath, TrackNumber = nextTrack });
                         }
-                    }
-                    else
-                    {
-                        book.AudioTracks.Add(new BookAudioTrack { FilePath = audioPath, TrackNumber = nextTrack });
                     }
                 }
             }
