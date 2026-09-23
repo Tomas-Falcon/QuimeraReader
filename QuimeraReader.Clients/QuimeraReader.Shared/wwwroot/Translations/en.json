@@ -11,7 +11,7 @@
   "Status_NextToRead": "Next to Read",
   "Status_Reading": "Continue Reading",
   "Status_Read": "Read",
-  "Status_Unread": "Unread",
+  "Status_Unread": "Unread",`r`n  "Action_StartReading": "Start reading",`r`n  "Action_ContinueReading": "Continue reading",`r`n  "Action_ReadAgain": "Read again",
   "EditBook_Title": "Edit Book",
   "EditBook_Metadata": "Metadata",
   "EditBook_Cover": "Cover",
