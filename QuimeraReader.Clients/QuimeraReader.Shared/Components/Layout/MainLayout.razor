@@ -34,7 +34,7 @@ else
     <main class="@(IsReadingMode ? "p-0" : "")">
         @if (!IsReadingMode)
         {
-            <div class="top-row px-4" style="justify-content: flex-end; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border-color); background-color: var(--bg-card);">
+            <div class="top-row px-4 py-2" style="justify-content: flex-end; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--border-color); background-color: var(--bg-card);">
                 
                 @if (_scanStatus != null && _scanStatus.IsScanning)
                 {

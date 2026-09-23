@@ -12,11 +12,11 @@
 @namespace QuimeraReader.Shared.Components
 
 <div class="library-container">
-    <div class="library-toolbar d-flex justify-content-between align-items-center mb-4">
-        <div class="search-box" style="flex: 0 0 300px;">
+    <div class="library-toolbar d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3 mb-4">
+        <div class="search-box w-100" style="max-width: 500px;">
             <RadzenTextBox Placeholder="Buscar libros, autores..." Value="@_searchQuery" Change="OnSearchInput" class="w-100" />
         </div>
-        <div class="filters d-flex gap-2 align-items-center">
+        <div class="filters d-flex flex-wrap gap-2 align-items-center w-100">
             @if (_selectionMode)
             {
                                 <span class="text-primary fw-bold me-2">@_selectedBookIds.Count seleccionados</span>
@@ -35,7 +35,7 @@
                     <RadzenIcon Icon="cloud_upload" /> Subir EPUB
                     <InputFile OnChange="HandleFileUpload" accept=".epub" class="d-none" multiple />
                 </label>
-                                <RadzenDropDown Multiple="true" Placeholder="Categorías" Data="@_availableCategories" TextProperty="Name" ValueProperty="Id" @bind-Value="_selectedCategories"  Style="width: 250px;" AllowClear="true" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
+                                <RadzenDropDown Multiple="true" Placeholder="Categorías" Data="@_availableCategories" TextProperty="Name" ValueProperty="Id" @bind-Value="_selectedCategories"  Style="min-width: 200px; max-width: 100%;" AllowClear="true" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
                 <RadzenDropDown TValue="string" Data="@_sortOptions" @bind-Value="_selectedSort" Style="width: auto;" />
             }
         </div>
