@@ -1,4 +1,4 @@
-﻿# QuimeraReader
+# QuimeraReader
 
 QuimeraReader is a comprehensive, self-hosted platform (Homelab) designed for managing massive ebook (EPUB) and audiobook libraries. It features artificial intelligence synchronization and provides a seamless read-along experience across web and mobile platforms.
 
@@ -55,11 +55,24 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid
-      - ASPNETCORE_ENVIRONMENT=Production
+      - QUIMERA_DB_PATH=/config/quimerareader.db
     volumes:
       - /path/to/your/downloads:/media
       - /path/to/your/library:/library
       - /path/to/your/config:/config
+      # Docker socket to enable restarts and manual updates from the web UI
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  # Automatic and on-demand updates (Watchtower)
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    environment:
+      - DOCKER_API_VERSION=1.44
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 300 --http-api-update --http-api-periodic-polls --http-api-token quimera quimerareader
     restart: unless-stopped
 ```
 
@@ -69,6 +82,13 @@ docker compose up -d
 ```
 Access the unified Web interface at `http://<your-server-ip>:5000`. 
 **Note:** On the first run, navigate to the Settings page and ensure the *Directorio de Origen* (`/media`) and *Directorio de Salida* (`/library`) are correctly configured to activate the automatic background scanner.
+
+### 3. Continuous & On-Demand Updates
+
+QuimeraReader includes automated update mechanisms out of the box:
+- **Automatic Background Updates:** The included `watchtower` service monitors the image on GHCR every 5 minutes (`--interval 300`). Whenever a new release or build is pushed, Watchtower automatically pulls the new image and recreates the container seamlessly.
+- **On-Demand Updates & Restarts:** In the Web UI under **Ajustes > Sistema** (`Settings > System`), you can trigger an immediate update and restart or simply restart the server. The backend directly communicates with Watchtower via its internal HTTP API to pull and recreate the container on demand without manual terminal commands.
+
 
 ## Local Development Setup
 
