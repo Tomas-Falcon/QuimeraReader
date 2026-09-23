@@ -9,6 +9,7 @@ public class Book
     public string? Isbn { get; set; }
     public string? Description { get; set; }
     public double? AverageRating { get; set; }
+    public int? TotalPages { get; set; }
 
     // Local File Paths
     public string EpubFilePath { get; set; } = string.Empty;
@@ -17,7 +18,9 @@ public class Book
     
     // Reading Progress
     public DateTime? LastReadAt { get; set; }
+    public string? ReadingStatus { get; set; } // Unread, Reading, Read, NextToRead
     public string? CurrentEpubCfi { get; set; }
+    public string? EpubLocationsCache { get; set; } // JSON cache of epub.js locations
     public double? CurrentAudioPosition { get; set; }
     public double? PercentageCompleted { get; set; }
 
@@ -29,7 +32,7 @@ public class Book
     // Metadata Tracking
     public bool IsMetadataComplete { get; set; } = false;
     
-    // Sincronización
+    // Sincronizacin
     public bool IsReadInHardcover { get; set; }
 
     // Relations

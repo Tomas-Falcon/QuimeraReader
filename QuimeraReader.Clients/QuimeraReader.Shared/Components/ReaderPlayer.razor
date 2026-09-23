@@ -159,8 +159,18 @@
                 var baseUrl = BookService.BaseAddress.TrimEnd('/');
                 var epubApiUrl = $"{baseUrl}/{Book.EpubUrl}";
                 
-                await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubApiUrl, _dotNetRef, Book.CurrentEpubCfi);
+                await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubApiUrl, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache);
             }
+        }
+    }
+
+        [JSInvokable]
+    public async Task SaveLocationsCache(string locationsJson)
+    {
+        if (Book != null)
+        {
+            Book.EpubLocationsCache = locationsJson;
+            await BookService.SaveEpubLocationsAsync(BookId, locationsJson);
         }
     }
 

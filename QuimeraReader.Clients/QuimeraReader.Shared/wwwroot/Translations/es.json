@@ -5,5 +5,14 @@
   "Filter_Title": "Título",
   "Filter_Author": "Autor",
   "Button_Search": "Buscar",
-  "Button_Cancel": "Cancelar"
+  "Button_Cancel": "Cancelar",
+  "Button_Save": "Guardar",
+  "Library_Categories_Select": "Categorías",
+  "Status_NextToRead": "Próximos a leer",
+  "Status_Reading": "Continuar Leyendo",
+  "Status_Read": "Leído",
+  "Status_Unread": "No Leído",
+  "EditBook_Title": "Editar Libro",
+  "EditBook_Metadata": "Metadatos",
+  "EditBook_Cover": "Portada"
 }

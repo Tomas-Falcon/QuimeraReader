@@ -1,4 +1,4 @@
-﻿@page "/book/{Id:int}"
+@page "/book/{Id:int}"
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @inject QuimeraReader.Shared.Services.IBookService BookService
@@ -7,6 +7,7 @@
 @inject NavigationManager NavManager
 @inject ToastService ToastService
 @inject IJSRuntime JS
+@inject Radzen.DialogService DialogService
 
 <PageTitle>Detalles del Libro</PageTitle>
 
@@ -47,7 +48,10 @@ else
                 
                 <!-- Metadata -->
                 <div class="info-section text-white mt-3 mt-md-0" style="flex: 1;">
-                    <h1 class="display-5 fw-bold mb-2">@_book.Title</h1>
+                    <div class="d-flex align-items-center mb-2">
+                        <h1 class="display-5 fw-bold mb-0 me-3">@_book.Title</h1>
+                        <RadzenButton Icon="edit" ButtonStyle="Radzen.ButtonStyle.Light" Size="Radzen.ButtonSize.Medium" Click="@OpenEditModal" />
+                    </div>
                     
                     @if (_book.Authors.Any())
                     {
@@ -319,6 +323,18 @@ else
     private void GoBack()
     {
         NavManager.NavigateTo("/");
+    }
+
+    private async Task OpenEditModal()
+    {
+        var result = await DialogService.OpenAsync<BookEditModal>("Editar Libro", 
+            new Dictionary<string, object?> { { "Book", _book } },
+            new Radzen.DialogOptions() { Width = "500px", Height = "450px" });
+        
+        if (result == true)
+        {
+            await LoadBookAsync();
+        }
     }
 }
 

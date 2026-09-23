@@ -1,9 +1,18 @@
 ﻿{
   "App_Title": "QuimeraReader",
-  "Filter_Placeholder": "Seleccionar filtro...",
-  "Filter_RecentlyAdded": "ño recientemente",
-  "Filter_Title": "ñaañña",
-  "Filter_Author": "ñeñeñe",
-  "Button_Search": "Buscar",
-  "Button_Cancel": "Cancelar"
+  "Filter_Placeholder": "Select filter...",
+  "Filter_RecentlyAdded": "Recently Added",
+  "Filter_Title": "Title",
+  "Filter_Author": "Author",
+  "Button_Search": "Search",
+  "Button_Cancel": "Cancel",
+  "Button_Save": "Save",
+  "Library_Categories_Select": "Categories",
+  "Status_NextToRead": "Next to Read",
+  "Status_Reading": "Continue Reading",
+  "Status_Read": "Read",
+  "Status_Unread": "Unread",
+  "EditBook_Title": "Edit Book",
+  "EditBook_Metadata": "Metadata",
+  "EditBook_Cover": "Cover"
 }

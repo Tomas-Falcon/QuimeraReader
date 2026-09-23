@@ -46,6 +46,7 @@ else
                     </div>
                 }
 
+                                <Radzen.Blazor.RadzenDropDown TValue="string" Value="@_currentLang" Data="@_languages" ValueProperty="Code" TextProperty="Name" Change="OnLanguageChanged" Style="width: 130px;" />
                 <button class="btn btn-outline-secondary metadata-btn" @onclick="FetchMissingMetadata" disabled="@_isFetchingMetadata" style="border-radius: 20px; display: flex; align-items: center; gap: 6px;">
                     @if (_isFetchingMetadata)
                     {
@@ -81,6 +82,22 @@ else
 
 @code {
     private bool isDarkTheme = true;
+    private string _currentLang = "es";
+    private List<dynamic> _languages = new List<dynamic>
+    {
+        new { Code = "es", Name = "Español" },
+        new { Code = "en", Name = "English" }
+    };
+
+    private async Task OnLanguageChanged(object value)
+    {
+        if (value != null)
+        {
+            _currentLang = value.ToString()!;
+            await TranslationService.LoadLanguageAsync(_currentLang);
+            NavManager.NavigateTo(NavManager.Uri, forceLoad: true);
+        }
+    }
     private string _serverInput = "http://";
     private bool _isFetchingMetadata = false;
     private bool IsReadingMode => NavManager.Uri.Contains("/read/", StringComparison.OrdinalIgnoreCase);
@@ -154,6 +171,9 @@ else
         if (firstRender)
         {
             await TranslationService.InitializeAsync();
+            var storedLang = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "preferredLanguage");
+            if (!string.IsNullOrEmpty(storedLang)) _currentLang = storedLang;
+            StateHasChanged();
             var theme = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "theme");
             if (theme == "light")
             {

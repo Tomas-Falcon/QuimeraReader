@@ -18,7 +18,8 @@
         <div class="filters d-flex gap-2 align-items-center">
             @if (_selectionMode)
             {
-                <span class="text-primary fw-bold me-2">@_selectedBookIds.Count seleccionados</span>
+                                <span class="text-primary fw-bold me-2">@_selectedBookIds.Count seleccionados</span>
+                <RadzenDropDown TValue="string" Placeholder="Marcar como..." Data="@_bulkActions" ValueProperty="Value" TextProperty="Text" Change="OnBulkActionSelected" Style="width: 180px;" />
                 <RadzenButton Text="Cancelar Selección" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Size="ButtonSize.Small" />
                 <RadzenButton Text="Borrar" Click="DeleteSelected" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Icon="delete" Disabled="@(_selectedBookIds.Count == 0)" />
             }
@@ -33,6 +34,7 @@
                     <RadzenIcon Icon="cloud_upload" /> Subir EPUB
                     <InputFile OnChange="HandleFileUpload" accept=".epub" class="d-none" multiple />
                 </label>
+                                <RadzenDropDown Multiple="true" Placeholder="Categorías" Data="@_availableCategories" TextProperty="Name" ValueProperty="Id" @bind-Value="_selectedCategories"  Style="width: 250px;" AllowClear="true" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
                 <RadzenDropDown TValue="string" Data="@_sortOptions" @bind-Value="_selectedSort" Style="width: auto;" />
             }
         </div>
@@ -51,6 +53,16 @@
             </div>
         }
 
+                @if (_nextToReadBooks != null && _nextToReadBooks.Any())
+        {
+            <h3 class="rz-color-primary rz-mt-4 mb-3">Próximos a leer</h3>
+            <div class="netflix-row mb-5">
+                @foreach (var book in _nextToReadBooks)
+                {
+                    <div class="col"><BookCard Book="book" /></div>
+                }
+            </div>
+        }
         @if (_recommendations != null && _recommendations.Any())
         {
             <h3 class="rz-color-primary rz-mt-4 mb-3">Recomendados para ti</h3>
@@ -144,6 +156,30 @@
     private List<string> _sortOptions = new List<string> { "Añadidos recientemente", "Título (A-Z)", "Autor (A-Z)" };
     private string _selectedSort = "Añadidos recientemente";
 
+        private List<dynamic> _bulkActions = new List<dynamic>
+    {
+        new { Text = "Marcar Leído", Value = "Read" },
+        new { Text = "Marcar No Leído", Value = "Unread" },
+        new { Text = "Próximo a leer", Value = "NextToRead" }
+    };
+
+    private async Task OnBulkActionSelected(object value)
+    {
+        if (value == null || !_selectedBookIds.Any()) return;
+        string status = value.ToString()!;
+        try
+        {
+            await BookService.BulkUpdateStatusAsync(_selectedBookIds.ToList(), status);
+            ToastService.ShowSuccess("Libros actualizados");
+            ToggleSelectionMode();
+            await LoadBooksAsync(); // Reload
+        }
+        catch(Exception ex)
+        {
+            ToastService.ShowError("Error al actualizar: " + ex.Message);
+        }
+    }
+
     private void ToggleSelectionMode()
     {
         _selectionMode = !_selectionMode;
@@ -227,9 +263,17 @@
             StateHasChanged();
         }
     }
+    private IEnumerable<QuimeraReader.Shared.Models.Category> _availableCategories = Array.Empty<QuimeraReader.Shared.Models.Category>();
+    private IEnumerable<int> _selectedCategories = new List<int>();
+    private IEnumerable<QuimeraReader.Shared.Models.Book> _nextToReadBooks = Array.Empty<QuimeraReader.Shared.Models.Book>();
 
     protected override async Task OnInitializedAsync()
     {
+        try
+        {
+            _availableCategories = await BookService.GetCategoriesAsync();
+        }
+        catch { }
         _objRef = DotNetObjectReference.Create(this);
         var fetchRecs = BookService.GetRecommendationsAsync();
         
@@ -272,6 +316,12 @@
         {
             await LoadBooksAsync();
         }
+    }
+
+        private async Task OnCategoryChanged(object value)
+    {
+        _currentPage = 1;
+        await LoadBooksAsync();
     }
 
     private void OnSearchInput(string value)

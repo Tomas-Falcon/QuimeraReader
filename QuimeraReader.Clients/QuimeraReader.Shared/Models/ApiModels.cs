@@ -22,6 +22,9 @@ public record Book
     public string? CurrentEpubCfi { get; set; }
     public double? CurrentAudioPosition { get; set; }
     public double? PercentageCompleted { get; set; }
+    public string? ReadingStatus { get; set; }
+    public string? EpubLocationsCache { get; set; }
+    public int? TotalPages { get; set; }
     
     // Virtual URLs para el frontend (generadas por MediaController)
     public string CoverUrl => $"api/media/books/{Id}/cover";
@@ -35,6 +38,9 @@ public class UpdatePositionRequest
     public string? CurrentEpubCfi { get; set; }
     public double? CurrentAudioPosition { get; set; }
     public double? PercentageCompleted { get; set; }
+    public string? ReadingStatus { get; set; }
+    public string? EpubLocationsCache { get; set; }
+    public int? TotalPages { get; set; }
 }
 
 public record PaginatedResult<T>
@@ -78,3 +84,26 @@ public record ScanStatus
     public string CurrentFile { get; set; } = string.Empty;
 }
 
+public class BulkStatusUpdateRequest
+{
+    public List<int> BookIds { get; set; } = new();
+    public string Status { get; set; } = string.Empty;
+}
+
+public class UpdateMetadataRequest
+{
+    public string Title { get; set; } = string.Empty;
+    public string? ReadingStatus { get; set; }
+    public List<string> Categories { get; set; } = new();
+}
+
+public class UpdateCoverRequest
+{
+    public string ImageUrl { get; set; } = string.Empty;
+}
+
+public class CoverSearchResult
+{
+    public string ImageUrl { get; set; } = string.Empty;
+    public string Source { get; set; } = string.Empty;
+}
