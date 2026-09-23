@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace QuimeraReader.Application.Books.DTOs;
@@ -53,3 +53,4 @@ public record CategoryDto
     public int BookCount { get; init; }
     public string? SampleCoverUrl { get; init; }
 }
+

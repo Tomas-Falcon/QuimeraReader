@@ -1,14 +1,16 @@
-@page "/category/{CategoryName}"
+﻿@page "/category/{CategoryName}"
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Components
-@inject QuimeraReader.Shared.Services.IQuimeraApiClient ApiClient
+@inject QuimeraReader.Shared.Services.IBookService BookService
+@inject QuimeraReader.Shared.Services.IScanService ScanService
+@inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject NavigationManager NavManager
 
 <PageTitle>@CategoryName - QuimeraReader</PageTitle>
 
 <div class="mb-4 d-flex align-items-center">
     <button class="btn btn-outline-secondary me-3" @onclick="GoBack">
-        <i class="bi bi-arrow-left"></i> Volver a Categor�as
+        <i class="bi bi-arrow-left"></i> Volver a Categorías
     </button>
     <h2 class="mb-0 text-primary"><i class="bi bi-tag-fill me-2"></i> @CategoryName</h2>
 </div>

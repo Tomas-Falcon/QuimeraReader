@@ -88,4 +88,19 @@ public class SettingsController : ControllerBase
             return StatusCode(500, new { Message = "Error al descargar el modelo: " + ex.Message });
         }
     }
+
+    [HttpPost("restart")]
+    public IActionResult RestartServer([FromServices] Microsoft.Extensions.Hosting.IHostApplicationLifetime appLifetime)
+    {
+        _logger.LogWarning("Se recibió comando de REINICIO desde los ajustes. Deteniendo la aplicación...");
+        
+        // Ejecutamos en un hilo separado para permitir que la respuesta HTTP termine y llegue al cliente
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(1000);
+            appLifetime.StopApplication();
+        });
+
+        return Ok(new { Message = "Reiniciando servidor..." });
+    }
 }

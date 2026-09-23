@@ -3,7 +3,8 @@ export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi) {
     var rendition = book.renderTo(elementId, {
         width: "100%",
         height: "100%",
-        spread: "none"
+        spread: "none",
+        allowScriptedContent: false //Esto es lo que permite ejecutar js proviniente de los epubs, podria ser inseguro si hay en script js malo, bajo tu propio riesgo
     });
 
     rendition.themes.register("dark", {
@@ -27,8 +28,14 @@ export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi) {
         return book.locations.generate(1600);
     }).then(function (locations) {
         // After generation, update current percentage
-        if (rendition.location) {
-            var percentage = book.locations.percentageFromCfi(rendition.location.start.cfi);
+        if (rendition.location && rendition.location.start) {
+            var percentage = 0;
+            try {
+                percentage = book.locations.percentageFromCfi(rendition.location.start.cfi);
+            } catch(e) { }
+            
+            if (percentage === null || percentage === undefined || percentage < 0) percentage = 0;
+            
             if (dotNetRef) {
                 dotNetRef.invokeMethodAsync("OnEpubLocationChanged", rendition.location.start.cfi, percentage).catch(e => console.warn(e));
             }
@@ -37,7 +44,15 @@ export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi) {
 
     rendition.on("relocated", function (location) {
         if (!location || !location.start || !location.start.cfi) return;
-        var percentage = book.locations ? book.locations.percentageFromCfi(location.start.cfi) : 0;
+        var percentage = 0;
+        try {
+            if (book.locations && book.locations.length > 0) {
+                percentage = book.locations.percentageFromCfi(location.start.cfi);
+            }
+        } catch(e) { }
+        
+        if (percentage === null || percentage === undefined || percentage < 0) percentage = 0;
+        
         if (dotNetRef) {
             dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage).catch(e => console.warn(e));
         }

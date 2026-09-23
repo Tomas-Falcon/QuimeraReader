@@ -1,7 +1,12 @@
 @using QuimeraReader.Shared.Components.Layout
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+
+<RadzenComponents @rendermode="InteractiveWebAssembly" />
+<RadzenTheme Theme="material" />
+
 <Router AppAssembly="@typeof(App).Assembly" AdditionalAssemblies="new[] { typeof(MainLayout).Assembly }" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
     </Found>
 </Router>

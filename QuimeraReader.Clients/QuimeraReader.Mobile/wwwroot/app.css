@@ -855,3 +855,28 @@ main {
 }
 
 
+/* Radzen Overrides */
+[data-theme=""dark""], :root {
+    --rz-base-background-color: var(--bg-main);
+    --rz-panel-background-color: var(--bg-card);
+    --rz-text-color: var(--text-main);
+    --rz-secondary-text-color: var(--text-muted);
+    
+    --rz-primary: #00f0ff;
+    --rz-primary-light: rgba(0, 240, 255, 0.2);
+    --rz-primary-dark: #00c3cf;
+    
+    --rz-success: #39ff14;
+    --rz-success-light: rgba(57, 255, 20, 0.2);
+    --rz-success-dark: #2cd40e;
+
+    --rz-card-background-color: var(--bg-card);
+    --rz-card-border: 1px solid var(--border-color);
+    
+    --rz-input-background-color: var(--bg-input);
+    --rz-input-border: 1px solid var(--border-color);
+    --rz-input-color: var(--text-main);
+    
+    --rz-border-color: var(--border-color);
+    --rz-border-radius: 8px;
+}

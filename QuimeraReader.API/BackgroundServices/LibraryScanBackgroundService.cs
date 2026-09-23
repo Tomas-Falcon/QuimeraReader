@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -50,6 +50,7 @@ public class LibraryScanBackgroundService : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var scannerService = scope.ServiceProvider.GetRequiredService<EpubScannerService>();
+        var audioMatcher = scope.ServiceProvider.GetRequiredService<AudioMatchingService>();
 
         var setting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "IncomingScanFolder", stoppingToken);
         if (setting == null || string.IsNullOrWhiteSpace(setting.Value))
@@ -61,7 +62,8 @@ public class LibraryScanBackgroundService : BackgroundService
             return;
         }
 
-        var rawFiles = Directory.GetFiles(setting.Value, "*.epub", SearchOption.AllDirectories);
+        string[] extensions = { ".epub", ".mp3", ".m4b", ".m4a", ".wav" };
+        var rawFiles = Directory.GetFiles(setting.Value, "*.*", SearchOption.AllDirectories).Where(f => extensions.Contains(Path.GetExtension(f).ToLowerInvariant())).ToArray();
         
         // Excluir archivos que ya han sido procesados (para el modo LeaveInPlace)
         var processedSources = await dbContext.Books
@@ -119,3 +121,4 @@ public class LibraryScanBackgroundService : BackgroundService
         }
     }
 }
+

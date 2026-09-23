@@ -1,7 +1,9 @@
-@page "/book/{Id:int}"
+﻿@page "/book/{Id:int}"
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
-@inject IQuimeraApiClient ApiClient
+@inject QuimeraReader.Shared.Services.IBookService BookService
+@inject QuimeraReader.Shared.Services.IScanService ScanService
+@inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject NavigationManager NavManager
 @inject ToastService ToastService
 @inject IJSRuntime JS
@@ -27,7 +29,7 @@ else
 {
     <div class="book-details-hero">
         <!-- Background Blur effect similar to Spotify/Reader -->
-        <div class="hero-bg" style="background-image: url('@(ApiClient.BaseAddress + _book.CoverUrl)');"></div>
+        <div class="hero-bg" style="background-image: url('@(BookService.BaseAddress + _book.CoverUrl)');"></div>
         <div class="hero-overlay"></div>
 
         <div class="container position-relative" style="z-index: 10; padding-top: 2rem; padding-bottom: 3rem;">
@@ -40,7 +42,7 @@ else
             <div class="d-flex flex-column flex-md-row gap-5 align-items-center align-items-md-start">
                 <!-- Cover -->
                 <div class="cover-section" style="flex: 0 0 auto; width: 100%; max-width: 300px;">
-                    <img src="@(ApiClient.BaseAddress + @_book.CoverUrl)" alt="Portada" class="img-fluid rounded shadow-lg" style="width: 100%;" onerror="this.outerHTML='<div class=\'placeholder-cover shadow-lg rounded d-flex align-items-center justify-content-center\' style=\'width:100%;aspect-ratio:2/3;background:#2a2a2a;color:#888;\'><span>Sin Portada</span></div>'" />
+                    <img src="@(BookService.BaseAddress + @_book.CoverUrl)" alt="Portada" class="img-fluid rounded shadow-lg" style="width: 100%;" onerror="this.outerHTML='<div class=\'placeholder-cover shadow-lg rounded d-flex align-items-center justify-content-center\' style=\'width:100%;aspect-ratio:2/3;background:#2a2a2a;color:#888;\'><span>Sin Portada</span></div>'" />
                 </div>
                 
                 <!-- Metadata -->
@@ -77,7 +79,7 @@ else
                     <div class="badges mb-4 d-flex gap-2 flex-wrap align-items-center">
                         @if (_book.AverageRating.HasValue && _book.AverageRating.Value > 0)
                         {
-                            <span class="badge bg-warning text-dark fs-6" title="Puntuación Media">
+                            <span class="badge bg-warning text-dark fs-6" title="PuntuaciÃ³n Media">
                                 <i class="bi bi-star-fill"></i> @_book.AverageRating.Value.ToString("0.0")
                             </span>
                         }
@@ -153,7 +155,7 @@ else
                     </div>
 
                     <div class="mt-4 pt-4" style="border-top: 1px solid rgba(255,255,255,0.1);">
-                        <h6 class="text-white-50 mb-3"><i class="bi bi-gear me-2"></i> Gestión de archivos</h6>
+                        <h6 class="text-white-50 mb-3"><i class="bi bi-gear me-2"></i> GestiÃ³n de archivos</h6>
                         <div class="d-flex gap-2 flex-wrap">
                             @if (_book.HasEpub)
                             {
@@ -218,7 +220,7 @@ else
     private async Task LoadBookAsync()
     {
         _isLoading = true;
-        _book = await ApiClient.GetBookAsync(Id);
+        _book = await BookService.GetBookAsync(Id);
         _isLoading = false;
         StateHasChanged();
     }
@@ -230,7 +232,7 @@ else
         
         try
         {
-            await ApiClient.RescanSingleBookMetadataAsync(Id);
+            await ScanService.RescanSingleBookMetadataAsync(Id);
             // Refresh book details to show the new metadata
             await LoadBookAsync();
             ToastService.ShowSuccess("Metadatos actualizados correctamente");
@@ -254,12 +256,12 @@ else
 
     private async Task DeleteEpubAsync()
     {
-        bool confirmed = await JS.InvokeAsync<bool>("confirm", "¿Seguro que deseas borrar el archivo EPUB de este libro?");
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", "Â¿Seguro que deseas borrar el archivo EPUB de este libro?");
         if (!confirmed) return;
 
         try
         {
-            await ApiClient.DeleteEpubAsync(Id);
+            await BookService.DeleteEpubAsync(Id);
             ToastService.ShowSuccess("Archivo EPUB eliminado.");
             
             try 
@@ -285,12 +287,12 @@ else
 
     private async Task DeleteAudioAsync()
     {
-        bool confirmed = await JS.InvokeAsync<bool>("confirm", "¿Seguro que deseas borrar el Audiolibro de este libro?");
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", "Â¿Seguro que deseas borrar el Audiolibro de este libro?");
         if (!confirmed) return;
 
         try
         {
-            await ApiClient.DeleteAudioAsync(Id);
+            await BookService.DeleteAudioAsync(Id);
             ToastService.ShowSuccess("Audiolibro eliminado.");
             
             try 

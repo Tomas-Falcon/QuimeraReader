@@ -1,6 +1,8 @@
-@using QuimeraReader.Shared.Models
+﻿@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
-@inject IQuimeraApiClient ApiClient
+@inject QuimeraReader.Shared.Services.IBookService BookService
+@inject QuimeraReader.Shared.Services.IScanService ScanService
+@inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject ToastService ToastService
 @namespace QuimeraReader.Shared.Components
 
@@ -25,7 +27,7 @@
         <div class="col-md-9">
             <div class="card bg-transparent border-0">
                 <div class="card-header bg-transparent border-0 pb-0">
-                    <h2 class="text-light fw-bold">Configuración del Servidor</h2>
+                    <h2 class="text-light fw-bold">ConfiguraciÃ³n del Servidor</h2>
                 </div>
 
                 <div class="card-body">
@@ -43,7 +45,7 @@
                             <div class="card bg-dark text-light border-secondary shadow-sm mb-4" style="border-radius: 12px;">
                                 <div class="card-body p-4">
                                     <h4 class="card-title text-primary"><i class="bi bi-folder-fill me-2"></i> Carpetas del Servidor</h4>
-                                    <p class="text-white-50 small mb-4">Define dónde buscará QuimeraReader los libros y cómo los importará.</p>
+                                    <p class="text-white-50 small mb-4">Define dÃ³nde buscarÃ¡ QuimeraReader los libros y cÃ³mo los importarÃ¡.</p>
 
                                     <div class="mb-4">
                                         <label class="form-label fw-bold">Directorio de Origen (Descargas/Media)</label>
@@ -52,18 +54,18 @@
                                     </div>
 
                                     <div class="mb-4">
-                                        <label class="form-label fw-bold">Directorio de Salida (Librería Organizada)</label>
+                                        <label class="form-label fw-bold">Directorio de Salida (LibrerÃ­a Organizada)</label>
                                         <input type="text" class="form-control bg-secondary text-light border-0" @bind="_outgoingLibraryPath" placeholder="/library" />
-                                        <div class="form-text text-white-50">Ruta donde se guardarán y organizarán los libros y carátulas (ej: /app/media/books o C:\MisLibros).</div>
+                                        <div class="form-text text-white-50">Ruta donde se guardarÃ¡n y organizarÃ¡n los libros y carÃ¡tulas (ej: /app/media/books o C:\MisLibros).</div>
                                     </div>
 
                                     <div class="mb-2">
-                                        <label class="form-label fw-bold">Modo de Importación</label>
+                                        <label class="form-label fw-bold">Modo de ImportaciÃ³n</label>
                                         <select class="form-select bg-secondary text-light border-0" @bind="_ingestionMode">
                                             <option value="Move">Mover y Organizar (Ahorra Espacio)</option>
                                             <option value="LeaveInPlace">Dejar en lugar original (Para Torrents - Crea Enlaces/Symlinks)</option>
                                         </select>
-                                        <div class="form-text text-white-50">Si seleccionas mover, el archivo se pasará a /library y se ordenará por autor. Si seleccionas Dejar, se crearán Symlinks.</div>
+                                        <div class="form-text text-white-50">Si seleccionas mover, el archivo se pasarÃ¡ a /library y se ordenarÃ¡ por autor. Si seleccionas Dejar, se crearÃ¡n Symlinks.</div>
                                     </div>
                                 </div>
                             </div>
@@ -73,11 +75,11 @@
                         {
                             <div class="card bg-dark text-light border-secondary shadow-sm mb-4" style="border-radius: 12px;">
                                 <div class="card-body p-4">
-                                    <h4 class="card-title text-primary"><i class="bi bi-robot me-2"></i> Inteligencia Artificial y Transcripción (Whisper)</h4>
-                                    <p class="text-white-50 small mb-4">Configura cómo deseas ejecutar los modelos de Inteligencia Artificial para sincronizar texto y audio.</p>
+                                    <h4 class="card-title text-primary"><i class="bi bi-robot me-2"></i> Inteligencia Artificial y TranscripciÃ³n (Whisper)</h4>
+                                    <p class="text-white-50 small mb-4">Configura cÃ³mo deseas ejecutar los modelos de Inteligencia Artificial para sincronizar texto y audio.</p>
 
                                     <div class="mb-4">
-                                        <label class="form-label fw-bold">Modo de Ejecución de Whisper</label>
+                                        <label class="form-label fw-bold">Modo de EjecuciÃ³n de Whisper</label>
                                         <select class="form-select bg-secondary text-light border-0 mb-3" @bind="_whisperMode">
                                             <option value="LocalServer">Plug & Play: Ejecutar Whisper localmente en este Servidor</option>
                                             <option value="ExternalApi">API Externa: Conectar a OpenAI o red local (Ollama / LLMStudio)</option>
@@ -86,8 +88,8 @@
                                         @if (_whisperMode == "LocalServer")
                                         {
                                             <div class="p-3 bg-secondary rounded mt-2">
-                                                <h6 class="fw-bold"><i class="bi bi-hdd-network-fill me-2"></i> Configuración Local (Whisper.net)</h6>
-                                                <p class="text-white-50 small">Se descargarán los pesos del modelo directamente al contenedor. Depende del CPU/GPU del servidor.</p>
+                                                <h6 class="fw-bold"><i class="bi bi-hdd-network-fill me-2"></i> ConfiguraciÃ³n Local (Whisper.net)</h6>
+                                                <p class="text-white-50 small">Se descargarÃ¡n los pesos del modelo directamente al contenedor. Depende del CPU/GPU del servidor.</p>
                                                 
                                                 <label class="form-label small">Ruta del Modelo Base (.bin)</label>
                                                 <div class="input-group">
@@ -102,7 +104,7 @@
                                         else
                                         {
                                             <div class="p-3 bg-secondary rounded mt-2">
-                                                <h6 class="fw-bold"><i class="bi bi-cloud-arrow-up-fill me-2"></i> Configuración API Externa</h6>
+                                                <h6 class="fw-bold"><i class="bi bi-cloud-arrow-up-fill me-2"></i> ConfiguraciÃ³n API Externa</h6>
                                                 <p class="text-white-50 small">Conecta QuimeraReader a OpenAI o a un modelo alojado en otro servidor (ej. Ollama).</p>
                                                 
                                                 <div class="mb-3">
@@ -113,7 +115,7 @@
                                                 <div>
                                                     <label class="form-label small">API Key</label>
                                                     <input type="password" class="form-control bg-dark text-light border-0" @bind="_openAiKey" placeholder="sk-..." />
-                                                    <div class="form-text text-white-50">Si usas un modelo en red local sin autenticación, déjalo vacío.</div>
+                                                    <div class="form-text text-white-50">Si usas un modelo en red local sin autenticaciÃ³n, dÃ©jalo vacÃ­o.</div>
                                                 </div>
                                             </div>
                                         }
@@ -129,7 +131,7 @@
                                     <div>
                                         <label class="form-label fw-bold">Google Books API Key (Opcional)</label>
                                         <input type="password" class="form-control bg-secondary text-light border-0" @bind="_googleBooksKey" placeholder="AIza..." />
-                                        <div class="form-text text-white-50">Mejora la descarga de portadas en alta resolución. QuimeraReader usará Google Books (sin key) o OpenLibrary por defecto.</div>
+                                        <div class="form-text text-white-50">Mejora la descarga de portadas en alta resoluciÃ³n. QuimeraReader usarÃ¡ Google Books (sin key) o OpenLibrary por defecto.</div>
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label fw-bold">Hardcover API Key (GraphQL)</label>
@@ -137,10 +139,10 @@
                                         
                                         <div class="form-check form-switch mt-2">
                                             <input class="form-check-input" type="checkbox" id="hardcoverSyncCheck" @bind="_hardcoverSyncEnabled">
-                                            <label class="form-check-label fw-bold" for="hardcoverSyncCheck">Sincronización de mi contenido (Hardcover)</label>
+                                            <label class="form-check-label fw-bold" for="hardcoverSyncCheck">SincronizaciÃ³n de mi contenido (Hardcover)</label>
                                         </div>
                                         <div class="form-text text-white-50">
-                                            Si está activado, QuimeraReader actualizará tu progreso de lectura y marcará los libros como leídos en tu cuenta de Hardcover.app automáticamente. Si está desactivado, el Token solo se usará para descargar metadatos de la tienda.
+                                            Si estÃ¡ activado, QuimeraReader actualizarÃ¡ tu progreso de lectura y marcarÃ¡ los libros como leÃ­dos en tu cuenta de Hardcover.app automÃ¡ticamente. Si estÃ¡ desactivado, el Token solo se usarÃ¡ para descargar metadatos de la tienda.
                                         </div>
                                     </div>
                                 </div>
@@ -151,7 +153,7 @@
                         {
                             <div class="card bg-dark text-light border-secondary shadow-sm mb-4" style="border-radius: 12px;">
                                 <div class="card-body p-4">
-                                    <h4 class="card-title text-primary"><i class="bi bi-arrow-repeat me-2"></i> Sincronización Manual</h4>
+                                    <h4 class="card-title text-primary"><i class="bi bi-arrow-repeat me-2"></i> SincronizaciÃ³n Manual</h4>
                                     <p class="text-white-50 small mb-4">Fuerza a los Background Workers a ejecutar tareas de mantenimiento ahora mismo.</p>
 
                                     @if (_scanStatus != null && _scanStatus.IsScanning)
@@ -185,7 +187,7 @@
 
                                         <div class="list-group-item bg-transparent border-secondary text-light d-flex justify-content-between align-items-center py-3 px-0">
                                             <div>
-                                                <h6 class="mb-1 fw-bold">Reparación de Metadatos</h6>
+                                                <h6 class="mb-1 fw-bold">ReparaciÃ³n de Metadatos</h6>
                                                 <p class="mb-0 text-white-50 small">Busca portadas y sinopsis faltantes en Google Books y OpenLibrary.</p>
                                             </div>
                                             <button class="btn btn-outline-light rounded-pill px-4" @onclick="RescanMetadataAsync">
@@ -196,7 +198,7 @@
                                         <div class="list-group-item bg-transparent border-secondary text-light d-flex justify-content-between align-items-center py-3 px-0">
                                             <div>
                                                 <h6 class="mb-1 fw-bold">Limpieza de Duplicados</h6>
-                                                <p class="mb-0 text-white-50 small">Fusiona autores y categorías que se hayan guardado múltiples veces.</p>
+                                                <p class="mb-0 text-white-50 small">Fusiona autores y categorÃ­as que se hayan guardado mÃºltiples veces.</p>
                                             </div>
                                             <button class="btn btn-outline-light rounded-pill px-4" @onclick="MergeDuplicatesAsync">
                                                 <i class="bi bi-magic me-1"></i> Fusionar
@@ -205,8 +207,8 @@
                                         
                                         <div class="list-group-item bg-transparent border-secondary text-light d-flex justify-content-between align-items-center py-3 px-0">
                                             <div>
-                                                <h6 class="mb-1 fw-bold">Alineación de Audio a Texto (Background Job)</h6>
-                                                <p class="mb-0 text-white-50 small">Sincroniza automáticamente MP3 y EPUBs en segundo plano si Whisper está configurado.</p>
+                                                <h6 class="mb-1 fw-bold">AlineaciÃ³n de Audio a Texto (Background Job)</h6>
+                                                <p class="mb-0 text-white-50 small">Sincroniza automÃ¡ticamente MP3 y EPUBs en segundo plano si Whisper estÃ¡ configurado.</p>
                                             </div>
                                             <span class="badge bg-success rounded-pill px-3 py-2">
                                                 <i class="bi bi-check-circle-fill me-1"></i> Activo
@@ -259,7 +261,7 @@
     {
         try
         {
-            var settings = await ApiClient.GetSettingsAsync();
+            var settings = await SettingsService.GetSettingsAsync();
             if (settings.TryGetValue("IncomingScanFolder", out var incoming)) _libraryRootPath = incoming;
             if (settings.TryGetValue("LibraryRootPath", out var outgoing)) _outgoingLibraryPath = outgoing;
             if (settings.TryGetValue("IngestionMode", out var mode)) _ingestionMode = mode;
@@ -292,7 +294,7 @@
                 await Task.Delay(2000, _cts.Token);
                 if (ActiveTab == "tasks")
                 {
-                    _scanStatus = await ApiClient.GetScanStatusAsync();
+                    _scanStatus = await ScanService.GetScanStatusAsync();
                     StateHasChanged();
                 }
             }
@@ -314,16 +316,16 @@
 
         try
         {
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "IncomingScanFolder", Value = _libraryRootPath });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "LibraryRootPath", Value = _outgoingLibraryPath });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "IngestionMode", Value = _ingestionMode });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "OpenAIApiKey", Value = _openAiKey });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "GoogleBooksApiKey", Value = _googleBooksKey });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "HardcoverApiKey", Value = _hardcoverKey });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "HardcoverSyncEnabled", Value = _hardcoverSyncEnabled.ToString() });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "WhisperModelPath", Value = _whisperModelPath });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "WhisperMode", Value = _whisperMode });
-            await ApiClient.SaveSettingAsync(new SystemSetting { Key = "OpenAIEndpoint", Value = _openAiEndpoint });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "IncomingScanFolder", Value = _libraryRootPath });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "LibraryRootPath", Value = _outgoingLibraryPath });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "IngestionMode", Value = _ingestionMode });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "OpenAIApiKey", Value = _openAiKey });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "GoogleBooksApiKey", Value = _googleBooksKey });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "HardcoverApiKey", Value = _hardcoverKey });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "HardcoverSyncEnabled", Value = _hardcoverSyncEnabled.ToString() });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "WhisperModelPath", Value = _whisperModelPath });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "WhisperMode", Value = _whisperMode });
+            await SettingsService.SaveSettingAsync(new SystemSetting { Key = "OpenAIEndpoint", Value = _openAiEndpoint });
             
             ShowMessage("Ajustes guardados correctamente.", true);
         }
@@ -346,8 +348,8 @@
         
         try
         {
-            await ApiClient.DownloadWhisperModelAsync();
-            ShowMessage("Modelo descargado con éxito.", true);
+            await SettingsService.DownloadWhisperModelAsync();
+            ShowMessage("Modelo descargado con Ã©xito.", true);
         }
         catch (Exception ex)
         {
@@ -368,8 +370,8 @@
 
         try
         {
-            var response = await ApiClient.TriggerScanAsync(new { FolderPath = _libraryRootPath });
-            ShowMessage("El escáner se ha iniciado en segundo plano. Los libros aparecerán pronto en la biblioteca.", true);
+            var response = await ScanService.TriggerScanAsync(new { FolderPath = _libraryRootPath });
+            ShowMessage("El escÃ¡ner se ha iniciado en segundo plano. Los libros aparecerÃ¡n pronto en la biblioteca.", true);
         }
         catch (Exception ex)
         {
@@ -386,7 +388,7 @@
     {
         try
         {
-            await ApiClient.CancelScanAsync();
+            await ScanService.CancelScanAsync();
             ShowMessage("Escaneo cancelado.", true);
             if (_scanStatus != null) _scanStatus.IsScanning = false;
             _isScanning = false;
@@ -401,8 +403,8 @@
     {
         try
         {
-            await ApiClient.RescanMetadataAsync();
-            ShowMessage("Se ha iniciado la búsqueda de metadatos en segundo plano.", true);
+            await ScanService.RescanMetadataAsync();
+            ShowMessage("Se ha iniciado la bÃºsqueda de metadatos en segundo plano.", true);
         }
         catch (Exception ex)
         {
@@ -414,7 +416,7 @@
     {
         try
         {
-            await ApiClient.MergeDuplicatesAsync();
+            await ScanService.MergeDuplicatesAsync();
             ShowMessage("Mantenimiento de duplicados completado exitosamente.", true);
         }
         catch (Exception ex)

@@ -98,10 +98,13 @@ public class MediaController : ControllerBase
     [HttpGet("books/{id}/audio")]
     public async Task<IActionResult> GetAudio(int id)
     {
-        var book = await _dbContext.Books.FindAsync(id);
+        var book = await _dbContext.Books.Include(b => b.AudioTracks).FirstOrDefaultAsync(b => b.Id == id);
         if (book == null) return NotFound();
 
-        var resolvedPath = await GetResolvedPathAsync(book.AudioFilePath);
+        var audioTrack = book.AudioTracks.OrderBy(t => t.TrackNumber).FirstOrDefault();
+        var audioFilePath = audioTrack?.FilePath;
+
+        var resolvedPath = await GetResolvedPathAsync(audioFilePath);
         if (resolvedPath == null) return NotFound();
 
         var mimeType = GetMimeType(resolvedPath);

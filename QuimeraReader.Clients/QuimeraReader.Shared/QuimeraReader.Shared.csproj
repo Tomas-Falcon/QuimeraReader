@@ -12,7 +12,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.5" />
+	  <PackageReference Include="Blazor.Radzen.Theming" Version="10.4.7" />
+	  <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.12" />
+	  <PackageReference Include="Radzen.Blazor" Version="11.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="wwwroot\Translations\" />
   </ItemGroup>
 
 </Project>

@@ -1,9 +1,11 @@
-@using QuimeraReader.Shared.Models
+﻿@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @using Microsoft.JSInterop
 @using System.Text.Json
 @using System.Text.Json.Serialization
-@inject IQuimeraApiClient ApiClient
+@inject QuimeraReader.Shared.Services.IBookService BookService
+@inject QuimeraReader.Shared.Services.IScanService ScanService
+@inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 @namespace QuimeraReader.Shared.Components
@@ -43,7 +45,7 @@
                     <div class="reading-progress text-center py-2" style="background: var(--bg-card); font-size: 0.85rem; color: var(--text-muted);">
                         @if (Book.PercentageCompleted.HasValue)
                         {
-                            <span>@($"{Math.Round(Book.PercentageCompleted.Value, 1)}% leído")</span>
+                            <span>@($"{Math.Round(Book.PercentageCompleted.Value, 1)}% leÃ­do")</span>
                         }
                     </div>
                 }
@@ -64,9 +66,9 @@
                 else
                 {
                     <div class="no-sync-map text-center pt-5" style="flex: 1;">
-                        <img src="@(ApiClient.BaseAddress + @Book.CoverUrl)" class="fallback-cover mb-4" style="max-width: 200px; border-radius: 8px;" />
+                        <img src="@(BookService.BaseAddress + @Book.CoverUrl)" class="fallback-cover mb-4" style="max-width: 200px; border-radius: 8px;" />
                         <h3>Modo Audiolibro Puro</h3>
-                        <p class="text-muted">No se encontraron transcripciones o texto para este título.</p>
+                        <p class="text-muted">No se encontraron transcripciones o texto para este tÃ­tulo.</p>
                     </div>
                 }
             </div>
@@ -75,7 +77,7 @@
             @if (Book.HasAudio)
             {
                 <div class="player-controls" style="background: var(--bg-card); padding: 10px;">
-                    <audio @ref="_audioElement" src="@(ApiClient.BaseAddress + @Book.AudioUrl)" controls class="native-audio w-100" />
+                    <audio @ref="_audioElement" src="@(BookService.BaseAddress + @Book.AudioUrl)" controls class="native-audio w-100" />
                 </div>
             }
         </div>
@@ -108,13 +110,13 @@
 
     protected override async Task OnInitializedAsync()
     {
-        Book = await ApiClient.GetBookAsync(BookId);
+        Book = await BookService.GetBookAsync(BookId);
         
         if (Book != null && Book.IsAligned)
         {
             try
             {
-                var syncMapJson = await ApiClient.GetSyncMapAsync(BookId);
+                var syncMapJson = await BookService.GetSyncMapAsync(BookId);
                 if (!string.IsNullOrEmpty(syncMapJson))
                 {
                     var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
@@ -154,7 +156,7 @@
             {
                 _epubJsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/QuimeraReader.Shared/epubInterop.js");
                 // Construct the absolute URL to the EPUB file via API
-                var baseUrl = ApiClient.BaseAddress.TrimEnd('/');
+                var baseUrl = BookService.BaseAddress.TrimEnd('/');
                 var epubApiUrl = $"{baseUrl}/{Book.EpubUrl}";
                 
                 await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubApiUrl, _dotNetRef, Book.CurrentEpubCfi);
@@ -175,7 +177,7 @@
             StateHasChanged();
         }
 
-        _ = ApiClient.UpdatePositionAsync(BookId, epubCfi: cfi, percentage: scaledPercentage);
+        _ = BookService.UpdatePositionAsync(BookId, epubCfi: cfi, percentage: scaledPercentage);
     }
 
     private async Task NextPage()
@@ -203,8 +205,8 @@
         {
             _lastSavedTime = time;
             // Solo mandamos el audioPosition, dejamos el epubCfi intacto o null. 
-            // Percentage se podría calcular si tuviéramos el total duration.
-            _ = ApiClient.UpdatePositionAsync(BookId, audioPosition: time);
+            // Percentage se podrÃ­a calcular si tuviÃ©ramos el total duration.
+            _ = BookService.UpdatePositionAsync(BookId, audioPosition: time);
         }
 
         var currentIndex = _segments.FindIndex(s => time >= s.Start && time <= s.End);

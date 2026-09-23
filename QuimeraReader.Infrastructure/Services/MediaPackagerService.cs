@@ -10,7 +10,10 @@ public class MediaPackagerService
 {
     public async Task<Stream> CreateAudiobookPackageAsync(Book book)
     {
-        if (string.IsNullOrEmpty(book.AudioFilePath) || !File.Exists(book.AudioFilePath))
+        var audioTrack = book.AudioTracks.OrderBy(t => t.TrackNumber).FirstOrDefault();
+        var audioFilePath = audioTrack?.FilePath;
+
+        if (string.IsNullOrEmpty(audioFilePath) || !File.Exists(audioFilePath))
         {
             throw new FileNotFoundException("El archivo de audio no existe.");
         }
@@ -19,10 +22,10 @@ public class MediaPackagerService
         using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
         {
             // 1. Agregar el archivo de audio
-            var audioEntryName = Path.GetFileName(book.AudioFilePath);
+            var audioEntryName = Path.GetFileName(audioFilePath);
             var audioEntry = archive.CreateEntry(audioEntryName, CompressionLevel.NoCompression);
             using (var entryStream = audioEntry.Open())
-            using (var fileStream = File.OpenRead(book.AudioFilePath))
+            using (var fileStream = File.OpenRead(audioFilePath))
             {
                 await fileStream.CopyToAsync(entryStream);
             }
@@ -41,7 +44,7 @@ public class MediaPackagerService
                     },
                     readingOrder = new[]
                     {
-                        new { href = audioEntryName, type = GetMimeType(book.AudioFilePath) }
+                        new { href = audioEntryName, type = GetMimeType(audioFilePath) }
                     }
                 };
 

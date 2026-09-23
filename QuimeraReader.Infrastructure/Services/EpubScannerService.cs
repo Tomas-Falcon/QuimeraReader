@@ -364,7 +364,8 @@ public class EpubScannerService
                     try { File.Delete(possibleAudioPath); } catch (Exception ex) { _logger.LogWarning(ex, "No se pudo borrar el audio original: {File}", possibleAudioPath); }
                 }
                 
-                book.AudioFilePath = newAudioPath;
+                book.AudioTracks.Clear();
+                book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = 1 });
                 hasAudio = true;
                 break;
             }
