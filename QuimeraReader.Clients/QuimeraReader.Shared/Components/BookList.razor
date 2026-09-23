@@ -296,7 +296,8 @@
         try
         {
             var initialBooks = await BookService.GetBooksAsync(1, 100, "");
-            _readingBooks = initialBooks.Data.Where(b => b.PercentageCompleted > 0 && b.PercentageCompleted < 100).OrderByDescending(b => b.LastReadAt).Take(10).ToList();
+            _readingBooks = initialBooks.Data.Where(b => b.ReadingStatus == "Reading" || (b.PercentageCompleted > 0 && b.PercentageCompleted < 100)).OrderByDescending(b => b.LastReadAt).Take(10).ToList();
+            _nextToReadBooks = initialBooks.Data.Where(b => b.ReadingStatus == "NextToRead").OrderByDescending(b => b.LastReadAt).Take(10).ToList();
         }
         catch { }
 
