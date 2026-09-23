@@ -100,6 +100,21 @@ public class MediaController : ControllerBase
         return PhysicalFile(resolvedPath, "application/epub+zip", enableRangeProcessing: true);
     }
 
+        [HttpGet("books/{id}/tracks/{trackNumber}")]
+    public async Task<IActionResult> GetAudioTrack(int id, int trackNumber)
+    {
+        var book = await _dbContext.Books.Include(b => b.AudioTracks).FirstOrDefaultAsync(b => b.Id == id);
+        if (book == null) return NotFound();
+
+        var audioTrack = book.AudioTracks.FirstOrDefault(t => t.TrackNumber == trackNumber);
+        var audioFilePath = audioTrack?.FilePath;
+
+        var resolvedPath = await GetResolvedPathAsync(audioFilePath);
+        if (resolvedPath == null) return NotFound();
+
+        return PhysicalFile(resolvedPath, "audio/mpeg", enableRangeProcessing: true);
+    }
+
     [HttpGet("books/{id}/audio")]
     public async Task<IActionResult> GetAudio(int id)
     {

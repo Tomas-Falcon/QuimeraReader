@@ -1,4 +1,4 @@
-export function initializePlayer(audioElement, dotNetReference) {
+﻿export function initializePlayer(audioElement, dotNetReference) {
     if (!audioElement) return;
 
     audioElement.addEventListener('timeupdate', () => {
@@ -11,6 +11,10 @@ export function initializePlayer(audioElement, dotNetReference) {
 
     audioElement.addEventListener('pause', () => {
         dotNetReference.invokeMethodAsync('OnPlayStateChanged', false);
+    });
+    
+    audioElement.addEventListener('ended', () => {
+        dotNetReference.invokeMethodAsync('OnAudioEnded');
     });
 }
 
