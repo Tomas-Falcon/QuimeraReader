@@ -6,7 +6,7 @@ namespace QuimeraReader.Shared.Services;
 
 public interface IBookService
 {
-    Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null);
+    Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null);
     Task<Book?> GetBookAsync(int id);
     Task<IEnumerable<Category>> GetCategoriesAsync();
     Task<IEnumerable<Author>> GetAuthorsAsync();
@@ -36,7 +36,7 @@ public class BookService : IBookService
 
     public string BaseAddress => _httpClient.BaseAddress?.ToString() ?? "";
 
-    public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null)
+    public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null)
     {
         try
         {

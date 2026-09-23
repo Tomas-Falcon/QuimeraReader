@@ -8,5 +8,6 @@ public record GetBooksQuery : IRequest<PaginatedListDto<BookDto>>
     public int Page { get; init; } = 1;
     public int PageSize { get; init; } = 50;
     public string? Search { get; init; }
+    public string? ReadingStatus { get; init; }
     public System.Collections.Generic.List<int>? CategoryIds { get; init; }
 }

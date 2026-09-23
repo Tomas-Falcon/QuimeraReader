@@ -92,7 +92,7 @@ public class BooksController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null, [FromQuery] int[]? categoryIds = null)
+    public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null, [FromQuery] int[]? categoryIds = null, [FromQuery] string? readingStatus = null)
     {
         try 
         {
@@ -102,7 +102,8 @@ public class BooksController : ControllerBase
                 Page = page, 
                 PageSize = pageSize, 
                 Search = search,
-                CategoryIds = categoryIds?.ToList() 
+                CategoryIds = categoryIds?.ToList(),
+                  ReadingStatus = readingStatus 
             });
             return Ok(result);
         }
@@ -752,6 +753,12 @@ public class BooksController : ControllerBase
         var book = await _dbContext.Books.Include(b => b.Categories).ThenInclude(bc => bc.Category).FirstOrDefaultAsync(b => b.Id == bookId);
         if (book == null) return NotFound();
 
+                if (book.ReadingStatus != request.ReadingStatus && 
+           (request.ReadingStatus == "Reading" || request.ReadingStatus == "NextToRead" || request.ReadingStatus == "Read"))
+        {
+            book.LastReadAt = DateTime.UtcNow;
+        }
+        
         book.Title = request.Title;
         book.ReadingStatus = request.ReadingStatus;
         

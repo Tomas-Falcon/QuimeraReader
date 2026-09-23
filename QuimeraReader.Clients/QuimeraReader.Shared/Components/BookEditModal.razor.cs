@@ -11,6 +11,7 @@ public partial class BookEditModal : ComponentBase
     [Inject] public IBookService BookService { get; set; } = default!;
     [Inject] public Radzen.DialogService DialogService { get; set; } = default!;
     [Inject] public HttpClient Http { get; set; } = default!;
+    [Inject] public QuimeraReader.Shared.Interfaces.ITranslationService TranslationService { get; set; } = default!;
 
     private bool _isSearchingCovers = false;
     private List<string> _suggestedCovers = new();
@@ -53,10 +54,23 @@ public partial class BookEditModal : ComponentBase
     private string _coverUrl = string.Empty;
 
     private IEnumerable<Category> _availableCategories = Array.Empty<Category>();
-    private IEnumerable<string> _readingStatuses = new[] { "Unread", "Reading", "Read", "NextToRead" };
+        public class StatusOption
+    {
+        public string Value { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+    }
+    private IEnumerable<StatusOption> _readingStatuses = new List<StatusOption>();
 
     protected override async Task OnInitializedAsync()
     {
+                _readingStatuses = new List<StatusOption>
+        {
+            new StatusOption { Value = "Unread", Label = TranslationService["Status_Unread"] },
+            new StatusOption { Value = "Reading", Label = TranslationService["Status_CurrentlyReading"] },
+            new StatusOption { Value = "Read", Label = TranslationService["Status_Read"] },
+            new StatusOption { Value = "NextToRead", Label = TranslationService["Status_NextToRead"] }
+        };
+        
         _availableCategories = await BookService.GetCategoriesAsync();
         
         if (Book != null)

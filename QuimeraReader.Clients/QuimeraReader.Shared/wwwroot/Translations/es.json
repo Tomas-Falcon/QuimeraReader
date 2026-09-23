@@ -10,6 +10,8 @@
   "Library_Categories_Select": "Categorías",
   "Status_NextToRead": "Próximos a leer",
   "Status_Reading": "Continuar Leyendo",
+  "Status_CurrentlyReading": "Leyendo",
+  "Nav_ReadBooks": "Leídos",
   "Status_Read": "Leído",
   "Nav_Library": "Biblioteca",
   "Nav_Authors": "Autores",

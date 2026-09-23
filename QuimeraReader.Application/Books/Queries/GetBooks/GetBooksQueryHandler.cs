@@ -27,7 +27,12 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
         // Ocultar libros "fantasma" que no tienen archivo asociado (ni EPUB ni Audio)
         query = query.Where(b => !string.IsNullOrEmpty(b.EpubFilePath) || b.AudioTracks.Any());
 
-                if (!string.IsNullOrWhiteSpace(request.Search))
+                if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
+        {
+            query = query.Where(b => b.ReadingStatus == request.ReadingStatus);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var s = request.Search.ToLower();
             query = query.Where(b => b.Title.ToLower().Contains(s) || 
