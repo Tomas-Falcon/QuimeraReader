@@ -14,5 +14,8 @@
   "Status_Unread": "No Leído",
   "EditBook_Title": "Editar Libro",
   "EditBook_Metadata": "Metadatos",
-  "EditBook_Cover": "Portada"
+  "EditBook_Cover": "Portada",
+  "Status_Recommended": "Recomendados para ti",
+  "Library_AllBooks": "Toda la biblioteca",
+  "Library_SearchResults": "Resultados de búsqueda"
 }

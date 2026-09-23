@@ -14,5 +14,8 @@
   "Status_Unread": "Unread",
   "EditBook_Title": "Edit Book",
   "EditBook_Metadata": "Metadata",
-  "EditBook_Cover": "Cover"
+  "EditBook_Cover": "Cover",
+  "Status_Recommended": "Recommended for you",
+  "Library_AllBooks": "All books",
+  "Library_SearchResults": "Search results"
 }
