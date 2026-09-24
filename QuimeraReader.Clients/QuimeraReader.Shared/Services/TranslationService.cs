@@ -3,6 +3,10 @@ using Microsoft.JSInterop;
 using Microsoft.Extensions.Logging;
 using QuimeraReader.Shared.Interfaces;
 using System.Net.Http.Json;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using System;
+using System.Net.Http;
 
 namespace QuimeraReader.Shared.Services;
 
@@ -13,6 +17,8 @@ public class TranslationService : ITranslationService
     private readonly IJSRuntime _jsRuntime;
     private readonly ILogger<TranslationService> _logger;
     private string _currentLanguage = "es";
+
+    public event Action? OnTranslationsLoaded;
 
     public TranslationService(NavigationManager navManager, IJSRuntime jsRuntime, ILogger<TranslationService> logger)
     {
@@ -60,6 +66,7 @@ public class TranslationService : ITranslationService
             if (data != null)
             {
                 _translations = data;
+                OnTranslationsLoaded?.Invoke();
             }
         }
         catch (Exception ex)

@@ -21,6 +21,14 @@
         </div>
     </div>
 }
+else if (!_isLoaded)
+{
+    <div class="d-flex justify-content-center align-items-center vh-100" style="background-color: var(--bg-body); color: var(--text-color);">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
+}
 else
 {
 <div class="page @(IsReadingMode ? "reading-mode" : "")">
@@ -46,7 +54,7 @@ else
                     </div>
                 }
 
-                                <Radzen.Blazor.RadzenDropDown TValue="string" Value="@_currentLang" Data="@_languages" ValueProperty="Code" TextProperty="Name" Change="OnLanguageChanged" Style="width: 130px;" />
+                <Radzen.Blazor.RadzenDropDown TValue="string" Value="@_currentLang" Data="@_languages" ValueProperty="Code" TextProperty="Name" Change="OnLanguageChanged" Style="width: 130px;" />
                 <button class="btn btn-outline-secondary metadata-btn" @onclick="FetchMissingMetadata" disabled="@_isFetchingMetadata" style="border-radius: 20px; display: flex; align-items: center; gap: 6px;">
                     @if (_isFetchingMetadata)
                     {
@@ -83,6 +91,7 @@ else
 
 @code {
     private bool isDarkTheme = true;
+    private bool _isLoaded = false;
     private string _currentLang = "es";
     private List<dynamic> _languages = new List<dynamic>
     {
@@ -145,7 +154,6 @@ else
         try
         {
             await ScanService.RescanMetadataAsync();
-            // Mostrar notificación global? Wait, ToastService is not injected in MainLayout yet. 
         }
         catch (Exception ex)
         {
@@ -174,13 +182,15 @@ else
             await TranslationService.InitializeAsync();
             var storedLang = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "preferredLanguage");
             if (!string.IsNullOrEmpty(storedLang)) _currentLang = storedLang;
-            StateHasChanged();
+            
             var theme = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "theme");
             if (theme == "light")
             {
                 isDarkTheme = false;
-                StateHasChanged();
             }
+            
+            _isLoaded = true;
+            StateHasChanged();
         }
     }
 
