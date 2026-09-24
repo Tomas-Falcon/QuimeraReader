@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Infrastructure;
 using QuimeraReader.Infrastructure.Services;
@@ -508,7 +508,13 @@ public partial class BooksController : ControllerBase
                         }
                     }
                 }
-                return BadRequest("El audio no pudo emparejarse con ningún libro de la biblioteca.");
+                string orphansDir = Path.Combine(Directory.GetCurrentDirectory(), "Library", "Orphans");
+                Directory.CreateDirectory(orphansDir);
+                string orphanPath = Path.Combine(orphansDir, file.FileName);
+                System.IO.File.Move(tempPath, orphanPath, true);
+                _dbContext.UnmatchedAudioTracks.Add(new UnmatchedAudioTrack { OriginalFileName = file.FileName, PhysicalPath = orphanPath, FileSizeBytes = file.Length, UploadedAt = DateTime.UtcNow });
+                await _dbContext.SaveChangesAsync();
+                return Ok(new { Message = "El audio fue guardado como huérfano porque no se encontró coincidencia." });
             }
 
             var scannerService = HttpContext.RequestServices.GetRequiredService<QuimeraReader.Infrastructure.Services.EpubScannerService>();

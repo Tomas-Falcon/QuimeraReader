@@ -33,6 +33,9 @@ public class LocalBookRepository : ILocalBookRepository
             IsAvailableOffline = domainBook.IsAvailableOffline,
             CurrentEpubCfi = domainBook.CurrentEpubCfi,
             PercentageCompleted = domainBook.PercentageCompleted,
+            LastReadAt = domainBook.LastReadAt,
+            CurrentAudioPosition = domainBook.CurrentAudioPosition,
+            CurrentAudioTrackNumber = domainBook.CurrentAudioTrackNumber,
             Authors = domainBook.Authors?.Select(a => a.Author?.Name ?? "").ToList() ?? new List<string>(),
             Categories = domainBook.Categories?.Select(c => c.Category?.Name ?? "").ToList() ?? new List<string>()
         };
@@ -48,7 +51,10 @@ public class LocalBookRepository : ILocalBookRepository
             EpubFilePath = sharedBook.LocalEpubPath,
             IsAvailableOffline = sharedBook.IsAvailableOffline,
             CurrentEpubCfi = sharedBook.CurrentEpubCfi ?? "",
-            PercentageCompleted = sharedBook.PercentageCompleted
+            PercentageCompleted = sharedBook.PercentageCompleted,
+            LastReadAt = sharedBook.LastReadAt,
+            CurrentAudioPosition = sharedBook.CurrentAudioPosition,
+            CurrentAudioTrackNumber = sharedBook.CurrentAudioTrackNumber
         };
     }
 
