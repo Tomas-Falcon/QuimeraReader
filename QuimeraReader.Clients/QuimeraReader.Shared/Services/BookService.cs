@@ -16,6 +16,8 @@ public interface IBookService
     Task<List<Book>> GetRecommendationsAsync();
     Task DeleteEpubAsync(int bookId);
     Task DeleteAudioAsync(int bookId);
+        Task DeleteCategoriesAsync(int[] ids);
+    Task DeleteAuthorsAsync(int[] ids);
     Task BulkUpdateStatusAsync(List<int> bookIds, string status);
     Task UpdateMetadataAsync(int bookId, UpdateMetadataRequest request);
     Task UpdateCoverAsync(int bookId, string imageUrl);
@@ -176,6 +178,18 @@ public class BookService : IBookService
             _logger.LogError(ex, "[BookService] Error eliminando EPUB del libro ID: {BookId}", bookId);
             throw;
         }
+    }
+
+        public async Task DeleteCategoriesAsync(int[] ids)
+    {
+        var queryString = string.Join("&", ids.Select(id => $"ids={id}"));
+        await _httpClient.DeleteAsync($"api/Books/categories?{queryString}");
+    }
+
+    public async Task DeleteAuthorsAsync(int[] ids)
+    {
+        var queryString = string.Join("&", ids.Select(id => $"ids={id}"));
+        await _httpClient.DeleteAsync($"api/Books/authors?{queryString}");
     }
 
     public async Task DeleteAudioAsync(int bookId)

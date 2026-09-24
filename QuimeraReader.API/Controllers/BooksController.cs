@@ -14,6 +14,61 @@ namespace QuimeraReader.API.Controllers;
 [Route("api/[controller]")]
 public class BooksController : ControllerBase
 {
+    [HttpDelete("authors")]
+    public async Task<IActionResult> DeleteAuthors([FromQuery] int[] ids)
+    {
+        if (ids == null || ids.Length == 0) return BadRequest();
+
+        var authors = await _dbContext.Authors.Where(a => ids.Contains(a.Id)).ToListAsync();
+        if (!authors.Any()) return Ok();
+
+        foreach (var author in authors)
+        {
+            var books = await _dbContext.Books.Where(b => b.Authors.Any(a => a.AuthorId == author.Id)).ToListAsync();
+            foreach (var book in books)
+            {
+                if (!string.IsNullOrEmpty(book.SourceFilePath) && System.IO.File.Exists(book.SourceFilePath))
+                {
+                    try { System.IO.File.Delete(book.SourceFilePath); } catch { }
+                }
+                if (!string.IsNullOrEmpty(book.EpubFilePath) && System.IO.File.Exists(book.EpubFilePath))
+                {
+                    try { System.IO.File.Delete(book.EpubFilePath); } catch { }
+                }
+                if (!string.IsNullOrEmpty(book.CoverImagePath) && System.IO.File.Exists(book.CoverImagePath))
+                {
+                    try { System.IO.File.Delete(book.CoverImagePath); } catch { }
+                }
+                
+                var audioTracks = await _dbContext.BookAudioTracks.Where(a => a.BookId == book.Id).ToListAsync();
+                foreach(var track in audioTracks)
+                {
+                    if (!string.IsNullOrEmpty(track.FilePath) && System.IO.File.Exists(track.FilePath))
+                    {
+                        try { System.IO.File.Delete(track.FilePath); } catch { }
+                    }
+                }
+            }
+            _dbContext.Books.RemoveRange(books);
+        }
+
+        _dbContext.Authors.RemoveRange(authors);
+        await _dbContext.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpDelete("categories")]
+    public async Task<IActionResult> DeleteCategories([FromQuery] int[] ids)
+    {
+        if (ids == null || ids.Length == 0) return BadRequest();
+
+        var categories = await _dbContext.Categories.Where(c => ids.Contains(c.Id)).ToListAsync();
+        if (!categories.Any()) return Ok();
+
+        _dbContext.Categories.RemoveRange(categories);
+        await _dbContext.SaveChangesAsync();
+        return Ok();
+    }
     private readonly AppDbContext _dbContext;
     private readonly EpubScannerService _scannerService;
     private readonly AudioAlignmentService _alignmentService;
@@ -685,7 +740,32 @@ public class BooksController : ControllerBase
         else if (!string.IsNullOrEmpty(book.EpubFilePath)) bookDir = Path.GetDirectoryName(book.EpubFilePath);
         else if (book.AudioTracks != null && book.AudioTracks.Any()) bookDir = Path.GetDirectoryName(book.AudioTracks.First().FilePath);
 
+                var authorIds = await _dbContext.Books.Where(b => b.Id == book.Id).SelectMany(b => b.Authors.Select(a => a.AuthorId)).ToListAsync();
+        var categoryIds = await _dbContext.Books.Where(b => b.Id == book.Id).SelectMany(b => b.Categories.Select(c => c.CategoryId)).ToListAsync();
+        
         _dbContext.Books.Remove(book);
+        await _dbContext.SaveChangesAsync();
+
+        // Limpieza de huérfanos
+        foreach(var authorId in authorIds)
+        {
+            bool authorHasMoreBooks = await _dbContext.Books.AnyAsync(b => b.Authors.Any(a => a.AuthorId == authorId));
+            if (!authorHasMoreBooks)
+            {
+                var author = await _dbContext.Authors.FindAsync(authorId);
+                if (author != null) _dbContext.Authors.Remove(author);
+            }
+        }
+
+        foreach(var catId in categoryIds)
+        {
+            bool catHasMoreBooks = await _dbContext.Books.AnyAsync(b => b.Categories.Any(c => c.CategoryId == catId));
+            if (!catHasMoreBooks)
+            {
+                var cat = await _dbContext.Categories.FindAsync(catId);
+                if (cat != null) _dbContext.Categories.Remove(cat);
+            }
+        }
         await _dbContext.SaveChangesAsync();
         await CleanupOrphansAsync();
 
