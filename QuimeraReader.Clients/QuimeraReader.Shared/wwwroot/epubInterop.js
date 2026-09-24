@@ -79,7 +79,14 @@
         
         if (percentage === null || percentage === undefined || percentage < 0) percentage = -1;
         if (dotNetRef) {
-            dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage).catch(e => console.warn(e));
+            var currentPage = 0; var totalPages = 0;
+        try {
+            if (book.locations && book.locations.length > 0) {
+                currentPage = book.locations.locationFromCfi(location.start.cfi) || 0;
+                totalPages = book.locations.total || 0;
+            }
+        } catch(e) {}
+        dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage, currentPage, totalPages).catch(e => console.warn(e));
         }
     }
 

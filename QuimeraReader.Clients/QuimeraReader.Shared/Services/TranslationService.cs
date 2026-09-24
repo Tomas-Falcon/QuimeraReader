@@ -64,7 +64,7 @@ public class TranslationService : ITranslationService
         {
             // The cleanest, most bulletproof way to read static assets across Web and MAUI without HttpClient issues
             var assembly = typeof(TranslationService).Assembly;
-            var resourceName = "QuimeraReader.Shared.wwwroot.Translations.$langCode.json";
+            var resourceName = $"QuimeraReader.Shared.wwwroot.Translations.{langCode}.json";
 
             using var stream = assembly.GetManifestResourceStream(resourceName);
             if (stream != null)

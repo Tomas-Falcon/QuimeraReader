@@ -73,7 +73,7 @@ else
 }
 
 @code {
-    private bool _sidebarExpanded = true;
+    private bool _sidebarExpanded = true; private bool _isMobile = false;
     private bool isDarkTheme = true;
     private bool _isLoaded = false;
     private string _currentLang = "es";
@@ -100,7 +100,7 @@ else
 
     protected override void OnInitialized()
     {
-        NavManager.LocationChanged += (s, e) => StateHasChanged();
+        NavManager.LocationChanged += (s, e) => { if (_isMobile) _sidebarExpanded = false; StateHasChanged(); };
         if (!ServerConfig.NeedsConfiguration)
         {
             _ = PollScanStatusAsync();
@@ -175,7 +175,7 @@ else
             
             // Auto collapse sidebar on mobile
             var screenWidth = await JSRuntime.InvokeAsync<int>("eval", "window.innerWidth");
-            if (screenWidth < 768)
+            if (screenWidth < 768) { _isMobile = true; } if (screenWidth < 768)
             {
                 _sidebarExpanded = false;
             }

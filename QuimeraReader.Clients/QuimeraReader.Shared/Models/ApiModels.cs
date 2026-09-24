@@ -29,7 +29,8 @@ public record Book
     public int? TotalPages { get; set; }
     
     // Virtual URLs para el frontend (generadas por MediaController)
-    public string CoverUrl => $"api/media/books/{Id}/cover";
+    public long CoverCacheBuster { get; set; } = 0;
+    public string CoverUrl => $"api/media/books/{Id}/cover" + (CoverCacheBuster > 0 ? $"?t={CoverCacheBuster}" : "");
     public string EpubUrl => $"api/media/books/{Id}/file.epub";
     public string AudioUrl => $"api/media/books/{Id}/audio";
     public string PackageUrl => $"api/media/books/{Id}/package?format=audiobook";

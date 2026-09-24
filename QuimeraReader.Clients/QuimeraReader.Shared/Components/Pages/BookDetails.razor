@@ -218,6 +218,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         await LoadBookAsync();
+            if (_book != null) _book.CoverCacheBuster = DateTime.UtcNow.Ticks;
     }
     
     private async Task LoadBookAsync()
@@ -238,6 +239,7 @@ else
             await ScanService.RescanSingleBookMetadataAsync(Id);
             // Refresh book details to show the new metadata
             await LoadBookAsync();
+            if (_book != null) _book.CoverCacheBuster = DateTime.UtcNow.Ticks;
             ToastService.ShowSuccess("Metadatos actualizados correctamente");
         }
         catch (Exception ex)
@@ -270,6 +272,7 @@ else
             try 
             {
                 await LoadBookAsync();
+            if (_book != null) _book.CoverCacheBuster = DateTime.UtcNow.Ticks;
             }
             catch
             {
@@ -301,6 +304,7 @@ else
             try 
             {
                 await LoadBookAsync();
+            if (_book != null) _book.CoverCacheBuster = DateTime.UtcNow.Ticks;
             }
             catch
             {
@@ -333,6 +337,7 @@ else
         if (result == true)
         {
             await LoadBookAsync();
+            if (_book != null) _book.CoverCacheBuster = DateTime.UtcNow.Ticks;
         }
     }
 }

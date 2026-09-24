@@ -87,6 +87,8 @@ public partial class BookEditModal : ComponentBase
         if (!string.IsNullOrWhiteSpace(_coverUrl))
         {
             await BookService.UpdateCoverAsync(Book.Id, _coverUrl);
+            Book.CoverCacheBuster = DateTime.UtcNow.Ticks;
+            
         }
         DialogService.Close(true);
     }
