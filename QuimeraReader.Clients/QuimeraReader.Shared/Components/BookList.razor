@@ -7,6 +7,7 @@
 @inject QuimeraReader.Shared.Services.IScanService ScanService
 @inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject ToastService ToastService
+@inject Radzen.DialogService _dialogService
 @inject IJSRuntime JSRuntime
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @namespace QuimeraReader.Shared.Components
@@ -278,23 +279,27 @@
     {
         if (_selectedBookIds.Count == 0) return;
         
-        foreach (var id in _selectedBookIds.ToList())
+        var result = await _dialogService.Confirm(
+            $"ATENCION! Vas a borrar {_selectedBookIds.Count} libros. Esta accion ELIMINARA PERMANENTEMENTE los archivos fisicos (EPUBs, audios, portadas).", 
+            "Eliminar Libros", 
+            new ConfirmOptions() { OkButtonText = "Si, ELIMINAR", CancelButtonText = "Cancelar" });
+
+        if (result == true)
         {
             try
             {
-                await BookService.DeleteEpubAsync(id);
-                
+                await BookService.DeleteBooksAsync(_selectedBookIds.ToArray());
+                _selectedBookIds.Clear();
+                _selectionMode = false;
+                ToastService.ShowSuccess("Libros borrados correctamente de forma permanente");
+                if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync(); 
+                StateHasChanged();
             }
             catch (Exception ex)
             {
-                ToastService.ShowError($"Error al borrar libro {id}: {ex.Message}");
+                ToastService.ShowError($"Error al borrar libros: {ex.Message}");
             }
         }
-        
-        _selectedBookIds.Clear();
-        _selectionMode = false;
-        ToastService.ShowSuccess("Libros borrados correctamente");
-        if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync(); StateHasChanged();
     }
 
     private async Task HandleFileUpload(InputFileChangeEventArgs e)

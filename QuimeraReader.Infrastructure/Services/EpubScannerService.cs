@@ -412,6 +412,28 @@ public class EpubScannerService
         bool ratingSatisfied = !needsRating || book.AverageRating.HasValue;
 
         book.IsMetadataComplete = hasTitle && hasAuthor && hasSynopsis && hasCover && ratingSatisfied;
+        if (!book.IsMetadataComplete)
+        {
+            var faltaMetaCat = await _dbContext.Categories.FirstOrDefaultAsync(c => c.Name == "Falta Metadatos");
+            if (faltaMetaCat == null)
+            {
+                faltaMetaCat = new Category { Name = "Falta Metadatos", IsUserGenerated = false };
+                _dbContext.Add(faltaMetaCat);
+            }
+            if (!book.Categories.Any(c => c.Category.Name == "Falta Metadatos"))
+            {
+                book.Categories.Add(new BookCategory { Category = faltaMetaCat });
+            }
+        }
+        else
+        {
+            var faltaMetaCat = book.Categories.FirstOrDefault(c => c.Category.Name == "Falta Metadatos");
+            if (faltaMetaCat != null)
+            {
+                book.Categories.Remove(faltaMetaCat);
+            }
+        }
+
 
         return book;
     }
@@ -547,6 +569,28 @@ public class EpubScannerService
         bool ratingSatisfied = !needsRating || book.AverageRating.HasValue;
 
         book.IsMetadataComplete = hasTitle && hasAuthor && hasSynopsis && hasCover && ratingSatisfied;
+        if (!book.IsMetadataComplete)
+        {
+            var faltaMetaCat = await _dbContext.Categories.FirstOrDefaultAsync(c => c.Name == "Falta Metadatos");
+            if (faltaMetaCat == null)
+            {
+                faltaMetaCat = new Category { Name = "Falta Metadatos", IsUserGenerated = false };
+                _dbContext.Add(faltaMetaCat);
+            }
+            if (!book.Categories.Any(c => c.Category.Name == "Falta Metadatos"))
+            {
+                book.Categories.Add(new BookCategory { Category = faltaMetaCat });
+            }
+        }
+        else
+        {
+            var faltaMetaCat = book.Categories.FirstOrDefault(c => c.Category.Name == "Falta Metadatos");
+            if (faltaMetaCat != null)
+            {
+                book.Categories.Remove(faltaMetaCat);
+            }
+        }
+
     }
 
     private string GetSafeFilename(string filename)

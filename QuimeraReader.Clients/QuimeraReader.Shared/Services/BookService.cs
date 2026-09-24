@@ -15,6 +15,7 @@ public interface IBookService
     Task UpdatePositionAsync(int bookId, string? epubCfi = null, double? audioPosition = null, double? percentage = null, int? audioTrackNumber = null);
     Task<List<Book>> GetRecommendationsAsync();
     Task DeleteEpubAsync(int bookId);
+    Task DeleteBooksAsync(int[] ids);
     Task DeleteAudioAsync(int bookId);
         Task DeleteCategoriesAsync(int[] ids);
     Task DeleteAuthorsAsync(int[] ids);
@@ -166,6 +167,13 @@ public class BookService : IBookService
             _logger.LogError(ex, "[BookService] Error obteniendo recomendaciones.");
             return new List<Book>();
         }
+    }
+
+        public async Task DeleteBooksAsync(int[] ids)
+    {
+        var queryString = string.Join("&", ids.Select(id => $"ids={id}"));
+        var response = await _httpClient.DeleteAsync($"api/Books?{queryString}");
+        response.EnsureSuccessStatusCode();
     }
 
     public async Task DeleteEpubAsync(int bookId)
