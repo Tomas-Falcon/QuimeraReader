@@ -73,11 +73,16 @@
         var percentage = -1;
         try {
             if (book.locations && book.locations.length > 0) {
-                percentage = book.locations.percentageFromCfi(location.start.cfi);
+                var p = book.locations.percentageFromCfi(location.start.cfi);
+                if (typeof p === 'number' && !isNaN(p) && isFinite(p)) {
+                    percentage = p;
+                }
             }
         } catch(e) { }
         
-        if (percentage === null || percentage === undefined || percentage < 0) percentage = -1;
+        if (percentage < 0) percentage = -1;
+        
+        console.log(""Reporting location: "", location.start.cfi, "" percentage: "", percentage);
         if (dotNetRef) {
             var currentPage = 0; var totalPages = 0;
         try {

@@ -1,5 +1,7 @@
 ﻿using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
+using QuimeraReader.Shared.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 using QuimeraReader.Shared.Models;
 
 namespace QuimeraReader.Shared.Services;
@@ -32,12 +34,19 @@ public class BookService : IBookService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<BookService> _logger;
+    private readonly INetworkStateService _networkState;
+    private readonly IServiceProvider _serviceProvider;
 
-    public BookService(HttpClient httpClient, ILogger<BookService> logger)
+    public BookService(HttpClient httpClient, ILogger<BookService> logger, INetworkStateService networkState, IServiceProvider serviceProvider)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _networkState = networkState;
+        _serviceProvider = serviceProvider;
     }
+
+    private ILocalBookRepository? GetLocalRepo() => _serviceProvider.GetService<ILocalBookRepository>();
+
 
     public string BaseAddress => _httpClient.BaseAddress?.ToString() ?? "";
 
@@ -147,6 +156,15 @@ public class BookService : IBookService
     {
         try
         {
+            if (_networkState.IsOffline)
+            {
+                var localRepo = GetLocalRepo();
+                if (localRepo != null) 
+                {
+                    await localRepo.UpdateProgressAsync(bookId, epubCfi ?? "", audioPosition, percentage);
+                    return;
+                }
+            }
             var request = new UpdatePositionRequest { CurrentEpubCfi = epubCfi, CurrentAudioPosition = audioPosition, PercentageCompleted = percentage, CurrentAudioTrackNumber = audioTrackNumber };
             var response = await _httpClient.PostAsJsonAsync($"api/Books/{bookId}/positions", request);
             response.EnsureSuccessStatusCode();

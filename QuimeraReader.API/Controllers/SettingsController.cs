@@ -62,34 +62,49 @@ public class SettingsController : ControllerBase
         await _dbContext.SaveChangesAsync();
         return Ok();
     }
-    [HttpPost("whisper/download")]
-    public async Task<IActionResult> DownloadWhisperModel()
+        [HttpPost("whisper/download")]
+    public async Task<IActionResult> DownloadWhisperModel([FromServices] QuimeraReader.Infrastructure.Services.AudioAlignmentQueue queue)
     {
         string modelUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin";
         string targetPath = "ggml-base.bin";
 
-        if (System.IO.File.Exists(targetPath))
+        bool wasAlreadyDownloaded = System.IO.File.Exists(targetPath);
+
+        if (!wasAlreadyDownloaded)
         {
-            return Ok(new { Message = "El modelo ya está descargado." });
+            try
+            {
+                using var httpClient = new System.Net.Http.HttpClient();
+                using var stream = await httpClient.GetStreamAsync(modelUrl);
+                using var fileStream = new FileStream(targetPath, FileMode.CreateNew);
+                await stream.CopyToAsync(fileStream);
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "Error al descargar el modelo Whisper");
+                return StatusCode(500, new { Message = "Error al descargar el modelo: " + ex.Message });
+            }
         }
 
-        try
+        // Auto-requeue any ERROR books
+        var failedBooks = _dbContext.Books.Where(b => b.ProcessingStatus == "ERROR").ToList();
+        foreach (var book in failedBooks)
         {
-            using var httpClient = new System.Net.Http.HttpClient();
-            using var stream = await httpClient.GetStreamAsync(modelUrl);
-            using var fileStream = new FileStream(targetPath, FileMode.CreateNew);
-            await stream.CopyToAsync(fileStream);
+            book.ProcessingStatus = "PENDING_SYNC";
+            await queue.EnqueueAsync(book.Id);
+        }
+        await _dbContext.SaveChangesAsync();
 
-            return Ok(new { Message = "Modelo descargado con éxito." });
-        }
-        catch (System.Exception ex)
-        {
-            _logger.LogError(ex, "Error al descargar el modelo Whisper");
-            return StatusCode(500, new { Message = "Error al descargar el modelo: " + ex.Message });
-        }
+        return Ok(new { Message = "Modelo descargado con éxito y trabajos reanudados." });
     }
 
-    [HttpPost("restart")]
+    [HttpGet("whisper/status")]
+    public IActionResult GetWhisperStatus()
+    {
+        bool isDownloaded = System.IO.File.Exists("ggml-base.bin");
+        return Ok(new { IsDownloaded = isDownloaded });
+    }
+[HttpPost("restart")]
     public IActionResult RestartServer([FromServices] Microsoft.Extensions.Hosting.IHostApplicationLifetime appLifetime)
     {
         _logger.LogWarning("Se recibió comando de REINICIO desde los ajustes. Deteniendo la aplicación...");

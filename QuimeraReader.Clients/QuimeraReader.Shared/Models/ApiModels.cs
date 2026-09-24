@@ -31,9 +31,13 @@ public record Book
     
     // Virtual URLs para el frontend (generadas por MediaController)
     public long CoverCacheBuster { get; set; } = 0;
-    public string CoverUrl => $"api/media/books/{Id}/cover" + (CoverCacheBuster > 0 ? $"?t={CoverCacheBuster}" : "");
-    public string EpubUrl => $"api/media/books/{Id}/file.epub";
-    public string AudioUrl => $"api/media/books/{Id}/audio";
+    public string? LocalEpubPath { get; set; }
+    public string? LocalCoverPath { get; set; }
+    public string? LocalAudioPath { get; set; }
+
+    public string CoverUrl => LocalCoverPath ?? ($"api/media/books/{Id}/cover" + (CoverCacheBuster > 0 ? $"?t={CoverCacheBuster}" : ""));
+    public string EpubUrl => LocalEpubPath ?? $"api/media/books/{Id}/file.epub";
+    public string AudioUrl => LocalAudioPath ?? $"api/media/books/{Id}/audio";
     public string PackageUrl => $"api/media/books/{Id}/package?format=audiobook";
 }
 

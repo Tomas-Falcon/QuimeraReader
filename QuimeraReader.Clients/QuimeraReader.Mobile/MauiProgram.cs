@@ -20,6 +20,7 @@ public static class MauiProgram
 			});
 
 		builder.Services.AddMauiBlazorWebView();
+		builder.Services.AddSingleton<QuimeraReader.Shared.Interfaces.INetworkStateService, QuimeraReader.Mobile.Services.MauiNetworkStateService>();
 
 #if ANDROID
         BlazorWebViewHandler.BlazorWebViewMapper.AppendToMapping("AllowMixedContent", (handler, view) =>
@@ -51,6 +52,11 @@ public static class MauiProgram
         builder.Services.AddScoped<QuimeraReader.Shared.Services.IScanService, QuimeraReader.Shared.Services.ScanService>();
         builder.Services.AddScoped<QuimeraReader.Shared.Interfaces.ITranslationService, QuimeraReader.Shared.Services.TranslationService>();
         builder.Services.AddScoped<QuimeraReader.Shared.Services.ToastService>();
+
+        builder.Services.AddDbContext<QuimeraReader.Mobile.Data.LocalAppDbContext>();
+        builder.Services.AddScoped<QuimeraReader.Shared.Interfaces.ILocalBookRepository, QuimeraReader.Mobile.Data.LocalBookRepository>();
+        builder.Services.AddSingleton<QuimeraReader.Shared.Interfaces.IOfflineSyncWorker, QuimeraReader.Mobile.Services.MauiOfflineSyncWorker>();
+
 
 		return builder.Build();
 	}

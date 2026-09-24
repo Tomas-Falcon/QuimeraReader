@@ -1,4 +1,11 @@
-using System.Net.Http.Json;
+﻿import sys
+
+def modify_file(filepath):
+    with open(filepath, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # Just cleanly format the whole file instead of replacing blindly
+    content = '''using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using QuimeraReader.Shared.Models;
 
@@ -113,3 +120,8 @@ public class SettingsService : ISettingsService
         }
     }
 }
+'''
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(content)
+
+modify_file('QuimeraReader.Clients/QuimeraReader.Shared/Services/SettingsService.cs')

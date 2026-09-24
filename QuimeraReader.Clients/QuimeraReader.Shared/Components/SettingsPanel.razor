@@ -1,5 +1,6 @@
 ﻿@using QuimeraReader.Shared.Models
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
+@inject QuimeraReader.Shared.Interfaces.INetworkStateService NetworkStateService
 @using QuimeraReader.Shared.Services
 
 
@@ -66,7 +67,11 @@
                                         <RadzenLabel Text="@TranslationService["Settings_BaseModelPath"]" class="small d-block mb-1" />
                                         <div class="d-flex gap-2">
                                             <RadzenTextBox @bind-Value="_whisperModelPath" class="flex-grow-1 bg-dark text-light border-0" />
-                                            <RadzenButton Text="@TranslationService["Settings_DownloadNow"]" Click="DownloadWhisperModelAsync" IsBusy="@_isDownloadingWhisper" ButtonStyle="Radzen.ButtonStyle.Primary" Variant="Radzen.Variant.Outlined" />
+                                            @if (_isWhisperDownloaded) {
+                                                <RadzenBadge BadgeStyle="Radzen.BadgeStyle.Success" Text="Modelo Listo" class="py-2 px-3 align-self-center" />
+                                            } else {
+                                                <RadzenButton Text="@TranslationService["Settings_DownloadNow"]" Click="DownloadWhisperModelAsync" IsBusy="@_isDownloadingWhisper" ButtonStyle="Radzen.ButtonStyle.Primary" Variant="Radzen.Variant.Outlined" />
+                                            }
                                         </div>
                                     </div>
                                 </div>

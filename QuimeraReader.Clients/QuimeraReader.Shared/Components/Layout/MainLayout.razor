@@ -1,6 +1,10 @@
 ﻿@inherits LayoutComponentBase
+@inject QuimeraReader.Shared.Interfaces.INetworkStateService NetworkStateService
+@implements IDisposable
+
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @inject IJSRuntime JSRuntime
+@inject IServiceProvider ServiceProvider
 @inject QuimeraReader.Shared.Services.IServerConfigService ServerConfig
 @inject NavigationManager NavManager
 @inject QuimeraReader.Shared.Services.IBookService BookService
@@ -100,10 +104,30 @@ else
 
     protected override void OnInitialized()
     {
+        NetworkStateService.OnNetworkStateChanged += HandleNetworkChange;
+        _ = NetworkStateService.InitializeAsync();
+
         NavManager.LocationChanged += (s, e) => { if (_isMobile) _sidebarExpanded = false; StateHasChanged(); };
         if (!ServerConfig.NeedsConfiguration)
         {
             _ = PollScanStatusAsync();
+        }
+        
+        var worker = (QuimeraReader.Shared.Interfaces.IOfflineSyncWorker?)ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.IOfflineSyncWorker));
+        if (worker != null) {
+            _ = worker.SyncNowAsync();
+        }
+    }
+
+    private void HandleNetworkChange()
+    {
+        InvokeAsync(StateHasChanged);
+        if (!NetworkStateService.IsOffline)
+        {
+            var worker = (QuimeraReader.Shared.Interfaces.IOfflineSyncWorker?)ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.IOfflineSyncWorker));
+            if (worker != null) {
+                _ = worker.SyncNowAsync();
+            }
         }
     }
     
@@ -126,6 +150,7 @@ else
     
     public void Dispose()
     {
+        NetworkStateService.OnNetworkStateChanged -= HandleNetworkChange;
         _cts.Cancel();
         _cts.Dispose();
     }
