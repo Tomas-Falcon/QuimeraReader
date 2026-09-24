@@ -42,16 +42,13 @@
                         <!-- Epub.js will render the book here -->
                     </div>
                     
-                    <!-- Progress Footer -->
-                    <div class="reading-progress text-center py-2" style="background: var(--bg-card); font-size: 0.85rem; color: var(--text-muted);">
-                        @if (Book.PercentageCompleted.HasValue)
-                        {
-                            <span>@($"{Math.Round(Book.PercentageCompleted.Value, 1)}% leído")</span>
-                            @if (_totalPages > 0)
-                            {
-                                <span class="ms-2 opacity-75">| Página @_currentPage de @_totalPages</span>
-                            }
-                        }
+                    <!-- Progress Footer (Kindle Style) -->
+                    <div class="reading-progress px-4 py-2" style="background: var(--bg-card); font-size: 0.85rem; color: var(--text-muted); border-top: 1px solid rgba(255,255,255,0.1);">
+                        <div class="d-flex align-items-center justify-content-between mb-1" style="font-size: 0.75rem;">
+                            <span class="fw-bold text-white-50">@(_totalPages > 0 ? $"Pág. {_currentPage}" : "")</span>
+                            <span class="fw-bold text-white-50">@(_totalPages > 0 ? $"{_totalPages} páginas -" : "") @($"{Math.Round(Book.PercentageCompleted ?? 0, 1)}%")</span>
+                        </div>
+                        <input type="range" class="form-range custom-progress-bar" min="0" max="100" step="0.1" value="@(Book.PercentageCompleted ?? 0)" @onchange="OnProgressSliderChanged" />
                     </div>
                 }
                 else if (_segments != null && _segments.Any())
@@ -77,6 +74,39 @@
                     </div>
                 }
             </div>
+
+            
+    @if (_showAnnotationDialog)
+    {
+        <div class="annotation-dialog position-fixed" style="bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--bg-card); padding: 15px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 9999; width: 90%; max-width: 400px; border: 1px solid rgba(255,255,255,0.1);">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0 text-white"><i class="bi bi-pencil-square me-2"></i> Nueva Anotación</h6>
+                <button class="btn-close btn-close-white" @onclick="CloseAnnotationDialog"></button>
+            </div>
+            <p class="text-white-50 small mb-3 text-truncate" style="font-style: italic;">"@_selectedText"</p>
+            
+            <div class="mb-3">
+                <label class="form-label text-white-50 small">Color de resaltado</label>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm rounded-circle" style="width: 30px; height: 30px; background-color: #ffeb3b; border: @(_selectedColor == "#ffeb3b" ? "2px solid white" : "none")" @onclick="@(() => _selectedColor = "#ffeb3b")"></button>
+                    <button class="btn btn-sm rounded-circle" style="width: 30px; height: 30px; background-color: #4caf50; border: @(_selectedColor == "#4caf50" ? "2px solid white" : "none")" @onclick="@(() => _selectedColor = "#4caf50")"></button>
+                    <button class="btn btn-sm rounded-circle" style="width: 30px; height: 30px; background-color: #2196f3; border: @(_selectedColor == "#2196f3" ? "2px solid white" : "none")" @onclick="@(() => _selectedColor = "#2196f3")"></button>
+                    <button class="btn btn-sm rounded-circle" style="width: 30px; height: 30px; background-color: #f44336; border: @(_selectedColor == "#f44336" ? "2px solid white" : "none")" @onclick="@(() => _selectedColor = "#f44336")"></button>
+                    <button class="btn btn-sm rounded-circle" style="width: 30px; height: 30px; background-color: transparent; border: 1px dashed rgba(255,255,255,0.5);" @onclick="@(() => _selectedColor = "")" title="Sin color (Solo subrayado)"></button>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label text-white-50 small">Nota (Opcional)</label>
+                <textarea class="form-control bg-dark text-white border-secondary" @bind="_annotationNote" rows="2" placeholder="Escribe un comentario..."></textarea>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-secondary btn-sm" @onclick="CloseAnnotationDialog">Cancelar</button>
+                <button class="btn btn-primary btn-sm" @onclick="SaveAnnotationAsync">Guardar</button>
+            </div>
+        </div>
+    }
 
             <!-- Native Player (Hidden unless audio exists and we want to show it, for now we keep it visible at the bottom if Audio exists) -->
             @if (Book.HasAudio)
@@ -232,10 +262,60 @@
             await _epubJsModule.InvokeVoidAsync("nextEpubPage");
     }
 
+    
+    private bool _showAnnotationDialog = false;
+    private string _selectedCfi = "";
+    private string _selectedText = "";
+    private string _selectedColor = "#ffeb3b";
+    private string _annotationNote = "";
+
+    [JSInvokable]
+    public void OnEpubTextSelected(string cfiRange, string text)
+    {
+        _selectedCfi = cfiRange;
+        _selectedText = text;
+        _selectedColor = "#ffeb3b";
+        _annotationNote = "";
+        _showAnnotationDialog = true;
+        StateHasChanged();
+    }
+
+    private void CloseAnnotationDialog()
+    {
+        _showAnnotationDialog = false;
+        StateHasChanged();
+    }
+
+    private async Task SaveAnnotationAsync()
+    {
+        _showAnnotationDialog = false;
+        if (_epubJsModule != null && !string.IsNullOrEmpty(_selectedCfi))
+        {
+            // Appy to viewer immediately for fast feedback
+            string annType = string.IsNullOrEmpty(_selectedColor) ? "underline" : "highlight";
+            string color = string.IsNullOrEmpty(_selectedColor) ? "#ffffff" : _selectedColor;
+            await _epubJsModule.InvokeVoidAsync("applyAnnotation", _selectedCfi, annType, color);
+            
+            // TODO: Call API to persist to BookAnnotations
+            // await BookService.CreateAnnotationAsync(BookId, new AnnotationDto { ... });
+        }
+    }
+
     private async Task PrevPage()
     {
         if (_epubJsModule != null)
             await _epubJsModule.InvokeVoidAsync("prevEpubPage");
+    }
+
+    private async Task OnProgressSliderChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double newPct))
+        {
+            if (_epubJsModule != null)
+            {
+                await _epubJsModule.InvokeVoidAsync("goToPercentage", newPct);
+            }
+        }
     }
 
     private int _lastActiveIndex = -1;

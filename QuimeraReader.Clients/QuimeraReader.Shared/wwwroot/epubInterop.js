@@ -90,6 +90,18 @@
         }
     }
 
+    
+    rendition.on("selected", function(cfiRange, contents) {
+        book.getRange(cfiRange).then(function(range) {
+            var text = range.toString();
+            if(text && text.trim().length > 0) {
+                if (dotNetRef) {
+                    dotNetRef.invokeMethodAsync("OnEpubTextSelected", cfiRange, text).catch(e => console.warn(e));
+                }
+            }
+        });
+    });
+
     rendition.on("relocated", function (location) {
         reportPercentage(location, dotNetRef, book);
     });
@@ -123,9 +135,36 @@
         if (event.key === "ArrowRight") { try { rendition.next(); } catch(e){} }
     });
 
+    
+    window.epubBook = book;
+    window.epubRendition = rendition;
+    window.epubDotNetRef = dotNetRef;
+
     window.epubNext = () => { try { rendition.next(); } catch (e) { } };
     window.epubPrev = () => { try { rendition.prev(); } catch (e) { } };
 }
 
 export function nextEpubPage() { if (window.epubNext) window.epubNext(); }
 export function prevEpubPage() { if (window.epubPrev) window.epubPrev(); }
+export function goToPercentage(pct) {
+    if (window.epubBook && window.epubBook.locations && window.epubBook.locations.length > 0) {
+        var cfi = window.epubBook.locations.cfiFromPercentage(pct / 100.0);
+        if (cfi && window.epubRendition) {
+            window.epubRendition.display(cfi);
+        }
+    }
+}
+
+export function applyAnnotation(cfiRange, type, color) {
+    if (window.epubRendition) {
+        if (type === "highlight") {
+            window.epubRendition.annotations.highlight(cfiRange, {}, (e) => {
+                console.log("Highlight clicked", e);
+            }, "", {"fill": color, "fill-opacity": "0.3"});
+        } else if (type === "underline") {
+            window.epubRendition.annotations.underline(cfiRange, {}, (e) => {
+                console.log("Underline clicked", e);
+            }, "", {"stroke": color, "stroke-width": "2px", "stroke-opacity": "0.8"});
+        }
+    }
+}
