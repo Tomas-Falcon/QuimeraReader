@@ -1,56 +1,20 @@
 ﻿@namespace QuimeraReader.Shared.Components.Layout
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 
-<div class="d-flex flex-column" style="height: 100vh;">
-    <div class="top-row ps-3 navbar navbar-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="">QuimeraReader</a>
-            <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-        </div>
-    </div>
+<RadzenPanelMenu Style="width:100%">
+    <RadzenPanelMenuItem Text="@TranslationService["Nav_Library"]" Icon="library_books" Path="" />
+    <RadzenPanelMenuItem Text="@TranslationService["Nav_Authors"]" Icon="people" Path="authors" />
+    <RadzenPanelMenuItem Text="@TranslationService["Nav_Genres"]" Icon="local_offer" Path="categories" />
+    <RadzenPanelMenuItem Text="@TranslationService["Nav_ReadBooks"]" Icon="check_circle" Path="read-books" />
+    <RadzenPanelMenuItem Text="@TranslationService["Nav_Settings"]" Icon="settings" Path="settings" />
+</RadzenPanelMenu>
 
-    <div class="@NavMenuCssClass nav-scrollable flex-grow-1" @onclick="ToggleNavMenu" style="overflow-y: auto;">
-        <nav class="nav flex-column">
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                    <RadzenIcon Icon="library_books" Style="margin-right: 8px;" /> @TranslationService["Nav_Library"]
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="authors">
-                    <RadzenIcon Icon="people" Style="margin-right: 8px;" /> @TranslationService["Nav_Authors"]
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="categories">
-                    <RadzenIcon Icon="local_offer" Style="margin-right: 8px;" /> @TranslationService["Nav_Genres"]
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="read-books">
-                    <RadzenIcon Icon="check_circle" Style="margin-right: 8px;" /> @TranslationService["Nav_ReadBooks"]
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="settings">
-                    <RadzenIcon Icon="settings" Style="margin-right: 8px;" /> @TranslationService["Nav_Settings"]
-                </NavLink>
-            </div>
-        </nav>
-    </div>
-    
-    <div class="px-3 pb-3 pt-3 text-muted mt-auto" style="font-size: 0.8rem; text-align: center; border-top: 1px solid var(--border-color); background-color: var(--bg-card);">
-        v. @AppVersion
-    </div>
+<div class="px-3 pb-3 pt-3 text-muted mt-auto" style="font-size: 0.8rem; text-align: center; border-top: 1px solid var(--border-color); background-color: var(--bg-card); position: absolute; bottom: 0; width: 100%;">
+    v. @AppVersion
 </div>
 
 @code {
-    private bool collapseNavMenu = true;
     private string AppVersion = "Desconocida";
-
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
     protected override void OnInitialized()
     {
@@ -72,10 +36,5 @@
                 AppVersion = informationalVersion;
             }
         }
-    }
-
-    private void ToggleNavMenu()
-    {
-        collapseNavMenu = !collapseNavMenu;
     }
 }

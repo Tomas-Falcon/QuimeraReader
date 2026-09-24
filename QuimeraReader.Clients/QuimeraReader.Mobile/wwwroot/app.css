@@ -1,4 +1,4 @@
-
+﻿
 :root {
     --bg-main: #f4f4f5;
     --bg-card: #ffffff;
@@ -609,6 +609,9 @@ code {
     .form-control:focus {
         outline: none;
         border-color: var(--primary-color);
+        background-color: var(--bg-main);
+        color: var(--text-main);
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
     }
 
     .help-text {
@@ -819,7 +822,7 @@ main {
     }
 
     .nav-item a {
-        color: #d7d7d7;
+        color: var(--text-muted);
         border-radius: 4px;
         height: 3rem;
         display: flex;
@@ -855,7 +858,13 @@ main {
 }
 
 
-/* Radzen Overrides */
+
+ [ d a t a - b s - t h e m e = " d a r k " ]   . f o r m - c o n t r o l : : p l a c e h o l d e r   { 
+         c o l o r :   # a 0 a a b 2 ;   / *   M a y o r   c o n t r a s t e   q u e   e l   d e f a u l t   d e   B o o t s t r a p   * / 
+         o p a c i t y :   1 ; 
+ } 
+  
+ /* Radzen Overrides */
 [data-theme=""dark""], :root {
     --rz-base-background-color: var(--bg-main);
     --rz-panel-background-color: var(--bg-card);
@@ -879,4 +888,16 @@ main {
     
     --rz-border-color: var(--border-color);
     --rz-border-radius: 8px;
+}
+
+main { min-width: 0 !important; overflow-x: hidden !important; width: 100%; }
+
+.netflix-item, .col {
+    content-visibility: auto;
+    contain-intrinsic-size: 150px 250px;
+}
+
+/* Safe area padding for mobile OS status bar */
+.pt-safe {
+    padding-top: env(safe-area-inset-top);
 }

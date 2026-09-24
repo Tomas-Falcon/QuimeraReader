@@ -896,3 +896,8 @@ main { min-width: 0 !important; overflow-x: hidden !important; width: 100%; }
     content-visibility: auto;
     contain-intrinsic-size: 150px 250px;
 }
+
+/* Safe area padding for mobile OS status bar */
+.pt-safe {
+    padding-top: env(safe-area-inset-top);
+}
