@@ -7,6 +7,7 @@
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @inject QuimeraReader.Shared.Services.IScanService ScanService
 @inject QuimeraReader.Shared.Services.ISettingsService SettingsService
+@inject QuimeraReader.Shared.Services.ToastService ToastService
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 @namespace QuimeraReader.Shared.Components
@@ -101,9 +102,19 @@
                 <textarea class="form-control bg-dark text-white border-secondary" @bind="_annotationNote" rows="2" placeholder="Escribe un comentario..."></textarea>
             </div>
 
-            <div class="d-flex justify-content-end gap-2">
-                <button class="btn btn-secondary btn-sm" @onclick="CloseAnnotationDialog">Cancelar</button>
-                <button class="btn btn-primary btn-sm" @onclick="SaveAnnotationAsync">Guardar</button>
+            <div class="d-flex justify-content-between gap-2">
+                @if (Book.HasAudio && _segments.Any())
+                {
+                    <button class="btn btn-info btn-sm text-white" @onclick="PlayFromSelectionAsync"><i class="bi bi-play-circle me-1"></i> Reproducir</button>
+                }
+                else
+                {
+                    <div></div>
+                }
+                <div class="d-flex gap-2">
+                    <button class="btn btn-secondary btn-sm" @onclick="CloseAnnotationDialog">Cancelar</button>
+                    <button class="btn btn-primary btn-sm" @onclick="SaveAnnotationAsync">Guardar</button>
+                </div>
             </div>
         </div>
     }
@@ -286,18 +297,56 @@
         StateHasChanged();
     }
 
+    private async Task PlayFromSelectionAsync()
+    {
+        _showAnnotationDialog = false;
+        if (!string.IsNullOrEmpty(_selectedText) && _segments.Any())
+        {
+            // Normalize selected text
+            var searchStr = new string(_selectedText.ToLower().Where(c => char.IsLetterOrDigit(c)).ToArray());
+            
+            // Find in segments
+            var match = _segments.FirstOrDefault(s => {
+                var sText = new string(s.Text.ToLower().Where(c => char.IsLetterOrDigit(c)).ToArray());
+                return sText.Contains(searchStr) || searchStr.Contains(sText);
+            });
+
+            if (match != null)
+            {
+                await SeekToSegmentAsync(match.Start);
+                ToastService.ShowSuccess("Reproduciendo desde la selección.");
+            }
+            else
+            {
+                ToastService.ShowError("No se encontró el audio para este fragmento.");
+            }
+        }
+    }
+
     private async Task SaveAnnotationAsync()
     {
         _showAnnotationDialog = false;
         if (_epubJsModule != null && !string.IsNullOrEmpty(_selectedCfi))
         {
-            // Appy to viewer immediately for fast feedback
-            string annType = string.IsNullOrEmpty(_selectedColor) ? "underline" : "highlight";
-            string color = string.IsNullOrEmpty(_selectedColor) ? "#ffffff" : _selectedColor;
-            await _epubJsModule.InvokeVoidAsync("applyAnnotation", _selectedCfi, annType, color);
+            bool hasNote = !string.IsNullOrWhiteSpace(_annotationNote);
+            string color = _selectedColor;
             
-            // TODO: Call API to persist to BookAnnotations
-            // await BookService.CreateAnnotationAsync(BookId, new AnnotationDto { ... });
+            // If neither highlighted nor noted, don't do anything
+            if (string.IsNullOrEmpty(color) && !hasNote) return;
+
+            // Apply immediately to UI
+            await _epubJsModule.InvokeVoidAsync("applyAnnotation", _selectedCfi, color, hasNote);
+            
+            // Persist
+            try 
+            {
+                await BookService.CreateAnnotationAsync(BookId, _selectedCfi, _selectedText, color, _annotationNote);
+                ToastService.ShowSuccess("Anotación guardada.");
+            }
+            catch(Exception ex)
+            {
+                ToastService.ShowError($"Error guardando anotación: {ex.Message}");
+            }
         }
     }
 
@@ -341,6 +390,10 @@
             _lastActiveIndex = currentIndex;
             StateHasChanged();
             
+            if (_epubJsModule != null)
+            {
+                await _epubJsModule.InvokeVoidAsync("highlightKaraokePhrase", _segments[currentIndex].Text);
+            }
             if (_jsModule != null)
             {
                 await _jsModule.InvokeVoidAsync("scrollToActiveSegment");

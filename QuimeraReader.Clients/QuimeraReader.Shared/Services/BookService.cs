@@ -22,6 +22,7 @@ public interface IBookService
     Task BulkUpdateStatusAsync(List<int> bookIds, string status);
     Task UpdateMetadataAsync(int bookId, UpdateMetadataRequest request);
     Task ToggleOfflineAvailabilityAsync(int bookId, bool isAvailable);
+    Task CreateAnnotationAsync(int bookId, string cfiRange, string selectedText, string colorHex, string note);
     Task UpdateCoverAsync(int bookId, string imageUrl);
     Task SaveEpubLocationsAsync(int bookId, string locationsJson);
     string BaseAddress { get; }
@@ -228,6 +229,13 @@ public class BookService : IBookService
     public async Task ToggleOfflineAvailabilityAsync(int bookId, bool isAvailable)
     {
         var response = await _httpClient.PutAsync($"api/Books/{bookId}/offline?isAvailable={isAvailable}", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task CreateAnnotationAsync(int bookId, string cfiRange, string selectedText, string colorHex, string note)
+    {
+        var payload = new { CfiRange = cfiRange, SelectedText = selectedText, ColorHex = colorHex, Note = note };
+        var response = await _httpClient.PostAsJsonAsync($"api/Books/{bookId}/annotations", payload);
         response.EnsureSuccessStatusCode();
     }
 
