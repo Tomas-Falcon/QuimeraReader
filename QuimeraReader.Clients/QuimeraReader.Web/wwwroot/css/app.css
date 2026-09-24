@@ -1,4 +1,4 @@
-
+﻿
 :root {
     --bg-main: #f4f4f5;
     --bg-card: #ffffff;
@@ -889,15 +889,9 @@ main {
     --rz-border-color: var(--border-color);
     --rz-border-radius: 8px;
 }
-body, html {
-    overflow-x: hidden !important;
-    max-width: 100vw;
-}
-main {
-    min-width: 0 !important;
-    overflow-x: hidden !important;
-}
-.page { overflow-x: hidden !important; max-width: 100vw; }
+
+main { min-width: 0 !important; overflow-x: hidden !important; width: 100%; }
+
 .netflix-item, .col {
     content-visibility: auto;
     contain-intrinsic-size: 150px 250px;
