@@ -909,6 +909,33 @@ public partial class BooksController : ControllerBase
         await _dbContext.SaveChangesAsync();
         return Ok();
     }
+
+    [HttpPut("{id}/offline")]
+    public async Task<IActionResult> ToggleOfflineAvailability(int id, [FromQuery] bool isAvailable)
+    {
+        var book = await _dbContext.Books.FindAsync(id);
+        if (book == null) return NotFound();
+
+        book.IsAvailableOffline = isAvailable;
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(new { book.Id, book.IsAvailableOffline });
+    }
+
+    [HttpPost("{id}/annotations")]
+    public async Task<IActionResult> CreateAnnotation(int id, [FromBody] QuimeraReader.Domain.Entities.BookAnnotation annotation)
+    {
+        var book = await _dbContext.Books.FindAsync(id);
+        if (book == null) return NotFound();
+
+        annotation.BookId = id;
+        annotation.CreatedAt = DateTime.UtcNow;
+        
+        _dbContext.BookAnnotations.Add(annotation);
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(annotation);
+    }
 }
 public class ScanRequest 
 { 

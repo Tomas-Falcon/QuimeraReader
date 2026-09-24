@@ -16,6 +16,7 @@ builder.Services.AddScoped<QuimeraReader.Shared.Services.IScanService, QuimeraRe
 builder.Services.AddScoped<QuimeraReader.Shared.Services.ISettingsService, QuimeraReader.Shared.Services.SettingsService>();
 builder.Services.AddScoped<QuimeraReader.Shared.Interfaces.ITranslationService, QuimeraReader.Shared.Services.TranslationService>();
 builder.Services.AddScoped<ToastService>();
+builder.Services.AddSingleton<QuimeraReader.Shared.Interfaces.INetworkStateService, QuimeraReader.Web.Services.WebNetworkStateService>();
 builder.Services.AddScoped<IServerConfigService, QuimeraReader.Web.Services.WebServerConfigService>();
 builder.Services.AddRadzenComponents();
 
