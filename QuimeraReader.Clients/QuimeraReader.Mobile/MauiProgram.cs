@@ -1,5 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
 using Radzen;
+#if ANDROID
+using Android.Webkit;
+using Microsoft.AspNetCore.Components.WebView.Maui;
+#endif
 
 namespace QuimeraReader.Mobile;
 
@@ -16,6 +20,13 @@ public static class MauiProgram
 			});
 
 		builder.Services.AddMauiBlazorWebView();
+
+#if ANDROID
+        BlazorWebViewHandler.BlazorWebViewMapper.AppendToMapping("AllowMixedContent", (handler, view) =>
+        {
+            handler.PlatformView.Settings.MixedContentMode = MixedContentHandling.AlwaysAllow;
+        });
+#endif
 
 
         builder.Services.AddRadzenComponents();

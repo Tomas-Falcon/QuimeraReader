@@ -8,22 +8,22 @@ using System.Threading.Tasks;
 using System;
 using System.Net.Http;
 using System.Text.Json;
+using System.Reflection;
+using System.IO;
 
 namespace QuimeraReader.Shared.Services;
 
 public class TranslationService : ITranslationService
 {
     private Dictionary<string, string> _translations = new();
-    private readonly HttpClient _localHttp;
     private readonly IJSRuntime _jsRuntime;
     private readonly ILogger<TranslationService> _logger;
     private string _currentLanguage = "es";
 
     public event Action? OnTranslationsLoaded;
 
-    public TranslationService(NavigationManager navManager, IJSRuntime jsRuntime, ILogger<TranslationService> logger)
+    public TranslationService(IJSRuntime jsRuntime, ILogger<TranslationService> logger)
     {
-        _localHttp = new HttpClient { BaseAddress = new Uri(navManager.BaseUri) };
         _jsRuntime = jsRuntime;
         _logger = logger;
     }
@@ -62,30 +62,32 @@ public class TranslationService : ITranslationService
     {
         try
         {
-            var url = "_content/QuimeraReader.Shared/Translations/$langCode.json";
-            Dictionary<string, string>? data = null;
-            
-            try 
-            {
-                // Fallback for MAUI: use JS fetch if HttpClient fails for local assets
-                var jsonString = await _jsRuntime.InvokeAsync<string>("eval", "fetch('$url').then(r => r.json()).then(j => JSON.stringify(j))");
-                data = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonString);
-            }
-            catch
-            {
-                // Fallback to traditional HttpClient (works perfectly on Web)
-                data = await _localHttp.GetFromJsonAsync<Dictionary<string, string>>(url);
-            }
+            // The cleanest, most bulletproof way to read static assets across Web and MAUI without HttpClient issues
+            var assembly = typeof(TranslationService).Assembly;
+            var resourceName = "QuimeraReader.Shared.wwwroot.Translations.$langCode.json";
 
-            if (data != null)
+            using var stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream != null)
             {
-                _translations = data;
-                OnTranslationsLoaded?.Invoke();
+                using var reader = new StreamReader(stream);
+                var json = await reader.ReadToEndAsync();
+                var data = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                
+                if (data != null)
+                {
+                    _translations = data;
+                    OnTranslationsLoaded?.Invoke();
+                    return;
+                }
+            }
+            else
+            {
+                _logger.LogWarning("[TranslationService] Recurso incrustado no encontrado: {ResourceName}. Intentando por red...", resourceName);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[TranslationService] Error cargando el archivo de idioma: {Lang}", langCode);
+            _logger.LogError(ex, "[TranslationService] Error cargando idioma desde recursos incrustados: {Lang}", langCode);
         }
     }
 

@@ -12,7 +12,7 @@
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @namespace QuimeraReader.Shared.Components
 
-<div class="library-container">
+<div class="library-container" style="height: calc(100vh - 120px); overflow-y: auto; overflow-x: hidden;">
     <div class="library-toolbar d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3 mb-4">
         <div class="search-box w-100" style="max-width: 500px;">
             <RadzenTextBox Placeholder="Buscar libros, autores..." Value="@_searchQuery" Change="OnSearchInput" class="w-100" />
