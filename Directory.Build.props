@@ -1,5 +1,7 @@
 ﻿<Project>
   <PropertyGroup>
-    <Version>1.0.1</Version>
+    <VersionPrefix>1.0</VersionPrefix>
+    <VersionSuffix Condition="'$(VersionSuffix)' == ''">0-dev</VersionSuffix>
+    <Version>$(VersionPrefix).$(VersionSuffix)</Version>
   </PropertyGroup>
 </Project>
