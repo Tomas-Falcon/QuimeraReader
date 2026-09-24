@@ -147,7 +147,7 @@ public class BooksController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null, [FromQuery] int[]? categoryIds = null, [FromQuery] string? readingStatus = null)
+    public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null, [FromQuery] int[]? categoryIds = null, [FromQuery] string? readingStatus = null, [FromQuery] int? skip = null, [FromQuery] int? take = null)
     {
         try 
         {
@@ -156,6 +156,8 @@ public class BooksController : ControllerBase
             { 
                 Page = page, 
                 PageSize = pageSize, 
+                Skip = skip,
+                Take = take,
                 Search = search,
                 CategoryIds = categoryIds?.ToList(),
                   ReadingStatus = readingStatus 

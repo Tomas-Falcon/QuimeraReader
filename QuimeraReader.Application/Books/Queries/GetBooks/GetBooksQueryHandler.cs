@@ -20,7 +20,9 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
     public async Task<PaginatedListDto<BookDto>> Handle(GetBooksQuery request, CancellationToken cancellationToken)
     {
         int page = request.Page < 1 ? 1 : request.Page;
-        int pageSize = request.PageSize < 1 ? 50 : (request.PageSize > 100 ? 100 : request.PageSize);
+        int pageSize = request.PageSize < 1 ? 50 : (request.PageSize > 1000 ? 1000 : request.PageSize);
+        int skip = request.Skip ?? ((page - 1) * pageSize);
+        int take = request.Take ?? pageSize;
 
         var query = _dbContext.Books.AsQueryable();
 
@@ -59,8 +61,8 @@ if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
             .Include(b => b.Authors).ThenInclude(ba => ba.Author)
             .Include(b => b.Categories).ThenInclude(bc => bc.Category)
             .Include(b => b.Series).ThenInclude(s => s.Universe)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
+            .Skip(skip)
+            .Take(take)
             .ToListAsync(cancellationToken);
 
         var books = booksList.Select(b => new BookDto

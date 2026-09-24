@@ -898,3 +898,7 @@ main {
     overflow-x: hidden !important;
 }
 .page { overflow-x: hidden !important; max-width: 100vw; }
+.netflix-item, .col {
+    content-visibility: auto;
+    contain-intrinsic-size: 150px 250px;
+}

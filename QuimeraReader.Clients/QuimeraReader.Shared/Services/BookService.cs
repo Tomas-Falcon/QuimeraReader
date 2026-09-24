@@ -6,7 +6,7 @@ namespace QuimeraReader.Shared.Services;
 
 public interface IBookService
 {
-    Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null);
+    Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null);
     Task<Book?> GetBookAsync(int id);
     Task<IEnumerable<Category>> GetCategoriesAsync();
     Task<IEnumerable<Author>> GetAuthorsAsync();
@@ -38,12 +38,14 @@ public class BookService : IBookService
 
     public string BaseAddress => _httpClient.BaseAddress?.ToString() ?? "";
 
-    public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null)
+    public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null)
     {
         try
         {
             _logger.LogInformation("[BookService] Obteniendo lista de libros. Page: {Page}, Search: {Search}", page, search);
             var url = $"api/Books?page={page}&pageSize={pageSize}";
+            if (skip.HasValue) url += $"&skip={skip.Value}";
+            if (take.HasValue) url += $"&take={take.Value}";
             if (!string.IsNullOrWhiteSpace(search))
             {
                 url += $"&search={Uri.EscapeDataString(search)}";
