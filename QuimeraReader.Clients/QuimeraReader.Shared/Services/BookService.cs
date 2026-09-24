@@ -52,6 +52,7 @@ public class BookService : IBookService
             {
                 foreach(var cid in categoryIds) url += $"&categoryIds={cid}";
             }
+            if (!string.IsNullOrWhiteSpace(readingStatus)) url += $"&readingStatus={readingStatus}";
             var response = await _httpClient.GetFromJsonAsync<PaginatedResult<Book>>(url);
             return response ?? new PaginatedResult<Book> { Page = page, PageSize = pageSize, Total = 0, Data = [] };
         }

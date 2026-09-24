@@ -1,44 +1,47 @@
 ﻿@namespace QuimeraReader.Shared.Components.Layout
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">QuimeraReader</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+<div class="d-flex flex-column" style="height: 100vh;">
+    <div class="top-row ps-3 navbar navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="">QuimeraReader</a>
+            <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
     </div>
-</div>
 
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu" style="display: flex; flex-direction: column;">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> @TranslationService["Nav_Library"]
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="authors">
-                <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> @TranslationService["Nav_Authors"]
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="categories">
-                <span class="bi bi-tags-fill-nav-menu" aria-hidden="true"></span> @TranslationService["Nav_Genres"]
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="read-books">
-                <span class="bi bi-check-circle-fill-nav-menu" aria-hidden="true"></span> @TranslationService["Nav_ReadBooks"]
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="settings">
-                <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> @TranslationService["Nav_Settings"]
-            </NavLink>
-        </div>
-    </nav>
-    <div class="px-3 pb-3 text-muted" style="margin-top: auto; font-size: 0.8rem; text-align: center;">
+    <div class="@NavMenuCssClass nav-scrollable flex-grow-1" @onclick="ToggleNavMenu" style="overflow-y: auto;">
+        <nav class="nav flex-column">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> @TranslationService["Nav_Library"]
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="authors">
+                    <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> @TranslationService["Nav_Authors"]
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="categories">
+                    <span class="bi bi-tags-fill-nav-menu" aria-hidden="true"></span> @TranslationService["Nav_Genres"]
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="read-books">
+                    <span class="bi bi-check-circle-fill-nav-menu" aria-hidden="true"></span> @TranslationService["Nav_ReadBooks"]
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="settings">
+                    <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> @TranslationService["Nav_Settings"]
+                </NavLink>
+            </div>
+        </nav>
+    </div>
+    
+    <div class="px-3 pb-3 pt-3 text-muted mt-auto" style="font-size: 0.8rem; text-align: center; border-top: 1px solid var(--border-color); background-color: var(--bg-card);">
         v. @AppVersion
     </div>
 </div>
