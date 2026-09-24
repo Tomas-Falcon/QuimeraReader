@@ -5,7 +5,7 @@
 @inject NavigationManager NavManager
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 
-<div class="p-4" style="background: var(--bg-body); min-height: 100vh; overflow-x: hidden; max-width: 100vw; box-sizing: border-box;">
+<div class="p-4" style="background: var(--bg-body); min-height: 100vh; overflow-x: hidden; max-width: 100%; box-sizing: border-box;">
     <div class="d-flex align-items-center mb-4 gap-3">
         <RadzenButton Icon="arrow_back" ButtonStyle="ButtonStyle.Light" Click="@(() => NavManager.NavigateTo(""))" />
         <h2 class="mb-0" style="color: var(--text-color);">@TranslationService["Nav_ReadBooks"]</h2>
