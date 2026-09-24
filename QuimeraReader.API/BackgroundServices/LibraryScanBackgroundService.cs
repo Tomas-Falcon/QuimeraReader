@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,7 +35,7 @@ public class LibraryScanBackgroundService : BackgroundService
         {
             try
             {
-                await ProcessScanBatchAsync(stoppingToken);
+                await PerformFullScanAsync(stoppingToken);
             }
             catch (Exception ex)
             {
@@ -42,11 +43,75 @@ public class LibraryScanBackgroundService : BackgroundService
                 _scanState.IsScanning = false;
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken); // Check more frequently
+            // Descansar 5 minutos antes de volver a comprobar si hay archivos nuevos
+            await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
         }
     }
 
-        private async Task<bool> ProcessScanBatchAsync(CancellationToken stoppingToken)
+    private async Task PerformFullScanAsync(CancellationToken stoppingToken)
+    {
+        string scanFolder;
+        int batchSize;
+        HashSet<string> processedSources;
+        HashSet<string> processedAudios;
+
+        // Fase 1: Leer configuración y estado actual de la BD
+        using (var scope = _serviceProvider.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            
+            var setting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "IncomingScanFolder", stoppingToken);
+            if (setting == null || string.IsNullOrWhiteSpace(setting.Value) || !Directory.Exists(setting.Value))
+                return;
+            scanFolder = setting.Value;
+
+            var batchSizeSetting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "ScanBatchSize", stoppingToken);
+            batchSize = int.TryParse(batchSizeSetting?.Value, out int parsedSize) ? parsedSize : 100;
+
+            var sourcesList = await dbContext.Books.Where(b => b.SourceFilePath != null).Select(b => b.SourceFilePath!).ToListAsync(stoppingToken);
+            processedSources = new HashSet<string>(sourcesList);
+            
+            var audiosList = await dbContext.BookAudioTracks.Where(t => t.FilePath != null).Select(t => t.FilePath!).ToListAsync(stoppingToken);
+            processedAudios = new HashSet<string>(audiosList);
+        }
+
+        // Fase 2: Escanear disco
+        string[] epubExtensions = { ".epub" };
+        string[] audioExtensions = { ".mp3", ".m4b", ".m4a", ".wav" };
+        
+        var rawFiles = Directory.GetFiles(scanFolder, "*.*", SearchOption.AllDirectories)
+                                .Where(f => epubExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()) || audioExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                                .ToArray();
+
+        var pendingFiles = rawFiles.Where(f => !processedSources.Contains(f) && !processedAudios.Contains(f)).ToArray();
+
+        if (pendingFiles.Length == 0) return;
+
+        _scanState.IsScanning = true;
+        _scanState.TotalFilesFound = pendingFiles.Length;
+        _scanState.FilesProcessed = 0;
+
+        _logger.LogInformation($"Iniciando procesamiento de {pendingFiles.Length} archivos en lotes de {batchSize}.");
+
+        try
+        {
+            // Procesar en lotes creando un Scope nuevo por lote para no saturar el DbContext
+            for (int i = 0; i < pendingFiles.Length; i += batchSize)
+            {
+                if (stoppingToken.IsCancellationRequested) break;
+
+                var batchFiles = pendingFiles.Skip(i).Take(batchSize).ToArray();
+                await ProcessBatchFilesAsync(batchFiles, scanFolder, epubExtensions, audioExtensions, stoppingToken);
+            }
+        }
+        finally
+        {
+            _scanState.IsScanning = false;
+            _logger.LogInformation("Escaneo de biblioteca finalizado.");
+        }
+    }
+
+    private async Task ProcessBatchFilesAsync(string[] files, string scanFolder, string[] epubExtensions, string[] audioExtensions, CancellationToken stoppingToken)
     {
         using var scope = _serviceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -54,120 +119,78 @@ public class LibraryScanBackgroundService : BackgroundService
         var audioMatcher = scope.ServiceProvider.GetRequiredService<AudioMatchingService>();
         var mediaPackager = scope.ServiceProvider.GetRequiredService<MediaPackagerService>();
 
-        var setting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "IncomingScanFolder", stoppingToken);
-        if (setting == null || string.IsNullOrWhiteSpace(setting.Value) || !Directory.Exists(setting.Value))
-            return false;
+        var modeSetting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "IngestionMode", stoppingToken);
+        bool leaveInPlace = modeSetting?.Value == "LeaveInPlace";
 
-        string[] epubExtensions = { ".epub" };
-        string[] audioExtensions = { ".mp3", ".m4b", ".m4a", ".wav" };
-        
-        var rawFiles = Directory.GetFiles(setting.Value, "*.*", SearchOption.AllDirectories)
-                                .Where(f => epubExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()) || audioExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
-                                .ToArray();
-        
-        // Excluir archivos que ya han sido procesados
-        var processedSources = new HashSet<string>(await dbContext.Books.Where(b => b.SourceFilePath != null).Select(b => b.SourceFilePath).ToListAsync(stoppingToken));
-        var processedAudios = new HashSet<string>(await dbContext.BookAudioTracks.Select(t => t.FilePath).ToListAsync(stoppingToken));
-
-        var allFiles = rawFiles.Where(f => !processedSources.Contains(f) && !processedAudios.Contains(f)).ToArray();
-
-        if (allFiles.Length == 0) return false;
-
-        _scanState.IsScanning = true;
-        _scanState.TotalFilesFound = allFiles.Length;
-        _scanState.FilesProcessed = 0;
-
-        bool hasMore = false;
-        try
+        foreach (var file in files)
         {
-            var batchSizeSetting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "ScanBatchSize", stoppingToken);
-            int batchSize = int.TryParse(batchSizeSetting?.Value, out int parsedSize) ? parsedSize : 100;
-            var files = allFiles.Take(batchSize).ToList();
-            hasMore = allFiles.Length > batchSize;
-
-            foreach (var file in files)
+            if (stoppingToken.IsCancellationRequested) break;
+            _scanState.CurrentFile = Path.GetFileName(file);
+            
+            try
             {
-                if (stoppingToken.IsCancellationRequested) break;
-                _scanState.CurrentFile = Path.GetFileName(file);
-                
-                try
+                if (epubExtensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
                 {
-                    if (epubExtensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
+                    var book = await scannerService.ScanEpubAsync(file, "GoogleBooks");
+                    if (book.Id == 0)
                     {
-                        var book = await scannerService.ScanEpubAsync(file, "GoogleBooks");
-                        if (book.Id == 0)
-                        {
-                            dbContext.Books.Add(book);
-                        }
-                        await dbContext.SaveChangesAsync(stoppingToken);
-                        _logger.LogInformation($"Libro importado y organizado: {book.Title}");
+                        dbContext.Books.Add(book);
                     }
-                    else if (audioExtensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
+                    await dbContext.SaveChangesAsync(stoppingToken);
+                }
+                else if (audioExtensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
+                {
+                    var bookId = await audioMatcher.TryMatchAudioToBookAsync(file, stoppingToken);
+                    if (bookId.HasValue)
                     {
-                        var bookId = await audioMatcher.TryMatchAudioToBookAsync(file, stoppingToken);
-                        if (bookId.HasValue)
+                        var book = await dbContext.Books.Include(b => b.AudioTracks).FirstOrDefaultAsync(b => b.Id == bookId.Value, stoppingToken);
+                        if (book != null)
                         {
-                            var book = await dbContext.Books.Include(b => b.AudioTracks).FirstOrDefaultAsync(b => b.Id == bookId.Value, stoppingToken);
-                            if (book != null)
-                            {
-                                int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
-                                
-                                string safeTitle = string.Join("_", book.Title.Split(Path.GetInvalidFileNameChars()));
-                                string bookDir = Path.GetDirectoryName(book.EpubFilePath ?? book.CoverImagePath) ?? setting.Value;
-                                string newAudioPath = Path.Combine(bookDir, $"{safeTitle} track {nextTrack}.mp3");
+                            int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
+                            string safeTitle = string.Join("_", book.Title.Split(Path.GetInvalidFileNameChars()));
+                            string bookDir = Path.GetDirectoryName(book.EpubFilePath ?? book.CoverImagePath) ?? scanFolder;
+                            string newAudioPath = Path.Combine(bookDir, $"{safeTitle} track {nextTrack}.mp3");
 
-                                if (file != newAudioPath)
+                            if (file != newAudioPath)
+                            {
+                                try 
                                 {
-                                    try 
+                                    bool converted = await mediaPackager.NormalizeAudioAsync(file, newAudioPath);
+                                    if (converted)
                                     {
-                                        _logger.LogInformation($"Normalizando audio a MP3: {file}");
-                                        bool converted = await mediaPackager.NormalizeAudioAsync(file, newAudioPath);
-                                        
-                                        if (converted)
-                                        {
-                                            var modeSetting = await dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "IngestionMode", stoppingToken);
-                                            if (modeSetting?.Value != "LeaveInPlace") {
-                                                try { File.Delete(file); } catch { }
-                                            }
-                                            book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
+                                        if (!leaveInPlace) {
+                                            try { File.Delete(file); } catch { }
                                         }
-                                        else
-                                        {
-                                            _logger.LogWarning("Falló la normalización de {File}. Copiando original.", file);
-                                            File.Copy(file, newAudioPath, true);
-                                            book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
-                                        }
-                                    } 
-                                    catch (Exception ex)
-                                    {
-                                        _logger.LogError(ex, "Error al normalizar/mover el audio huérfano.");
-                                        book.AudioTracks.Add(new BookAudioTrack { FilePath = file, TrackNumber = nextTrack });
+                                        book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
                                     }
-                                }
-                                else
+                                    else
+                                    {
+                                        File.Copy(file, newAudioPath, true);
+                                        book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
+                                    }
+                                } 
+                                catch (Exception)
                                 {
                                     book.AudioTracks.Add(new BookAudioTrack { FilePath = file, TrackNumber = nextTrack });
                                 }
-                                await dbContext.SaveChangesAsync(stoppingToken);
-                                _logger.LogInformation($"Audio importado y asociado al libro {book.Title} como Track {nextTrack}");
                             }
+                            else
+                            {
+                                book.AudioTracks.Add(new BookAudioTrack { FilePath = file, TrackNumber = nextTrack });
+                            }
+                            await dbContext.SaveChangesAsync(stoppingToken);
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Error escaneando el archivo {file}");
-                }
-                finally
-                {
-                    _scanState.FilesProcessed++;
-                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error escaneando el archivo {file}");
+            }
+            finally
+            {
+                _scanState.FilesProcessed++;
             }
         }
-        finally
-        {
-            _scanState.IsScanning = false;
-        }
-        return hasMore;
     }
 }
