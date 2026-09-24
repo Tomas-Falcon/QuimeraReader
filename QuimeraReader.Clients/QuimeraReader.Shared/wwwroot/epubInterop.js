@@ -1,4 +1,4 @@
-﻿export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi, epubLocationsCache) {
+export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi, epubLocationsCache) {
     var book = ePub(epubUrl);
     var rendition = book.renderTo(elementId, {
         width: "100%",
@@ -25,28 +25,22 @@
 
     book.ready.then(function () {
         if (epubLocationsCache && epubLocationsCache.length > 10) {
-            console.log("[epub.js] Cargando ubicaciones desde cache...");
             try {
                 book.locations.load(epubLocationsCache);
                 reportPercentage(rendition.location, dotNetRef, book);
                 return Promise.resolve(book.locations);
             } catch (e) {
-                console.error("Error loading locations cache", e);
             }
         }
         
-        console.log("[epub.js] Iniciando generacion de locations...");
         showLoadingSpinner(elementId);
-        var t0 = performance.now();
         
         return book.locations.generate(1600).then(function(locations) {
-            var t1 = performance.now();
-            console.log("[epub.js] Locations generadas en " + (t1 - t0) + " ms.");
             hideLoadingSpinner();
             
             var savedLocations = book.locations.save();
             if (dotNetRef) {
-                dotNetRef.invokeMethodAsync("SaveLocationsCache", savedLocations).catch(e => console.warn(e));
+                dotNetRef.invokeMethodAsync("SaveLocationsCache", savedLocations).catch(e => {});
             }
             return locations;
         });
@@ -82,16 +76,15 @@
         
         if (percentage < 0) percentage = -1;
         
-        console.log(""Reporting location: "", location.start.cfi, "" percentage: "", percentage);
         if (dotNetRef) {
             var currentPage = 0; var totalPages = 0;
-        try {
-            if (book.locations && book.locations.length > 0) {
-                currentPage = book.locations.locationFromCfi(location.start.cfi) || 0;
-                totalPages = book.locations.total || 0;
-            }
-        } catch(e) {}
-        dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage, currentPage, totalPages).catch(e => console.warn(e));
+            try {
+                if (book.locations && book.locations.length > 0) {
+                    currentPage = book.locations.locationFromCfi(location.start.cfi) || 0;
+                    totalPages = book.locations.total || 0;
+                }
+            } catch(e) {}
+            dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage, currentPage, totalPages).catch(e => {});
         }
     }
 
@@ -101,7 +94,7 @@
             var text = range.toString();
             if(text && text.trim().length > 0) {
                 if (dotNetRef) {
-                    dotNetRef.invokeMethodAsync("OnEpubTextSelected", cfiRange, text).catch(e => console.warn(e));
+                    dotNetRef.invokeMethodAsync("OnEpubTextSelected", cfiRange, text).catch(e => {});
                 }
             }
         });
@@ -164,13 +157,11 @@ export function applyAnnotation(cfiRange, color, hasNote) {
     if (window.epubRendition) {
         if (color && color.length > 0) {
             window.epubRendition.annotations.highlight(cfiRange, {}, (e) => {
-                console.log("Highlight clicked", e);
             }, "", {"fill": color, "fill-opacity": "0.3"});
         }
         if (hasNote) {
             var underlineColor = (color && color.length > 0) ? color : "#ffffff";
             window.epubRendition.annotations.underline(cfiRange, {}, (e) => {
-                console.log("Underline clicked", e);
             }, "", {"stroke": underlineColor, "stroke-width": "3px", "stroke-opacity": "0.9", "stroke-dasharray": "2,2"});
         }
     }

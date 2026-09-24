@@ -1,4 +1,4 @@
-﻿@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @using Radzen
 @using Radzen.Blazor
@@ -34,7 +34,7 @@
                 }
                 <label class="rz-button rz-button-md rz-variant-filled rz-primary rz-shade-default m-0 d-flex align-items-center gap-2" style="cursor: pointer;">
                     <RadzenIcon Icon="cloud_upload" /> Subir EPUB
-                    <InputFile OnChange="HandleFileUpload" accept=".epub" class="d-none" multiple />
+                    <InputFile OnChange="HandleFileUpload" accept=".epub,.mp3,.m4b,.m4a,.wav" class="d-none" multiple />
                 </label>
                                 <RadzenDropDown Multiple="true" Placeholder="Categorías" Data="@_availableCategories" TextProperty="Name" ValueProperty="Id" @bind-Value="_selectedCategories"  Style="min-width: 200px; max-width: 100%;" AllowClear="true" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
                 <RadzenDropDown TValue="string" Data="@_sortOptions" @bind-Value="_selectedSort" Style="width: auto;" />
@@ -317,7 +317,7 @@
             {
                 try
                 {
-                    await BookService.UploadEpubAsync(file.OpenReadStream(maxAllowedSize: 104857600), file.Name);
+                    await BookService.UploadEpubAsync(file.OpenReadStream(maxAllowedSize: 1073741824), file.Name);
                     successCount++;
                 }
                 catch (Exception fileEx)

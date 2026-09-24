@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Infrastructure;
 using QuimeraReader.Infrastructure.Services;
@@ -463,6 +463,8 @@ public partial class BooksController : ControllerBase
     }
 
     [HttpPost("upload")]
+    [RequestSizeLimit(1073741824)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 1073741824)]
     public async Task<IActionResult> UploadEpub(IFormFile file)
     {
         if (file == null || file.Length == 0)
@@ -553,6 +555,8 @@ public partial class BooksController : ControllerBase
     }
 
     [HttpPost("{id}/audio")]
+    [RequestSizeLimit(1073741824)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 1073741824)]
     public async Task<IActionResult> UploadAudio(int id, IFormFile file)
     {
         if (file == null || file.Length == 0) return BadRequest("No se proporcionó ningún archivo de audio.");
