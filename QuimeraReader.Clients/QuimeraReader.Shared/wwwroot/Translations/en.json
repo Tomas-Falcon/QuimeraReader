@@ -1,4 +1,4 @@
-﻿{
+{
   "App_Title": "QuimeraReader",
   "Filter_Placeholder": "Select filter...",
   "Filter_RecentlyAdded": "Recently Added",
@@ -81,6 +81,18 @@
   "Settings_DuplicateCleanup": "Duplicate Cleanup",
   "Settings_DuplicateCleanupDesc": "Merge authors and categories that have been saved multiple times.",
   "Settings_Merge": "Merge",
-  "Settings_SaveAllChanges": "Save All Changes",
-  "Settings_System": "System"
+  "Settings_SaveAllChanges": "Save All Changes",
+  "Settings_System": "System",
+  "Annotation_New": "New Annotation",
+  "Annotation_Color": "Highlight Color",
+  "Annotation_NoColor": "No color (Underline only)",
+  "Annotation_NoteTitle": "Note (Optional)",
+  "Annotation_NotePlaceholder": "Write a comment...",
+  "Action_Cancel": "Cancel",
+  "Action_Save": "Save",
+  "Action_PlayFromHere": "Play",
+  "Message_PlayingFromSelection": "Playing from selection.",
+  "Error_AudioNotFoundForSelection": "Audio not found for this segment.",
+  "Message_AnnotationSaved": "Annotation saved.",
+  "Error_SavingAnnotation": "Error saving annotation:"
 }

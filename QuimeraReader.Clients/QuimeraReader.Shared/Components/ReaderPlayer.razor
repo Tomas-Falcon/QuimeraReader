@@ -313,7 +313,8 @@
 
             if (match != null)
             {
-                await SeekToSegmentAsync(match.Start);
+                var startOffset = Math.Max(0, match.Start - 1.5);
+                await SeekToSegmentAsync(startOffset);
                 ToastService.ShowSuccess("Reproduciendo desde la selección.");
             }
             else
