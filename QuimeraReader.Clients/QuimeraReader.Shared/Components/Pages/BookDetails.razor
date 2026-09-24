@@ -162,6 +162,13 @@ else
                     </div>
 
                     <div class="mt-4 pt-4" style="border-top: 1px solid rgba(255,255,255,0.1);">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <div>
+                                <h6 class="text-white mb-0"><i class="bi bi-cloud-arrow-down me-2"></i> Disponible sin conexión</h6>
+                                <small class="text-white-50">Descarga los archivos a tu dispositivo para leer y escuchar sin internet.</small>
+                            </div>
+                            <RadzenSwitch @bind-Value="_book.IsAvailableOffline" Change="@ToggleOfflineAsync" />
+                        </div>
                         <h6 class="text-white-50 mb-3"><i class="bi bi-gear me-2"></i> Gestión de archivos</h6>
                         <div class="d-flex gap-2 flex-wrap">
                             @if (_book.HasEpub)
@@ -254,6 +261,22 @@ else
         }
     }
     
+    
+    private async Task ToggleOfflineAsync(bool value)
+    {
+        try
+        {
+            await BookService.ToggleOfflineAvailabilityAsync(Id, value);
+            ToastService.ShowSuccess(value ? "Libro marcado para leer sin conexión." : "Libro eliminado de descargas automáticas.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error: {ex.Message}");
+            // Revert state on failure
+            _book.IsAvailableOffline = !value;
+        }
+    }
+
     private void GoToRead()
     {
         NavManager.NavigateTo($"/read/{Id}");

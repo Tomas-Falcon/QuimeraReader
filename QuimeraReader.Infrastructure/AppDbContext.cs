@@ -21,7 +21,8 @@ public class AppDbContext : DbContext, IAppDbContext
     {
     }
 
-    public DbSet<BookAudioTrack> BookAudioTracks { get; set; } = null!;
+    public DbSet<BookAudioTrack> BookAudioTracks { get; set; }
+        public DbSet<BookAnnotation> BookAnnotations { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

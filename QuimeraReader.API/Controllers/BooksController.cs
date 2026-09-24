@@ -189,6 +189,7 @@ public partial class BooksController : ControllerBase
             Series = book.Series != null ? book.Series.Name : null,
             Universe = book.Series != null && book.Series.Universe != null ? book.Series.Universe.Name : null,
             HasCover = !string.IsNullOrEmpty(book.CoverImagePath),
+            IsAvailableOffline = book.IsAvailableOffline,
             HasEpub = !string.IsNullOrEmpty(book.EpubFilePath),
             HasAudio = book.AudioTracks.Any(),
             IsAligned = book.ProcessingStatus == "SYNCED",
@@ -245,6 +246,7 @@ public partial class BooksController : ControllerBase
                 Authors = b.Authors.Select(a => a.Author!.Name).ToList(),
                 Categories = b.Categories.Select(c => c.Category!.Name).ToList(),
                 HasCover = !string.IsNullOrEmpty(b.CoverImagePath),
+                IsAvailableOffline = b.IsAvailableOffline,
                 HasEpub = !string.IsNullOrEmpty(b.EpubFilePath),
                 HasAudio = b.AudioTracks.Any(),
                 IsAligned = b.ProcessingStatus == "SYNCED",
@@ -527,6 +529,7 @@ public partial class BooksController : ControllerBase
                 Title = book.Title,
                 HasEpub = !string.IsNullOrEmpty(book.EpubFilePath),
                 HasCover = !string.IsNullOrEmpty(book.CoverImagePath),
+            IsAvailableOffline = book.IsAvailableOffline,
                 HasAudio = book.AudioTracks != null && book.AudioTracks.Any(),
             });
         }

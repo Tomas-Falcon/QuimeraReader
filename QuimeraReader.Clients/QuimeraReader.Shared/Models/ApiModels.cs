@@ -14,6 +14,7 @@ public record Book
     public string? Universe { get; init; }
     
     public bool HasCover { get; init; }
+    public bool IsAvailableOffline { get; set; }
     public bool HasEpub { get; init; }
     public bool HasAudio { get; init; }
     public bool IsAligned { get; init; }

@@ -21,6 +21,7 @@ public interface IBookService
     Task DeleteAuthorsAsync(int[] ids);
     Task BulkUpdateStatusAsync(List<int> bookIds, string status);
     Task UpdateMetadataAsync(int bookId, UpdateMetadataRequest request);
+    Task ToggleOfflineAvailabilityAsync(int bookId, bool isAvailable);
     Task UpdateCoverAsync(int bookId, string imageUrl);
     Task SaveEpubLocationsAsync(int bookId, string locationsJson);
     string BaseAddress { get; }
@@ -221,6 +222,12 @@ public class BookService : IBookService
     {
         var request = new BulkStatusUpdateRequest { BookIds = bookIds, Status = status };
         var response = await _httpClient.PutAsJsonAsync("api/Books/bulk/status", request);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task ToggleOfflineAvailabilityAsync(int bookId, bool isAvailable)
+    {
+        var response = await _httpClient.PutAsync($"api/Books/{bookId}/offline?isAvailable={isAvailable}", null);
         response.EnsureSuccessStatusCode();
     }
 
