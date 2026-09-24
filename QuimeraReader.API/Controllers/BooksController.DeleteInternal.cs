@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -14,8 +14,6 @@ namespace QuimeraReader.API.Controllers
     {
         private async Task DeleteBooksInternalAsync(List<Book> books)
         {
-            var authorIdsToCheck = new HashSet<int>();
-            var categoryIdsToCheck = new HashSet<int>();
             var dirsToDelete = new HashSet<string>();
 
             foreach (var book in books)
@@ -46,39 +44,13 @@ namespace QuimeraReader.API.Controllers
                 else if (book.AudioTracks != null && book.AudioTracks.Any()) bookDir = Path.GetDirectoryName(book.AudioTracks.First().FilePath);
                 
                 if (!string.IsNullOrEmpty(bookDir)) dirsToDelete.Add(bookDir);
-
-                // Collect authors/categories for orphan check
-                var bookAuthors = await _dbContext.Books.Where(b => b.Id == book.Id).SelectMany(b => b.Authors.Select(a => a.AuthorId)).ToListAsync();
-                foreach(var aid in bookAuthors) authorIdsToCheck.Add(aid);
-
-                var bookCategories = await _dbContext.Books.Where(b => b.Id == book.Id).SelectMany(b => b.Categories.Select(c => c.CategoryId)).ToListAsync();
-                foreach(var cid in bookCategories) categoryIdsToCheck.Add(cid);
             }
 
             _dbContext.Books.RemoveRange(books);
             await _dbContext.SaveChangesAsync();
 
-            // Huérfanos
-            foreach(var authorId in authorIdsToCheck)
-            {
-                bool authorHasMoreBooks = await _dbContext.Books.AnyAsync(b => b.Authors.Any(a => a.AuthorId == authorId));
-                if (!authorHasMoreBooks)
-                {
-                    var author = await _dbContext.Authors.FindAsync(authorId);
-                    if (author != null) _dbContext.Authors.Remove(author);
-                }
-            }
-
-            foreach(var catId in categoryIdsToCheck)
-            {
-                bool catHasMoreBooks = await _dbContext.Books.AnyAsync(b => b.Categories.Any(c => c.CategoryId == catId));
-                if (!catHasMoreBooks)
-                {
-                    var cat = await _dbContext.Categories.FindAsync(catId);
-                    if (cat != null) _dbContext.Categories.Remove(cat);
-                }
-            }
-            await _dbContext.SaveChangesAsync();
+            // CleanupOrphansAsync ya se encarga de buscar y borrar cualquier autor o categoria sin libros 
+            // de forma masiva sin hacer N+1
             await CleanupOrphansAsync();
 
             // Clean directories

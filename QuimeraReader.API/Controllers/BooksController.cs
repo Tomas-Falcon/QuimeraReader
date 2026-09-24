@@ -33,12 +33,13 @@ public partial class BooksController : ControllerBase
         var authors = await _dbContext.Authors.Where(a => ids.Contains(a.Id)).ToListAsync();
         if (!authors.Any()) return Ok();
 
-        foreach (var author in authors)
-        {
-            var books = await _dbContext.Books.Include(b => b.AudioTracks).Where(b => b.Authors.Any(a => a.AuthorId == author.Id)).ToListAsync();
-            if (books.Any()) {
-                await DeleteBooksInternalAsync(books);
-            }
+        var books = await _dbContext.Books
+            .Include(b => b.AudioTracks)
+            .Where(b => b.Authors.Any(a => ids.Contains(a.AuthorId)))
+            .ToListAsync();
+
+        if (books.Any()) {
+            await DeleteBooksInternalAsync(books);
         }
 
         // Si quedaron autores vacios (por ej, subidos a mano) los borramos
