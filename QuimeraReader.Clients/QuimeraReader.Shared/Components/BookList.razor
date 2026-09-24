@@ -17,7 +17,7 @@
         <div class="search-box w-100" style="max-width: 500px;">
             <RadzenTextBox Placeholder="Buscar libros, autores..." Value="@_searchQuery" Change="OnSearchInput" class="w-100" />
         </div>
-        <div class="filters d-flex flex-wrap gap-2 align-items-center w-100">
+        <div class="filters d-flex flex-column flex-sm-row flex-wrap gap-2 align-items-stretch align-items-sm-center w-100">
             @if (_selectionMode)
             {
                                 <span class="text-primary fw-bold me-2">@_selectedBookIds.Count seleccionados</span>

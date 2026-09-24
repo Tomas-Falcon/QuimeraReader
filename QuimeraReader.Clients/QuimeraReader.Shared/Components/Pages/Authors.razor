@@ -14,7 +14,7 @@
     <div class="library-toolbar d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
         <h2 class="mb-0"><span class="bi bi-people-fill text-primary me-2"></span> Autores</h2>
         
-        <div class="d-flex flex-wrap gap-2 align-items-center">
+        <div class="d-flex flex-column flex-sm-row flex-wrap gap-2 align-items-stretch align-items-sm-center w-100">
             @if (_selectionMode)
             {
                 <span class="text-primary fw-bold me-2">@_selectedAuthorIds.Count seleccionados</span>
@@ -25,7 +25,7 @@
             {
                 <RadzenButton Text="Seleccionar" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Icon="check_box" />
             }
-            <div class="search-box" style="flex: 0 0 250px;">
+            <div class="search-box" style="flex: 1 1 250px;">
                 <RadzenTextBox Placeholder="Buscar autor..." Value="@_searchQuery" Change="OnSearchInput" class="w-100" />
             </div>
         </div>

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System;
 using System.Net.Http;
+using System.Text.Json;
 
 namespace QuimeraReader.Shared.Services;
 
@@ -61,8 +62,21 @@ public class TranslationService : ITranslationService
     {
         try
         {
-            var url = $"_content/QuimeraReader.Shared/Translations/{langCode}.json";
-            var data = await _localHttp.GetFromJsonAsync<Dictionary<string, string>>(url);
+            var url = "_content/QuimeraReader.Shared/Translations/$langCode.json";
+            Dictionary<string, string>? data = null;
+            
+            try 
+            {
+                // Fallback for MAUI: use JS fetch if HttpClient fails for local assets
+                var jsonString = await _jsRuntime.InvokeAsync<string>("eval", "fetch('$url').then(r => r.json()).then(j => JSON.stringify(j))");
+                data = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonString);
+            }
+            catch
+            {
+                // Fallback to traditional HttpClient (works perfectly on Web)
+                data = await _localHttp.GetFromJsonAsync<Dictionary<string, string>>(url);
+            }
+
             if (data != null)
             {
                 _translations = data;
