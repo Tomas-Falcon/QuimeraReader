@@ -66,11 +66,11 @@
         window.netflixScroll.initialize();
 
         window.infiniteScroll = {
-            initialize: function (element, dotnetHelper) {
+            initialize: function (element, dotnetHelper, methodName = 'LoadMoreRequested') {
                 if (!element) return;
                 const observer = new IntersectionObserver(async (entries) => {
                     if (entries[0].isIntersecting) {
-                        await dotnetHelper.invokeMethodAsync('LoadMoreRequested');
+                        await dotnetHelper.invokeMethodAsync(methodName);
                     }
                 }, { rootMargin: "200px" });
                 observer.observe(element);

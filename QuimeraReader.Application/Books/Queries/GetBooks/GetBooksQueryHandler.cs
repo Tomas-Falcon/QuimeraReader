@@ -46,11 +46,19 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
 
         var totalBooks = await query.CountAsync(cancellationToken);
 
+if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
+        {
+            query = query.OrderByDescending(b => b.LastReadAt).ThenByDescending(b => b.Id);
+        }
+        else
+        {
+            query = query.OrderByDescending(b => b.Id);
+        }
+
         var booksList = await query
             .Include(b => b.Authors).ThenInclude(ba => ba.Author)
             .Include(b => b.Categories).ThenInclude(bc => bc.Category)
             .Include(b => b.Series).ThenInclude(s => s.Universe)
-            .OrderByDescending(b => b.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
