@@ -317,13 +317,13 @@ public class EpubScannerService
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Error creando Symlink, cayendo de nuevo a Copia para: {File}", sourceFilePath);
-                File.Copy(sourceFilePath, newEpubPath, overwrite: true);
+                if (File.Exists(newEpubPath)) File.Delete(newEpubPath); File.Copy(sourceFilePath, newEpubPath, overwrite: true);
             }
             book.EpubFilePath = newEpubPath;
         }
         else
         {
-            File.Copy(sourceFilePath, newEpubPath, overwrite: true);
+            if (File.Exists(newEpubPath)) File.Delete(newEpubPath); File.Copy(sourceFilePath, newEpubPath, overwrite: true);
             try { File.Delete(sourceFilePath); } catch (Exception ex) { _logger.LogWarning(ex, "No se pudo borrar el archivo original: {File}", sourceFilePath); }
             book.EpubFilePath = newEpubPath;
         }
@@ -354,13 +354,13 @@ public class EpubScannerService
                     catch (Exception ex)
                     {
                         _logger.LogWarning(ex, "Error creando Symlink Audio, usando copia para: {File}", possibleAudioPath);
-                        File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
+                        if (File.Exists(newAudioPath)) File.Delete(newAudioPath); File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
                     }
                     hasAudio = true;
                 }
                 else
                 {
-                    File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
+                    if (File.Exists(newAudioPath)) File.Delete(newAudioPath); File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
                     try { File.Delete(possibleAudioPath); } catch (Exception ex) { _logger.LogWarning(ex, "No se pudo borrar el audio original: {File}", possibleAudioPath); }
                 }
                 
