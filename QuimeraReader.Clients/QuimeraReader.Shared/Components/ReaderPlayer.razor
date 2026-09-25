@@ -1,4 +1,4 @@
-﻿@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @using Microsoft.JSInterop
 @using System.Text.Json
@@ -234,6 +234,21 @@
                 var epubApiUrl = $"{baseUrl}/{Book.EpubUrl}";
                 
                 await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubApiUrl, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache);
+
+                // Cargar y pintar anotaciones guardadas
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var annotations = await BookService.GetAnnotationsAsync(BookId);
+                        if (annotations.Any() && _epubJsModule != null)
+                        {
+                            var json = System.Text.Json.JsonSerializer.Serialize(annotations);
+                            await _epubJsModule.InvokeVoidAsync("applyAllAnnotations", json);
+                        }
+                    }
+                    catch { }
+                });
             }
         }
     }

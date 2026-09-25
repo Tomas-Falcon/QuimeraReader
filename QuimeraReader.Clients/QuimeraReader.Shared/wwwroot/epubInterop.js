@@ -185,6 +185,31 @@ export function applyAnnotation(cfiRange, color, hasNote) {
     }
 }
 
+export function applyAllAnnotations(annotationsJson) {
+    if (!window.epubRendition) return;
+    try {
+        var annotations = typeof annotationsJson === 'string' ? JSON.parse(annotationsJson) : annotationsJson;
+        for (var i = 0; i < annotations.length; i++) {
+            var a = annotations[i];
+            var color = a.colorHex || a.ColorHex || "";
+            var hasNote = !!(a.note || a.Note);
+            var cfi = a.cfiRange || a.CfiRange || "";
+            if (!cfi) continue;
+            if (color && color.length > 0) {
+                try {
+                    window.epubRendition.annotations.highlight(cfi, {}, () => {}, "", {"fill": color, "fill-opacity": "0.3"});
+                } catch(e) {}
+            }
+            if (hasNote) {
+                var underlineColor = (color && color.length > 0) ? color : "#ffffff";
+                try {
+                    window.epubRendition.annotations.underline(cfi, {}, () => {}, "", {"stroke": underlineColor, "stroke-width": "3px", "stroke-opacity": "0.9", "stroke-dasharray": "2,2"});
+                } catch(e) {}
+            }
+        }
+    } catch(e) { console.error("Error applying annotations:", e); }
+}
+
 export function highlightKaraokePhrase(text) {
     if (!window.epubRendition) return;
     

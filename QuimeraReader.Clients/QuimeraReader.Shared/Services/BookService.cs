@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Json;
+using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using QuimeraReader.Shared.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +25,7 @@ public interface IBookService
     Task UpdateMetadataAsync(int bookId, UpdateMetadataRequest request);
     Task ToggleOfflineAvailabilityAsync(int bookId, bool isAvailable);
     Task CreateAnnotationAsync(int bookId, string cfiRange, string selectedText, string colorHex, string note);
+    Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId);
     Task UpdateCoverAsync(int bookId, string imageUrl);
     Task SaveEpubLocationsAsync(int bookId, string locationsJson);
     string BaseAddress { get; }
@@ -255,6 +256,20 @@ public class BookService : IBookService
         var payload = new { CfiRange = cfiRange, SelectedText = selectedText, ColorHex = colorHex, Note = note };
         var response = await _httpClient.PostAsJsonAsync($"api/Books/{bookId}/annotations", payload);
         response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId)
+    {
+        try
+        {
+            _logger.LogInformation("[BookService] Obteniendo anotaciones del libro ID: {BookId}", bookId);
+            return await _httpClient.GetFromJsonAsync<List<AnnotationDto>>($"api/Books/{bookId}/annotations") ?? new();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[BookService] Error obteniendo anotaciones del libro ID: {BookId}", bookId);
+            return new();
+        }
     }
 
     public async Task UpdateMetadataAsync(int bookId, UpdateMetadataRequest request)

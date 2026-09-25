@@ -1,4 +1,4 @@
-﻿namespace QuimeraReader.Shared.Models;
+namespace QuimeraReader.Shared.Models;
 
 public record Book
 {
@@ -123,4 +123,14 @@ public class CoverSearchResult
 {
     public string ImageUrl { get; set; } = string.Empty;
     public string Source { get; set; } = string.Empty;
+}
+
+public class AnnotationDto
+{
+    public int Id { get; set; }
+    public string CfiRange { get; set; } = string.Empty;
+    public string SelectedText { get; set; } = string.Empty;
+    public string? ColorHex { get; set; }
+    public string? Note { get; set; }
+    public DateTime CreatedAt { get; set; }
 }

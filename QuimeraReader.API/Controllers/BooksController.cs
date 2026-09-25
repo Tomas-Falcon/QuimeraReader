@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Infrastructure;
 using QuimeraReader.Infrastructure.Services;
@@ -173,6 +173,7 @@ public partial class BooksController : ControllerBase
             .Include(b => b.Authors).ThenInclude(ba => ba.Author)
             .Include(b => b.Categories).ThenInclude(bc => bc.Category)
             .Include(b => b.Series)
+            .Include(b => b.AudioTracks)
             .FirstOrDefaultAsync(b => b.Id == id);
 
         if (book == null) return NotFound();
@@ -946,6 +947,26 @@ public partial class BooksController : ControllerBase
         await _dbContext.SaveChangesAsync();
 
         return Ok(annotation);
+    }
+
+    [HttpGet("{id}/annotations")]
+    public async Task<IActionResult> GetAnnotations(int id)
+    {
+        var annotations = await _dbContext.BookAnnotations
+            .Where(a => a.BookId == id)
+            .OrderBy(a => a.CreatedAt)
+            .Select(a => new
+            {
+                a.Id,
+                a.CfiRange,
+                a.SelectedText,
+                a.ColorHex,
+                a.Note,
+                a.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(annotations);
     }
 }
 public class ScanRequest 
