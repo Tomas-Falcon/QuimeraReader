@@ -26,10 +26,13 @@ export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi, epubLocat
     book.ready.then(function () {
         if (epubLocationsCache && epubLocationsCache.length > 10) {
             try {
-                book.locations.load(epubLocationsCache);
+                // If it's a JSON string representation of an array, parse it first
+                var parsed = typeof epubLocationsCache === 'string' ? JSON.parse(epubLocationsCache) : epubLocationsCache;
+                book.locations.load(parsed);
                 reportPercentage(rendition.location, dotNetRef, book);
                 return Promise.resolve(book.locations);
             } catch (e) {
+                console.error("Error loading cache:", e);
             }
         }
         
@@ -40,7 +43,9 @@ export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi, epubLocat
             
             var savedLocations = book.locations.save();
             if (dotNetRef) {
-                dotNetRef.invokeMethodAsync("SaveLocationsCache", savedLocations).catch(e => {});
+                // Always send as JSON string to match C# 'string' parameter
+                var payload = typeof savedLocations === 'string' ? savedLocations : JSON.stringify(savedLocations);
+                dotNetRef.invokeMethodAsync("SaveLocationsCache", payload).catch(e => { console.error("Interop Error:", e); });
             }
             return locations;
         });
@@ -84,7 +89,7 @@ export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi, epubLocat
                     totalPages = book.locations.total || 0;
                 }
             } catch(e) {}
-            dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage, currentPage, totalPages).catch(e => {});
+            dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage, currentPage, totalPages).catch(e => { console.error("Interop Error OnEpubLocationChanged:", e); });
         }
     }
 

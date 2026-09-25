@@ -637,7 +637,7 @@ public partial class BooksController : ControllerBase
         if (book.ReadingStatus != "Read") book.ReadingStatus = "Reading";
         if (request.CurrentEpubCfi != null) book.CurrentEpubCfi = request.CurrentEpubCfi;
         if (request.CurrentAudioPosition.HasValue) book.CurrentAudioPosition = request.CurrentAudioPosition;
-            book.CurrentAudioTrackNumber = request.CurrentAudioTrackNumber;
+        if (request.CurrentAudioTrackNumber.HasValue) book.CurrentAudioTrackNumber = request.CurrentAudioTrackNumber;
         if (request.PercentageCompleted.HasValue) book.PercentageCompleted = request.PercentageCompleted;
 
         if (book.AudioTracks.Any() && 
