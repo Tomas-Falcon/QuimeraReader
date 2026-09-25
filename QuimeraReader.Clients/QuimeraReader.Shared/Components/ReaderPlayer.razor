@@ -1,4 +1,4 @@
-﻿﻿@using QuimeraReader.Shared.Models
+﻿@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @using Microsoft.JSInterop
 @using System.Text.Json
@@ -411,7 +411,6 @@
     }
 
     [JSInvokable]
-        [JSInvokable]
     public async Task OnAudioEnded()
     {
         if (Book?.AudioTracks != null && Book.AudioTracks.Count > 0)
