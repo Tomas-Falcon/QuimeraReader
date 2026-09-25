@@ -5,7 +5,7 @@ namespace QuimeraReader.Domain.Entities
         public int Id { get; set; }
         public int BookId { get; set; }
         [System.Text.Json.Serialization.JsonIgnore]
-        public Book Book { get; set; } = null!;
+        public Book? Book { get; set; }
         public string CfiRange { get; set; } = string.Empty;
         public string SelectedText { get; set; } = string.Empty;
         public string? Note { get; set; }

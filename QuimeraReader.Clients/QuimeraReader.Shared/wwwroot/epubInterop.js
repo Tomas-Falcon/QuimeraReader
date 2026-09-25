@@ -119,6 +119,19 @@ export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi, epubLocat
     rendition.on("mouseup", event => { if (!isDragging) return; isDragging = false; endX = event.screenX; handleSwipe(); });
     
     function handleSwipe() {
+        // Ignorar click/swipe si el usuario seleccionó texto
+        let isTextSelected = false;
+        try {
+            const contents = rendition.getContents();
+            if (contents && contents.length > 0) {
+                const selection = contents[0].window.getSelection();
+                if (selection && selection.toString().trim().length > 0) {
+                    isTextSelected = true;
+                }
+            }
+        } catch(e) {}
+        if (isTextSelected) return;
+
         if (endX < startX - 50) rendition.next();
         else if (endX > startX + 50) rendition.prev();
         else {
