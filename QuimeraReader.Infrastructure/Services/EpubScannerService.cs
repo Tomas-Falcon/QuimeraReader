@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,6 +19,7 @@ public class EpubScannerService
     private readonly AppDbContext _dbContext;
     private readonly AudioAlignmentQueue _queue;
     private readonly ILogger<EpubScannerService> _logger;
+    private static readonly SemaphoreSlim _scanLock = new(1, 1);
 
     public EpubScannerService(IEnumerable<IMetadataProvider> providers, HttpClient httpClient, AppDbContext dbContext, AudioAlignmentQueue queue, ILogger<EpubScannerService> logger)
     {

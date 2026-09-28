@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -65,14 +65,23 @@
         window.netflixScroll.initialize();
 
         window.infiniteScroll = {
+            _observers: new Map(),
             initialize: function (element, dotnetHelper, methodName = 'LoadMoreRequested') {
                 if (!element) return;
+                if (window.infiniteScroll._observers.has(element)) {
+                    window.infiniteScroll._observers.get(element).disconnect();
+                }
                 const observer = new IntersectionObserver(async (entries) => {
                     if (entries[0].isIntersecting) {
                         await dotnetHelper.invokeMethodAsync(methodName);
                     }
                 }, { rootMargin: "200px" });
                 observer.observe(element);
+                window.infiniteScroll._observers.set(element, observer);
+            },
+            cleanup: function () {
+                window.infiniteScroll._observers.forEach(function(observer) { observer.disconnect(); });
+                window.infiniteScroll._observers.clear();
             }
         };
     </script>

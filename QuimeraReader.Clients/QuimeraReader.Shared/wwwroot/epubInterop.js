@@ -160,6 +160,22 @@ export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi, epubLocat
     window.epubPrev = () => { try { rendition.prev(); } catch (e) { } };
 }
 
+export function destroyEpub() {
+    try {
+        if (window.epubRendition) {
+            window.epubRendition.destroy();
+            window.epubRendition = null;
+        }
+        if (window.epubBook) {
+            window.epubBook.destroy();
+            window.epubBook = null;
+        }
+        window.epubDotNetRef = null;
+        window.epubNext = null;
+        window.epubPrev = null;
+    } catch(e) {}
+}
+
 export function nextEpubPage() { if (window.epubNext) window.epubNext(); }
 export function prevEpubPage() { if (window.epubPrev) window.epubPrev(); }
 export function goToPercentage(pct) {

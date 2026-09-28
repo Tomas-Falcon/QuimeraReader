@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Infrastructure;
 using QuimeraReader.Infrastructure.Services;
 using Microsoft.Extensions.Hosting;
@@ -79,12 +79,18 @@ public class AudioAlignmentBackgroundService : BackgroundService
             .Include(b => b.AudioTracks)
             .FirstOrDefaultAsync(b => b.Id == bookId, stoppingToken);
 
+        if (bookToSync == null)
+        {
+            _logger.LogWarning("El libro {Id} no fue encontrado en la base de datos.", bookId);
+            return;
+        }
+
         var audioTrack = bookToSync.AudioTracks.OrderBy(t => t.TrackNumber).FirstOrDefault();
         var audioFilePath = audioTrack?.FilePath;
 
-        if (bookToSync == null || string.IsNullOrEmpty(audioFilePath) || string.IsNullOrEmpty(bookToSync.EpubFilePath))
+        if (string.IsNullOrEmpty(audioFilePath) || string.IsNullOrEmpty(bookToSync.EpubFilePath))
         {
-            _logger.LogWarning("El libro {Id} no es válido para sincronización.", bookId);
+            _logger.LogWarning("El libro {Id} no es válido para sincronización (falta audio o epub).", bookId);
             return;
         }
 

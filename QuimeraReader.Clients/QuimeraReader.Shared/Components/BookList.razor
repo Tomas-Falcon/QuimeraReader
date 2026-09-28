@@ -2,7 +2,7 @@
 @using QuimeraReader.Shared.Services
 @using Radzen
 @using Radzen.Blazor
-@implements IDisposable
+@implements IAsyncDisposable
 @inject QuimeraReader.Shared.Services.IBookService BookService
 @inject QuimeraReader.Shared.Services.IScanService ScanService
 @inject QuimeraReader.Shared.Services.ISettingsService SettingsService
@@ -330,7 +330,6 @@
             {
                 ToastService.ShowSuccess($"{successCount} libro(s) subido(s) correctamente!");
                                 if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
-                if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
             }
         }
         catch (Exception ex)
@@ -517,10 +516,13 @@
 
 
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         _cts.Cancel();
         _cts.Dispose();
+        _debounceTimer?.Stop();
+        _debounceTimer?.Dispose();
+        try { await JSRuntime.InvokeVoidAsync("infiniteScroll.cleanup"); } catch { }
         _objRef?.Dispose();
     }
 }
