@@ -151,7 +151,12 @@ export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi, epubLocat
         if (event.key === "ArrowRight") { try { rendition.next(); } catch(e){} }
     });
 
-    
+    rendition.on("markClicked", function (cfiRange, data) {
+        if (dotNetRef) {
+            dotNetRef.invokeMethodAsync("OnAnnotationClicked", cfiRange).catch(e => {});
+        }
+    });
+
     window.epubBook = book;
     window.epubRendition = rendition;
     window.epubDotNetRef = dotNetRef;
@@ -198,6 +203,15 @@ export function applyAnnotation(cfiRange, color, hasNote) {
             window.epubRendition.annotations.underline(cfiRange, {}, (e) => {
             }, "", {"stroke": underlineColor, "stroke-width": "3px", "stroke-opacity": "0.9", "stroke-dasharray": "2,2"});
         }
+    }
+}
+
+export function removeAnnotation(cfiRange) {
+    if (window.epubRendition) {
+        try {
+            window.epubRendition.annotations.remove(cfiRange, "highlight");
+            window.epubRendition.annotations.remove(cfiRange, "underline");
+        } catch(e) { console.error("Error removing annotation", e); }
     }
 }
 
