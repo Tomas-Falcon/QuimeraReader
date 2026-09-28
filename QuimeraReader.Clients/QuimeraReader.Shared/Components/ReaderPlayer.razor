@@ -1,4 +1,4 @@
-@using QuimeraReader.Shared.Models
+﻿@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @using Microsoft.JSInterop
 @using System.Text.Json
@@ -46,8 +46,8 @@
                     <!-- Progress Footer (Kindle Style) -->
                     <div class="reading-progress px-4 py-2" style="background: var(--bg-card); font-size: 0.85rem; color: var(--text-muted); border-top: 1px solid rgba(255,255,255,0.1);">
                         <div class="d-flex align-items-center justify-content-between mb-1" style="font-size: 0.75rem;">
-                            <span class="fw-bold text-white-50">@(_totalPages > 0 ? $"Pág. {_currentPage}" : "")</span>
-                            <span class="fw-bold text-white-50">@(_totalPages > 0 ? $"{_totalPages} páginas -" : "") @($"{Math.Round(Book.PercentageCompleted ?? 0, 1)}%")</span>
+                            <span class="fw-bold text-white-50">@(_totalPages > 0 ? $"PÃ¡g. {_currentPage}" : "")</span>
+                            <span class="fw-bold text-white-50">@(_totalPages > 0 ? $"{_totalPages} pÃ¡ginas -" : "") @($"{Math.Round(Book.PercentageCompleted ?? 0, 1)}%")</span>
                         </div>
                         <input type="range" class="form-range custom-progress-bar" min="0" max="100" step="0.1" value="@(Book.PercentageCompleted ?? 0)" @onchange="OnProgressSliderChanged" />
                     </div>
@@ -71,7 +71,7 @@
                     <div class="no-sync-map text-center pt-5" style="flex: 1;">
                         <img src="@(BookService.BaseAddress + @Book.CoverUrl)" class="fallback-cover mb-4" style="max-width: 200px; border-radius: 8px;" />
                         <h3>Modo Audiolibro Puro</h3>
-                        <p class="text-muted">No se encontraron transcripciones o texto para este título.</p>
+                        <p class="text-muted">No se encontraron transcripciones o texto para este tÃ­tulo.</p>
                     </div>
                 }
             </div>
@@ -81,7 +81,7 @@
     {
         <div class="annotation-dialog position-fixed" style="bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--bg-card); padding: 15px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 9999; width: 90%; max-width: 400px; border: 1px solid rgba(255,255,255,0.1);">
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <h6 class="mb-0 text-white"><i class="bi bi-pencil-square me-2"></i> Nueva Anotación</h6>
+                <h6 class="mb-0 text-white"><i class="bi bi-pencil-square me-2"></i> Nueva AnotaciÃ³n</h6>
                 <button class="btn-close btn-close-white" @onclick="CloseAnnotationDialog"></button>
             </div>
             <p class="text-white-50 small mb-3 text-truncate" style="font-style: italic;">"@_selectedText"</p>
@@ -102,18 +102,21 @@
                 <textarea class="form-control bg-dark text-white border-secondary" @bind="_annotationNote" rows="2" placeholder="Escribe un comentario..."></textarea>
             </div>
 
-            <div class="d-flex justify-content-between gap-2">
-                @if (Book.HasAudio && _segments != null && _segments.Any())
+                                    <div class="d-flex justify-content-between gap-2 mt-3">
+                @if (_editingAnnotationId.HasValue)
                 {
-                    <button class="btn btn-info btn-sm text-white" @onclick="PlayFromSelectionAsync"><i class="bi bi-play-circle me-1"></i> Reproducir</button>
+                    <RadzenButton Text="Eliminar" Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Outlined" Size="ButtonSize.Small" Click="DeleteAnnotationAsync" />
                 }
-                else
+                else if (Book.HasAudio && _segments != null && _segments.Any())
                 {
+                    <RadzenButton Text="Reproducir" Icon="play_circle" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small" Click="PlayFromSelectionAsync" />
+                }
+                else {
                     <div></div>
                 }
                 <div class="d-flex gap-2">
-                    <button class="btn btn-secondary btn-sm" @onclick="CloseAnnotationDialog">Cancelar</button>
-                    <button class="btn btn-primary btn-sm" @onclick="SaveAnnotationAsync">Guardar</button>
+                    <RadzenButton Text="Cancelar" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Size="ButtonSize.Small" Click="CloseAnnotationDialog" />
+                    <RadzenButton Text="Guardar" Icon="save" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" Click="SaveAnnotationAsync" />
                 </div>
             </div>
         </div>
@@ -240,7 +243,7 @@
                 {
                     try
                     {
-                        var annotations = await BookService.GetAnnotationsAsync(BookId);
+                        _bookAnnotations = await BookService.GetAnnotationsAsync(BookId);`n                        var annotations = _bookAnnotations;
                         if (annotations.Any() && _epubJsModule != null)
                         {
                             var json = System.Text.Json.JsonSerializer.Serialize(annotations);
@@ -293,7 +296,9 @@
     }
 
     
+        private List<QuimeraReader.Shared.Models.AnnotationDto>? _bookAnnotations;
     private bool _showAnnotationDialog = false;
+    private int? _editingAnnotationId = null;
     private string _selectedCfi = "";
     private string _selectedText = "";
     private string _selectedColor = "#ffeb3b";
@@ -306,13 +311,34 @@
         _selectedText = text;
         _selectedColor = "#ffeb3b";
         _annotationNote = "";
+        _editingAnnotationId = null;
         _showAnnotationDialog = true;
         StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnAnnotationClicked(string cfiRange)
+    {
+        if (_bookAnnotations != null)
+        {
+            var match = _bookAnnotations.FirstOrDefault(a => a.CfiRange == cfiRange);
+            if (match != null)
+            {
+                _selectedCfi = match.CfiRange;
+                _selectedText = match.SelectedText;
+                _selectedColor = match.ColorHex ?? "";
+                _annotationNote = match.Note ?? "";
+                _editingAnnotationId = match.Id;
+                _showAnnotationDialog = true;
+                StateHasChanged();
+            }
+        }
     }
 
     private void CloseAnnotationDialog()
     {
         _showAnnotationDialog = false;
+        _editingAnnotationId = null;
         StateHasChanged();
     }
 
@@ -321,10 +347,7 @@
         _showAnnotationDialog = false;
         if (!string.IsNullOrEmpty(_selectedText) && _segments != null && _segments.Any())
         {
-            // Normalize selected text
             var searchStr = new string(_selectedText.ToLower().Where(c => char.IsLetterOrDigit(c)).ToArray());
-            
-            // Find in segments
             var match = _segments.FirstOrDefault(s => {
                 var sText = new string(s.Text.ToLower().Where(c => char.IsLetterOrDigit(c)).ToArray());
                 return sText.Contains(searchStr) || searchStr.Contains(sText);
@@ -343,6 +366,25 @@
         }
     }
 
+    private async Task DeleteAnnotationAsync()
+    {
+        if (_editingAnnotationId.HasValue && _epubJsModule != null)
+        {
+            try
+            {
+                await BookService.DeleteAnnotationAsync(BookId, _editingAnnotationId.Value);
+                _bookAnnotations?.RemoveAll(a => a.Id == _editingAnnotationId.Value);
+                await _epubJsModule.InvokeVoidAsync("removeAnnotation", _selectedCfi);
+                ToastService.ShowSuccess("Anotación eliminada.");
+            }
+            catch (Exception ex)
+            {
+                ToastService.ShowError($"Error al eliminar: {ex.Message}");
+            }
+        }
+        CloseAnnotationDialog();
+    }
+
     private async Task SaveAnnotationAsync()
     {
         _showAnnotationDialog = false;
@@ -351,17 +393,34 @@
             bool hasNote = !string.IsNullOrWhiteSpace(_annotationNote);
             string color = _selectedColor;
             
-            // If neither highlighted nor noted, don't do anything
-            if (string.IsNullOrEmpty(color) && !hasNote) return;
-
-            // Apply immediately to UI
-            await _epubJsModule.InvokeVoidAsync("applyAnnotation", _selectedCfi, color, hasNote);
+            if (_editingAnnotationId.HasValue)
+            {
+                await _epubJsModule.InvokeVoidAsync("removeAnnotation", _selectedCfi);
+            }
             
-            // Persist
+            if (string.IsNullOrEmpty(color) && !hasNote && !_editingAnnotationId.HasValue) 
+                return;
+
+            if (!string.IsNullOrEmpty(color) || hasNote)
+            {
+                await _epubJsModule.InvokeVoidAsync("applyAnnotation", _selectedCfi, color, hasNote);
+            }
+            
             try 
             {
-                await BookService.CreateAnnotationAsync(BookId, _selectedCfi, _selectedText, color, _annotationNote);
-                ToastService.ShowSuccess("Anotación guardada.");
+                if (_editingAnnotationId.HasValue)
+                {
+                    await BookService.UpdateAnnotationAsync(BookId, _editingAnnotationId.Value, color, _annotationNote);
+                    var ann = _bookAnnotations?.FirstOrDefault(a => a.Id == _editingAnnotationId.Value);
+                    if(ann != null) { ann.ColorHex = color; ann.Note = _annotationNote; }
+                    ToastService.ShowSuccess("Anotación actualizada.");
+                }
+                else
+                {
+                    await BookService.CreateAnnotationAsync(BookId, _selectedCfi, _selectedText, color, _annotationNote);
+                    _bookAnnotations = await BookService.GetAnnotationsAsync(BookId);
+                    ToastService.ShowSuccess("Anotación guardada.");
+                }
             }
             catch(Exception ex)
             {
@@ -395,12 +454,12 @@
     {
         _currentTime = time;
         
-        // Guardar progreso cada 10 segundos
-        if (_lastSavedTime == -1 || (time - _lastSavedTime) > 10)
+        // Guardar progreso cada 5 segundos
+        if (_lastSavedTime == -1 || (time - _lastSavedTime) > 5)
         {
             _lastSavedTime = time;
             // Solo mandamos el audioPosition, dejamos el epubCfi intacto o null. 
-            // Percentage se podría calcular si tuviéramos el total duration.
+            // Percentage se podrÃ­a calcular si tuviÃ©ramos el total duration.
             _ = BookService.UpdatePositionAsync(BookId, audioPosition: time, audioTrackNumber: _currentTrackNumber);
         }
 
@@ -488,5 +547,12 @@
         public string Text { get; set; } = string.Empty;
     }
 }
+
+
+
+
+
+
+
 
 

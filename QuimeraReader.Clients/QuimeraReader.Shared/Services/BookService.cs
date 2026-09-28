@@ -25,6 +25,8 @@ public interface IBookService
     Task UpdateMetadataAsync(int bookId, UpdateMetadataRequest request);
     Task ToggleOfflineAvailabilityAsync(int bookId, bool isAvailable);
     Task CreateAnnotationAsync(int bookId, string cfiRange, string selectedText, string colorHex, string note);
+    Task UpdateAnnotationAsync(int bookId, int annotationId, string colorHex, string note);
+    Task DeleteAnnotationAsync(int bookId, int annotationId);
     Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId);
     Task UpdateCoverAsync(int bookId, string imageUrl);
     Task SaveEpubLocationsAsync(int bookId, string locationsJson);
@@ -270,6 +272,21 @@ public class BookService : IBookService
             _logger.LogError(ex, "[BookService] Error obteniendo anotaciones del libro ID: {BookId}", bookId);
             return new();
         }
+    }
+
+    public async Task UpdateAnnotationAsync(int bookId, int annotationId, string colorHex, string note)
+    {
+        _logger.LogInformation("[BookService] Actualizando anotación {AnnotationId} del libro {BookId}", annotationId, bookId);
+        var payload = new { colorHex, note };
+        var response = await _httpClient.PutAsJsonAsync($"api/Books/{bookId}/annotations/{annotationId}", payload);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteAnnotationAsync(int bookId, int annotationId)
+    {
+        _logger.LogInformation("[BookService] Eliminando anotación {AnnotationId} del libro {BookId}", annotationId, bookId);
+        var response = await _httpClient.DeleteAsync($"api/Books/{bookId}/annotations/{annotationId}");
+        response.EnsureSuccessStatusCode();
     }
 
     public async Task UpdateMetadataAsync(int bookId, UpdateMetadataRequest request)

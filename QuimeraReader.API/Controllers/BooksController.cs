@@ -968,6 +968,31 @@ public partial class BooksController : ControllerBase
 
         return Ok(annotations);
     }
+
+    [HttpPut("{id}/annotations/{annotationId}")]
+    public async Task<IActionResult> UpdateAnnotation(int id, int annotationId, [FromBody] QuimeraReader.Domain.Entities.BookAnnotation updatedAnnotation)
+    {
+        var annotation = await _dbContext.BookAnnotations.FirstOrDefaultAsync(a => a.Id == annotationId && a.BookId == id);
+        if (annotation == null) return NotFound();
+
+        annotation.Note = updatedAnnotation.Note;
+        annotation.ColorHex = updatedAnnotation.ColorHex;
+        
+        await _dbContext.SaveChangesAsync();
+        return Ok(annotation);
+    }
+
+    [HttpDelete("{id}/annotations/{annotationId}")]
+    public async Task<IActionResult> DeleteAnnotation(int id, int annotationId)
+    {
+        var annotation = await _dbContext.BookAnnotations.FirstOrDefaultAsync(a => a.Id == annotationId && a.BookId == id);
+        if (annotation == null) return NotFound();
+
+        _dbContext.BookAnnotations.Remove(annotation);
+        await _dbContext.SaveChangesAsync();
+        
+        return NoContent();
+    }
 }
 public class ScanRequest 
 { 
