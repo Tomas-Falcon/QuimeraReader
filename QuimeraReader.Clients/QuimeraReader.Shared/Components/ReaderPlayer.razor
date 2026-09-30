@@ -5,6 +5,7 @@
 @using System.Text.Json.Serialization
 @inject QuimeraReader.Shared.Services.IBookService BookService
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
+@inject IServiceProvider ServiceProvider
 @inject QuimeraReader.Shared.Services.IScanService ScanService
 @inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject QuimeraReader.Shared.Services.ToastService ToastService
@@ -27,7 +28,7 @@
             <!-- Header (Auto-hidden in future, but keep for back button for now) -->
             <div class="reader-header" style="padding: 10px 20px; z-index: 10; display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); border-bottom: 1px solid var(--border-color);">
                 <button class="btn btn-link text-white text-decoration-none px-0" @onclick="GoBack">
-                    <i class="bi bi-arrow-left me-2"></i> Volver
+                    <i class="bi bi-arrow-left me-2"></i> @TranslationService["Common_Back"]
                 </button>
                 <div class="text-center" style="flex: 1;">
                     <h5 class="mb-0 text-truncate" style="max-width: 300px; margin: 0 auto;">@Book.Title</h5>
@@ -517,12 +518,20 @@
     public async ValueTask DisposeAsync()
     {
         // Guardado de emergencia al salir
+        
         if (Book != null && !string.IsNullOrEmpty(Book.CurrentEpubCfi))
         {
             try {
                 await BookService.UpdatePositionAsync(BookId, epubCfi: Book.CurrentEpubCfi, audioPosition: _currentTime, percentage: Book.PercentageCompleted);
+                
+                var syncWorker = (QuimeraReader.Shared.Interfaces.IOfflineSyncWorker)ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.IOfflineSyncWorker));
+                if (syncWorker != null)
+                {
+                    _ = syncWorker.SyncNowAsync();
+                }
             } catch { }
         }
+
 
         _dotNetRef?.Dispose();
         if (_jsModule != null)

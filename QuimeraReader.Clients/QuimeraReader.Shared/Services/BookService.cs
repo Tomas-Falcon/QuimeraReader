@@ -1,4 +1,4 @@
-Ôªøusing System.Net.Http.Json;
+using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using QuimeraReader.Shared.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,10 +53,27 @@ public class BookService : IBookService
 
     public string BaseAddress => _httpClient.BaseAddress?.ToString() ?? "";
 
-    public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null)
+        public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null)
     {
         try
         {
+            var network = _serviceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.INetworkStateService)) as QuimeraReader.Shared.Interfaces.INetworkStateService;
+            var localRepo = _serviceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
+            
+            if (network != null && network.IsOffline && localRepo != null)
+            {
+                var localBooks = await localRepo.GetOfflineBooksAsync();
+                var filtered = localBooks.AsEnumerable();
+                
+                if (!string.IsNullOrWhiteSpace(search))
+                    filtered = filtered.Where(b => b.Title.Contains(search, StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrWhiteSpace(readingStatus))
+                    filtered = filtered.Where(b => b.ReadingStatus == readingStatus);
+                
+                var data = filtered.Skip(skip ?? ((page - 1) * pageSize)).Take(take ?? pageSize).ToArray();
+                return new PaginatedResult<Book> { Page = page, PageSize = pageSize, Total = filtered.Count(), Data = data };
+            }
+
             _logger.LogInformation("[BookService] Obteniendo lista de libros. Page: {Page}, Search: {Search}", page, search);
             var url = $"api/Books?page={page}&pageSize={pageSize}";
             if (skip.HasValue) url += $"&skip={skip.Value}";
@@ -102,7 +119,7 @@ public class BookService : IBookService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[BookService] Error obteniendo categor√≠as.");
+            _logger.LogError(ex, "[BookService] Error obteniendo categorÌas.");
             return Array.Empty<Category>();
         }
     }
@@ -146,7 +163,7 @@ public class BookService : IBookService
             var response = await _httpClient.PostAsync("api/Books/upload", content);
             response.EnsureSuccessStatusCode();
 
-            return await response.Content.ReadFromJsonAsync<Book>() ?? throw new InvalidOperationException("Respuesta inv√°lida del servidor");
+            return await response.Content.ReadFromJsonAsync<Book>() ?? throw new InvalidOperationException("Respuesta inv·lida del servidor");
         }
         catch (Exception ex)
         {
@@ -174,7 +191,7 @@ public class BookService : IBookService
         }
         catch (Exception ex)
         { 
-            _logger.LogError(ex, "[BookService] Error actualizando posici√≥n para libro ID: {BookId}", bookId);
+            _logger.LogError(ex, "[BookService] Error actualizando posiciÛn para libro ID: {BookId}", bookId);
         }
     }
 
@@ -276,7 +293,7 @@ public class BookService : IBookService
 
     public async Task UpdateAnnotationAsync(int bookId, int annotationId, string colorHex, string note)
     {
-        _logger.LogInformation("[BookService] Actualizando anotaci√≥n {AnnotationId} del libro {BookId}", annotationId, bookId);
+        _logger.LogInformation("[BookService] Actualizando anotaciÛn {AnnotationId} del libro {BookId}", annotationId, bookId);
         var payload = new { colorHex, note };
         var response = await _httpClient.PutAsJsonAsync($"api/Books/{bookId}/annotations/{annotationId}", payload);
         response.EnsureSuccessStatusCode();
@@ -284,7 +301,7 @@ public class BookService : IBookService
 
     public async Task DeleteAnnotationAsync(int bookId, int annotationId)
     {
-        _logger.LogInformation("[BookService] Eliminando anotaci√≥n {AnnotationId} del libro {BookId}", annotationId, bookId);
+        _logger.LogInformation("[BookService] Eliminando anotaciÛn {AnnotationId} del libro {BookId}", annotationId, bookId);
         var response = await _httpClient.DeleteAsync($"api/Books/{bookId}/annotations/{annotationId}");
         response.EnsureSuccessStatusCode();
     }

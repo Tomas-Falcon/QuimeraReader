@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -180,6 +180,32 @@ public class LibraryScanBackgroundService : BackgroundService
                             }
                             await dbContext.SaveChangesAsync(stoppingToken);
                         }
+                    }
+                    else
+                    {
+                        string orphansDir = Path.Combine(Directory.GetCurrentDirectory(), "Library", "Orphans");
+                        Directory.CreateDirectory(orphansDir);
+                        string fileName = Path.GetFileName(file);
+                        string orphanPath = Path.Combine(orphansDir, fileName);
+                        
+                        if (!leaveInPlace && file != orphanPath)
+                        {
+                            File.Move(file, orphanPath, true);
+                        }
+                        else if (file != orphanPath)
+                        {
+                            File.Copy(file, orphanPath, true);
+                        }
+
+                        var fileInfo = new FileInfo(orphanPath);
+                        dbContext.UnmatchedAudioTracks.Add(new UnmatchedAudioTrack 
+                        { 
+                            OriginalFileName = fileName, 
+                            PhysicalPath = orphanPath, 
+                            FileSizeBytes = fileInfo.Length, 
+                            UploadedAt = DateTime.UtcNow 
+                        });
+                        await dbContext.SaveChangesAsync(stoppingToken);
                     }
                 }
             }

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components;
 using QuimeraReader.Shared.Models;
 using QuimeraReader.Shared.Services;
 
@@ -65,6 +65,8 @@ public partial class SettingsPanel : ComponentBase
             if (settings.TryGetValue("WhisperModelPath", out var whisper)) _whisperModelPath = whisper;
             if (settings.TryGetValue("WhisperMode", out var wMode)) _whisperMode = wMode;
             if (settings.TryGetValue("OpenAIEndpoint", out var wEndpoint)) _openAiEndpoint = wEndpoint;
+
+            _isWhisperDownloaded = await SettingsService.CheckWhisperModelStatusAsync();
         }
         catch (Exception ex)
         {

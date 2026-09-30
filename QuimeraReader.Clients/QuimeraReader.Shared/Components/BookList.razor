@@ -345,8 +345,15 @@
     private IEnumerable<QuimeraReader.Shared.Models.Category> _availableCategories = Array.Empty<QuimeraReader.Shared.Models.Category>();
     private IEnumerable<int> _selectedCategories = new List<int>();
 
+    
+    private bool _isInitialized = false;
+
+    protected override bool ShouldRender() => _isInitialized;
+
     protected override async Task OnInitializedAsync()
     {
+        if (_isInitialized) return;
+
         try
         {
             _availableCategories = await BookService.GetCategoriesAsync();
@@ -386,6 +393,7 @@
         catch { }
 
         _ = PollNewBooksAsync();
+        _isInitialized = true;
     }
 
     protected override async Task OnParametersSetAsync()

@@ -109,11 +109,16 @@ public partial class BooksController : ControllerBase
     }
 
     [HttpGet("authors")]
-    public async Task<IActionResult> GetAuthors()
+    public async Task<IActionResult> GetAuthors([FromQuery] int limit = 5000, [FromQuery] int offset = 0)
     {
         try
         {
-            var authors = await _dbContext.Authors
+            var query = _dbContext.Authors
+                .Where(a => a.Name != null)
+                .GroupBy(a => a.Name)
+                .Select(g => g.OrderBy(a => a.Id).FirstOrDefault());
+
+            var authors = await query
                 .Select(a => new {
                     a.Id,
                     Name = a.Name ?? "Desconocido",
@@ -124,15 +129,11 @@ public partial class BooksController : ControllerBase
                                             .FirstOrDefault()
                 })
                 .OrderBy(a => a.Name)
+                .Skip(offset)
+                .Take(limit)
                 .ToListAsync();
-                
-            // Eliminar duplicados en memoria si la BD todavÃ­a tiene problemas
-            var uniqueAuthors = authors
-                .GroupBy(a => a.Name)
-                .Select(g => g.First())
-                .ToList();
 
-            return Ok(uniqueAuthors);
+            return Ok(authors);
         }
         catch (Exception ex)
         {
