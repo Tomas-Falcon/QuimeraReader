@@ -1,17 +1,21 @@
 ﻿@namespace QuimeraReader.Shared.Components.Layout
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 
-<RadzenPanelMenu Style="width:100%">
-    <RadzenPanelMenuItem Text="@TranslationService["Nav_Library"]" Icon="library_books" Path="" />
-    <RadzenPanelMenuItem Text="@TranslationService["Nav_Authors"]" Icon="people" Path="authors" />
-    <RadzenPanelMenuItem Text="@TranslationService["Nav_Genres"]" Icon="local_offer" Path="categories" />
-    <RadzenPanelMenuItem Text="@TranslationService["Nav_ReadBooks"]" Icon="check_circle" Path="read-books" />
-    <RadzenPanelMenuItem Text="@TranslationService["Nav_Settings"]" Icon="settings" Path="settings" />
-        <RadzenPanelMenuItem Text="Audios Huerfanos" Path="unmatched-audios" Icon="audio_file" />
-</RadzenPanelMenu>
+<div class="d-flex flex-column h-100 position-relative">
+    <div style="flex-grow: 1; overflow-y: auto;">
+        <RadzenPanelMenu Style="width:100%">
+            <RadzenPanelMenuItem Text="@TranslationService["Nav_Library"]" Icon="library_books" Path="" />
+            <RadzenPanelMenuItem Text="@TranslationService["Nav_Authors"]" Icon="people" Path="authors" />
+            <RadzenPanelMenuItem Text="@TranslationService["Nav_Genres"]" Icon="local_offer" Path="categories" />
+            <RadzenPanelMenuItem Text="@TranslationService["Nav_ReadBooks"]" Icon="check_circle" Path="read-books" />
+            <RadzenPanelMenuItem Text="@TranslationService["Nav_Settings"]" Icon="settings" Path="settings" />
+            <RadzenPanelMenuItem Text="Audios Huerfanos" Path="unmatched-audios" Icon="audio_file" />
+        </RadzenPanelMenu>
+    </div>
 
-<div class="px-3 pb-3 pt-3 text-muted mt-auto" style="font-size: 0.8rem; text-align: center; border-top: 1px solid var(--border-color); background-color: var(--bg-card); position: absolute; bottom: 0; width: 100%;">
-    v. @AppVersion
+    <div class="px-3 pb-3 pt-3 text-muted mt-auto" style="font-size: 0.8rem; text-align: center; border-top: 1px solid var(--border-color); background-color: var(--bg-card); width: 100%;">
+        v. @AppVersion
+    </div>
 </div>
 
 @code {
@@ -30,7 +34,7 @@
             {
                 var parts = informationalVersion.Split('+');
                 string hash = parts[1].Length >= 7 ? parts[1].Substring(0, 7) : parts[1];
-                AppVersion = $"{parts[0]} (dev-{hash})";
+                AppVersion = parts[0] + " (dev-" + hash + ")";
             }
             else
             {

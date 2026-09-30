@@ -865,7 +865,7 @@ main {
  } 
   
  /* Radzen Overrides */
-[data-theme=""dark""], :root {
+[data-theme="dark"], :root {
     --rz-base-background-color: var(--bg-main);
     --rz-panel-background-color: var(--bg-card);
     --rz-text-color: var(--text-main);
@@ -888,6 +888,24 @@ main {
     
     --rz-border-color: var(--border-color);
     --rz-border-radius: 8px;
+    
+    /* Contrast Fixes */
+    --rz-dialog-background-color: var(--bg-card);
+    --rz-dropdown-background-color: var(--bg-input);
+    --rz-dropdown-item-background-color: var(--bg-input);
+    --rz-dropdown-item-color: var(--text-main);
+    --rz-dropdown-item-hover-background-color: var(--bg-hover);
+    --rz-dropdown-item-hover-color: var(--text-main);
+    --rz-header-background-color: var(--bg-card);
+    --rz-sidebar-background-color: var(--bg-card);
+}
+
+[data-theme="light"] {
+    --rz-primary: #0d6efd;
+    --rz-primary-light: rgba(13, 110, 253, 0.2);
+    --rz-primary-dark: #0a58ca;
+    --rz-text-color: #212529;
+    --rz-secondary-text-color: #6c757d;
 }
 
 main { min-width: 0 !important; overflow-x: hidden !important; width: 100%; }

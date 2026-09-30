@@ -11,6 +11,10 @@
     <PackageReference Include="Blazor.Radzen.Theming" Version="10.4.7" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.5" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.5" PrivateAssets="all" />
+    <PackageReference Include="MinVer" Version="8.0.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Radzen.Blazor" Version="11.4.1" />
   </ItemGroup>
 

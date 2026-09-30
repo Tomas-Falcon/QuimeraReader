@@ -34,11 +34,20 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
             query = query.Where(b => b.ReadingStatus == request.ReadingStatus);
         }
 
-        if (!string.IsNullOrWhiteSpace(request.Search))
+                if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var s = request.Search.ToLower();
-            query = query.Where(b => b.Title.ToLower().Contains(s) || 
-                                     b.Authors.Any(a => a.Author!.Name.ToLower().Contains(s)) || b.Categories.Any(c => c.Category!.Name.ToLower().Contains(s)));
+            var s = request.Search.Trim();
+            if (!string.IsNullOrEmpty(s))
+            {
+                var ftsSearch = s + "*";
+                var ftsQuery = _dbContext.Books.FromSqlInterpolated($"SELECT b.* FROM Books b INNER JOIN BooksFTS fts ON b.Id = fts.rowid WHERE BooksFTS MATCH {ftsSearch}");
+                
+                // Unimos la busqueda FTS con el IQueryable original usando un join virtual o aplicando los filtros encima.
+                // Como FromSqlInterpolated devuelve un IQueryable, podemos seguir encadenando los filtros.
+                query = query.Where(b => ftsQuery.Select(f => f.Id).Contains(b.Id) || 
+                                         b.Authors.Any(a => a.Author!.Name.ToLower().Contains(s.ToLower())) || 
+                                         b.Categories.Any(c => c.Category!.Name.ToLower().Contains(s.ToLower())));
+            }
         }
 
         if (request.CategoryIds != null && request.CategoryIds.Any())
@@ -99,3 +108,4 @@ if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
         };
     }
 }
+
