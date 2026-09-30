@@ -1,4 +1,4 @@
-﻿using System.Threading.Channels;
+using System.Threading.Channels;
 
 namespace QuimeraReader.Infrastructure.Services;
 
@@ -11,7 +11,7 @@ public class AudioAlignmentQueue
         // Usamos Bounded channel por si acaso para no volar la RAM si se meten 1 millón de libros
         var options = new BoundedChannelOptions(10000)
         {
-            FullMode = BoundedChannelFullMode.Wait
+            FullMode = BoundedChannelFullMode.DropOldest
         };
         _queue = Channel.CreateBounded<int>(options);
     }

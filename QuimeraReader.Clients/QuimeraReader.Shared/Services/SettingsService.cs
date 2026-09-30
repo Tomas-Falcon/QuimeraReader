@@ -9,6 +9,7 @@ public interface ISettingsService
     Task<Dictionary<string, string>> GetSettingsAsync();
     Task SaveSettingAsync(SystemSetting setting);
     Task DownloadWhisperModelAsync();
+    Task<bool> CheckWhisperModelStatusAsync();
     Task RestartServerAsync();
     Task UpdateContainerAsync();
 }
@@ -69,6 +70,21 @@ public class SettingsService : ISettingsService
         }
     }
 
+    public async Task<bool> CheckWhisperModelStatusAsync()
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("api/Settings/whisper/status");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<System.Text.Json.Nodes.JsonObject>();
+                return result?["isDownloaded"]?.GetValue<bool>() ?? false;
+            }
+        }
+        catch { }
+        return false;
+    }
+
     public async Task RestartServerAsync()
     {
         try
@@ -82,6 +98,7 @@ public class SettingsService : ISettingsService
             throw;
         }
     }
+    
     public async Task UpdateContainerAsync()
     {
         try
@@ -96,3 +113,4 @@ public class SettingsService : ISettingsService
         }
     }
 }
+

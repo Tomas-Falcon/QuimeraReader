@@ -10,7 +10,7 @@
             </div>
             <div class="mb-3">
                 <RadzenLabel Text="Estado de lectura" />
-                <RadzenDropDown @bind-Value="_request.ReadingStatus" Data="@_readingStatuses" class="w-100" />
+                <RadzenDropDown @bind-Value="_request.ReadingStatus" Data="@_readingStatuses" TextProperty="Label" ValueProperty="Value" class="w-100" />
             </div>
             <div class="mb-3">
                 <RadzenLabel Text="Categorías" />

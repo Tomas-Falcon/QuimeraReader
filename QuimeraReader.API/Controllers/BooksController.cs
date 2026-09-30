@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Infrastructure;
 using QuimeraReader.Infrastructure.Services;
@@ -12,8 +12,58 @@ namespace QuimeraReader.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class BooksController : ControllerBase
+public partial class BooksController : ControllerBase
 {
+        [HttpDelete]
+    public async Task<IActionResult> DeleteBooks([FromQuery] int[] ids)
+    {
+        if (ids == null || ids.Length == 0) return BadRequest();
+        var books = await _dbContext.Books.Include(b => b.AudioTracks).Where(b => ids.Contains(b.Id)).ToListAsync();
+        if (books.Any()) {
+            await DeleteBooksInternalAsync(books);
+        }
+        return Ok();
+    }
+
+    [HttpDelete("authors")]
+    public async Task<IActionResult> DeleteAuthors([FromQuery] int[] ids)
+    {
+        if (ids == null || ids.Length == 0) return BadRequest();
+
+        var authors = await _dbContext.Authors.Where(a => ids.Contains(a.Id)).ToListAsync();
+        if (!authors.Any()) return Ok();
+
+        var books = await _dbContext.Books
+            .Include(b => b.AudioTracks)
+            .Where(b => b.Authors.Any(a => ids.Contains(a.AuthorId)))
+            .ToListAsync();
+
+        if (books.Any()) {
+            await DeleteBooksInternalAsync(books);
+        }
+
+        // Si quedaron autores vacios (por ej, subidos a mano) los borramos
+        var remainingAuthors = await _dbContext.Authors.Where(a => ids.Contains(a.Id)).ToListAsync();
+        if (remainingAuthors.Any())
+        {
+            _dbContext.Authors.RemoveRange(remainingAuthors);
+            await _dbContext.SaveChangesAsync();
+        }
+        return Ok();
+    }
+
+    [HttpDelete("categories")]
+    public async Task<IActionResult> DeleteCategories([FromQuery] int[] ids)
+    {
+        if (ids == null || ids.Length == 0) return BadRequest();
+
+        var categories = await _dbContext.Categories.Where(c => ids.Contains(c.Id)).ToListAsync();
+        if (!categories.Any()) return Ok();
+
+        _dbContext.Categories.RemoveRange(categories);
+        await _dbContext.SaveChangesAsync();
+        return Ok();
+    }
     private readonly AppDbContext _dbContext;
     private readonly EpubScannerService _scannerService;
     private readonly AudioAlignmentService _alignmentService;
@@ -59,11 +109,16 @@ public class BooksController : ControllerBase
     }
 
     [HttpGet("authors")]
-    public async Task<IActionResult> GetAuthors()
+    public async Task<IActionResult> GetAuthors([FromQuery] int limit = 5000, [FromQuery] int offset = 0)
     {
         try
         {
-            var authors = await _dbContext.Authors
+            var query = _dbContext.Authors
+                .Where(a => a.Name != null)
+                .GroupBy(a => a.Name)
+                .Select(g => g.OrderBy(a => a.Id).FirstOrDefault());
+
+            var authors = await query
                 .Select(a => new {
                     a.Id,
                     Name = a.Name ?? "Desconocido",
@@ -74,15 +129,11 @@ public class BooksController : ControllerBase
                                             .FirstOrDefault()
                 })
                 .OrderBy(a => a.Name)
+                .Skip(offset)
+                .Take(limit)
                 .ToListAsync();
-                
-            // Eliminar duplicados en memoria si la BD todavÃ­a tiene problemas
-            var uniqueAuthors = authors
-                .GroupBy(a => a.Name)
-                .Select(g => g.First())
-                .ToList();
 
-            return Ok(uniqueAuthors);
+            return Ok(authors);
         }
         catch (Exception ex)
         {
@@ -92,7 +143,7 @@ public class BooksController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null, [FromQuery] int[]? categoryIds = null)
+    public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null, [FromQuery] int[]? categoryIds = null, [FromQuery] string? readingStatus = null, [FromQuery] int? skip = null, [FromQuery] int? take = null)
     {
         try 
         {
@@ -101,8 +152,11 @@ public class BooksController : ControllerBase
             { 
                 Page = page, 
                 PageSize = pageSize, 
+                Skip = skip,
+                Take = take,
                 Search = search,
-                CategoryIds = categoryIds?.ToList() 
+                CategoryIds = categoryIds?.ToList(),
+                  ReadingStatus = readingStatus 
             });
             return Ok(result);
         }
@@ -120,6 +174,7 @@ public class BooksController : ControllerBase
             .Include(b => b.Authors).ThenInclude(ba => ba.Author)
             .Include(b => b.Categories).ThenInclude(bc => bc.Category)
             .Include(b => b.Series)
+            .Include(b => b.AudioTracks)
             .FirstOrDefaultAsync(b => b.Id == id);
 
         if (book == null) return NotFound();
@@ -137,6 +192,7 @@ public class BooksController : ControllerBase
             Series = book.Series != null ? book.Series.Name : null,
             Universe = book.Series != null && book.Series.Universe != null ? book.Series.Universe.Name : null,
             HasCover = !string.IsNullOrEmpty(book.CoverImagePath),
+            IsAvailableOffline = book.IsAvailableOffline,
             HasEpub = !string.IsNullOrEmpty(book.EpubFilePath),
             HasAudio = book.AudioTracks.Any(),
             IsAligned = book.ProcessingStatus == "SYNCED",
@@ -193,6 +249,7 @@ public class BooksController : ControllerBase
                 Authors = b.Authors.Select(a => a.Author!.Name).ToList(),
                 Categories = b.Categories.Select(c => c.Category!.Name).ToList(),
                 HasCover = !string.IsNullOrEmpty(b.CoverImagePath),
+                IsAvailableOffline = b.IsAvailableOffline,
                 HasEpub = !string.IsNullOrEmpty(b.EpubFilePath),
                 HasAudio = b.AudioTracks.Any(),
                 IsAligned = b.ProcessingStatus == "SYNCED",
@@ -409,6 +466,8 @@ public class BooksController : ControllerBase
     }
 
     [HttpPost("upload")]
+    [RequestSizeLimit(1073741824)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 1073741824)]
     public async Task<IActionResult> UploadEpub(IFormFile file)
     {
         if (file == null || file.Length == 0)
@@ -451,7 +510,13 @@ public class BooksController : ControllerBase
                         }
                     }
                 }
-                return BadRequest("El audio no pudo emparejarse con ningún libro de la biblioteca.");
+                string orphansDir = Path.Combine(Directory.GetCurrentDirectory(), "Library", "Orphans");
+                Directory.CreateDirectory(orphansDir);
+                string orphanPath = Path.Combine(orphansDir, file.FileName);
+                System.IO.File.Move(tempPath, orphanPath, true);
+                _dbContext.UnmatchedAudioTracks.Add(new UnmatchedAudioTrack { OriginalFileName = file.FileName, PhysicalPath = orphanPath, FileSizeBytes = file.Length, UploadedAt = DateTime.UtcNow });
+                await _dbContext.SaveChangesAsync();
+                return Ok(new { Message = "El audio fue guardado como huérfano porque no se encontró coincidencia." });
             }
 
             var scannerService = HttpContext.RequestServices.GetRequiredService<QuimeraReader.Infrastructure.Services.EpubScannerService>();
@@ -475,6 +540,7 @@ public class BooksController : ControllerBase
                 Title = book.Title,
                 HasEpub = !string.IsNullOrEmpty(book.EpubFilePath),
                 HasCover = !string.IsNullOrEmpty(book.CoverImagePath),
+            IsAvailableOffline = book.IsAvailableOffline,
                 HasAudio = book.AudioTracks != null && book.AudioTracks.Any(),
             });
         }
@@ -498,6 +564,8 @@ public class BooksController : ControllerBase
     }
 
     [HttpPost("{id}/audio")]
+    [RequestSizeLimit(1073741824)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 1073741824)]
     public async Task<IActionResult> UploadAudio(int id, IFormFile file)
     {
         if (file == null || file.Length == 0) return BadRequest("No se proporcionó ningún archivo de audio.");
@@ -571,7 +639,7 @@ public class BooksController : ControllerBase
         if (book.ReadingStatus != "Read") book.ReadingStatus = "Reading";
         if (request.CurrentEpubCfi != null) book.CurrentEpubCfi = request.CurrentEpubCfi;
         if (request.CurrentAudioPosition.HasValue) book.CurrentAudioPosition = request.CurrentAudioPosition;
-            book.CurrentAudioTrackNumber = request.CurrentAudioTrackNumber;
+        if (request.CurrentAudioTrackNumber.HasValue) book.CurrentAudioTrackNumber = request.CurrentAudioTrackNumber;
         if (request.PercentageCompleted.HasValue) book.PercentageCompleted = request.PercentageCompleted;
 
         if (book.AudioTracks.Any() && 
@@ -641,7 +709,7 @@ public class BooksController : ControllerBase
         
         if (!book.AudioTracks.Any())
         {
-            await DeleteBookEntityAndFoldersAsync(book);
+            await DeleteBooksInternalAsync(new List<Book> { book });
         }
         else 
         {
@@ -667,7 +735,7 @@ public class BooksController : ControllerBase
         
         if (string.IsNullOrEmpty(book.EpubFilePath))
         {
-            await DeleteBookEntityAndFoldersAsync(book);
+            await DeleteBooksInternalAsync(new List<Book> { book });
         }
         else
         {
@@ -684,7 +752,32 @@ public class BooksController : ControllerBase
         else if (!string.IsNullOrEmpty(book.EpubFilePath)) bookDir = Path.GetDirectoryName(book.EpubFilePath);
         else if (book.AudioTracks != null && book.AudioTracks.Any()) bookDir = Path.GetDirectoryName(book.AudioTracks.First().FilePath);
 
+                var authorIds = await _dbContext.Books.Where(b => b.Id == book.Id).SelectMany(b => b.Authors.Select(a => a.AuthorId)).ToListAsync();
+        var categoryIds = await _dbContext.Books.Where(b => b.Id == book.Id).SelectMany(b => b.Categories.Select(c => c.CategoryId)).ToListAsync();
+        
         _dbContext.Books.Remove(book);
+        await _dbContext.SaveChangesAsync();
+
+        // Limpieza de huérfanos
+        foreach(var authorId in authorIds)
+        {
+            bool authorHasMoreBooks = await _dbContext.Books.AnyAsync(b => b.Authors.Any(a => a.AuthorId == authorId));
+            if (!authorHasMoreBooks)
+            {
+                var author = await _dbContext.Authors.FindAsync(authorId);
+                if (author != null) _dbContext.Authors.Remove(author);
+            }
+        }
+
+        foreach(var catId in categoryIds)
+        {
+            bool catHasMoreBooks = await _dbContext.Books.AnyAsync(b => b.Categories.Any(c => c.CategoryId == catId));
+            if (!catHasMoreBooks)
+            {
+                var cat = await _dbContext.Categories.FindAsync(catId);
+                if (cat != null) _dbContext.Categories.Remove(cat);
+            }
+        }
         await _dbContext.SaveChangesAsync();
         await CleanupOrphansAsync();
 
@@ -752,6 +845,12 @@ public class BooksController : ControllerBase
         var book = await _dbContext.Books.Include(b => b.Categories).ThenInclude(bc => bc.Category).FirstOrDefaultAsync(b => b.Id == bookId);
         if (book == null) return NotFound();
 
+                if (book.ReadingStatus != request.ReadingStatus && 
+           (request.ReadingStatus == "Reading" || request.ReadingStatus == "NextToRead" || request.ReadingStatus == "Read"))
+        {
+            book.LastReadAt = DateTime.UtcNow;
+        }
+        
         book.Title = request.Title;
         book.ReadingStatus = request.ReadingStatus;
         
@@ -822,6 +921,78 @@ public class BooksController : ControllerBase
         book.EpubLocationsCache = locationsJson;
         await _dbContext.SaveChangesAsync();
         return Ok();
+    }
+
+    [HttpPut("{id}/offline")]
+    public async Task<IActionResult> ToggleOfflineAvailability(int id, [FromQuery] bool isAvailable)
+    {
+        var book = await _dbContext.Books.FindAsync(id);
+        if (book == null) return NotFound();
+
+        book.IsAvailableOffline = isAvailable;
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(new { book.Id, book.IsAvailableOffline });
+    }
+
+    [HttpPost("{id}/annotations")]
+    public async Task<IActionResult> CreateAnnotation(int id, [FromBody] QuimeraReader.Domain.Entities.BookAnnotation annotation)
+    {
+        var book = await _dbContext.Books.FindAsync(id);
+        if (book == null) return NotFound();
+
+        annotation.BookId = id;
+        annotation.CreatedAt = DateTime.UtcNow;
+        
+        _dbContext.BookAnnotations.Add(annotation);
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(annotation);
+    }
+
+    [HttpGet("{id}/annotations")]
+    public async Task<IActionResult> GetAnnotations(int id)
+    {
+        var annotations = await _dbContext.BookAnnotations
+            .Where(a => a.BookId == id)
+            .OrderBy(a => a.CreatedAt)
+            .Select(a => new
+            {
+                a.Id,
+                a.CfiRange,
+                a.SelectedText,
+                a.ColorHex,
+                a.Note,
+                a.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(annotations);
+    }
+
+    [HttpPut("{id}/annotations/{annotationId}")]
+    public async Task<IActionResult> UpdateAnnotation(int id, int annotationId, [FromBody] QuimeraReader.Domain.Entities.BookAnnotation updatedAnnotation)
+    {
+        var annotation = await _dbContext.BookAnnotations.FirstOrDefaultAsync(a => a.Id == annotationId && a.BookId == id);
+        if (annotation == null) return NotFound();
+
+        annotation.Note = updatedAnnotation.Note;
+        annotation.ColorHex = updatedAnnotation.ColorHex;
+        
+        await _dbContext.SaveChangesAsync();
+        return Ok(annotation);
+    }
+
+    [HttpDelete("{id}/annotations/{annotationId}")]
+    public async Task<IActionResult> DeleteAnnotation(int id, int annotationId)
+    {
+        var annotation = await _dbContext.BookAnnotations.FirstOrDefaultAsync(a => a.Id == annotationId && a.BookId == id);
+        if (annotation == null) return NotFound();
+
+        _dbContext.BookAnnotations.Remove(annotation);
+        await _dbContext.SaveChangesAsync();
+        
+        return NoContent();
     }
 }
 public class ScanRequest 

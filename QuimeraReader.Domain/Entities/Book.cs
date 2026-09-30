@@ -40,5 +40,7 @@ public class Book
     public ICollection<BookAuthor> Authors { get; set; } = new List<BookAuthor>();
     public ICollection<BookCategory> Categories { get; set; } = new List<BookCategory>();
     public ICollection<BookAudioTrack> AudioTracks { get; set; } = new List<BookAudioTrack>();
+        public ICollection<BookAnnotation> Annotations { get; set; } = new List<BookAnnotation>();
+        public bool IsAvailableOffline { get; set; } = false;
     public SyncMap? SyncMap { get; set; }
 }

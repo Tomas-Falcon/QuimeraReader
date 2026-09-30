@@ -2,21 +2,22 @@
 @using QuimeraReader.Shared.Services
 @using Radzen
 @using Radzen.Blazor
-@implements IDisposable
+@implements IAsyncDisposable
 @inject QuimeraReader.Shared.Services.IBookService BookService
 @inject QuimeraReader.Shared.Services.IScanService ScanService
 @inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject ToastService ToastService
+@inject Radzen.DialogService _dialogService
 @inject IJSRuntime JSRuntime
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @namespace QuimeraReader.Shared.Components
 
-<div class="library-container">
+<div class="library-container" style="height: calc(100vh - 120px); overflow-y: auto; overflow-x: hidden;">
     <div class="library-toolbar d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3 mb-4">
         <div class="search-box w-100" style="max-width: 500px;">
-            <RadzenTextBox Placeholder="Buscar libros, autores..." Value="@_searchQuery" Change="OnSearchInput" class="w-100" />
+            <RadzenTextBox Placeholder="Buscar libros, autores..." @bind-Value="@_searchQuery" @oninput="@(args => OnSearchInput(args.Value?.ToString() ?? string.Empty))" class="w-100" />
         </div>
-        <div class="filters d-flex flex-wrap gap-2 align-items-center w-100">
+        <div class="filters d-flex flex-column flex-sm-row flex-wrap gap-2 align-items-stretch align-items-sm-center w-100">
             @if (_selectionMode)
             {
                                 <span class="text-primary fw-bold me-2">@_selectedBookIds.Count seleccionados</span>
@@ -33,7 +34,7 @@
                 }
                 <label class="rz-button rz-button-md rz-variant-filled rz-primary rz-shade-default m-0 d-flex align-items-center gap-2" style="cursor: pointer;">
                     <RadzenIcon Icon="cloud_upload" /> Subir EPUB
-                    <InputFile OnChange="HandleFileUpload" accept=".epub" class="d-none" multiple />
+                    <InputFile OnChange="HandleFileUpload" accept=".epub,.mp3,.m4b,.m4a,.wav" class="d-none" multiple />
                 </label>
                                 <RadzenDropDown Multiple="true" Placeholder="Categorías" Data="@_availableCategories" TextProperty="Name" ValueProperty="Id" @bind-Value="_selectedCategories"  Style="min-width: 200px; max-width: 100%;" AllowClear="true" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
                 <RadzenDropDown TValue="string" Data="@_sortOptions" @bind-Value="_selectedSort" Style="width: auto;" />
@@ -51,6 +52,12 @@
                 {
                     <div class="netflix-item"><BookCard Book="book" /></div>
                 }
+                @if (_hasMoreReading)
+                {
+                    <div @ref="_loadMoreReadingElement" class="netflix-item d-flex align-items-center justify-content-center" style="width: 100px;">
+                        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Medium" />
+                    </div>
+                }
             </div>
         }
 
@@ -62,6 +69,12 @@
                 {
                     <div class="netflix-item"><BookCard Book="book" /></div>
                 }
+                @if (_hasMoreNextToRead)
+                {
+                    <div @ref="_loadMoreNextToReadElement" class="netflix-item d-flex align-items-center justify-content-center" style="width: 100px;">
+                        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Medium" />
+                    </div>
+                }
             </div>
         }
                 @if (_readBooks != null && _readBooks.Any())
@@ -71,6 +84,12 @@
                 @foreach (var book in _readBooks)
                 {
                     <div class="netflix-item"><BookCard Book="book" /></div>
+                }
+                @if (_hasMoreRead)
+                {
+                    <div @ref="_loadMoreReadElement" class="netflix-item d-flex align-items-center justify-content-center" style="width: 100px;">
+                        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Medium" />
+                    </div>
                 }
             </div>
         }
@@ -88,7 +107,7 @@
 
     <h3 class="rz-color-primary rz-mt-4 mb-3">@(string.IsNullOrWhiteSpace(_searchQuery) ? TranslationService["Library_AllBooks"] : TranslationService["Library_SearchResults"])</h3>
     
-    @if (_books.Count == 0 && !_isLoading)
+    @if (false)
     {
         <div class="text-center p-5">
             <RadzenIcon Icon="library_books" Style="font-size: 3rem; color: var(--rz-text-disabled-color);" />
@@ -97,27 +116,39 @@
     }
     else
     {
-        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-5 g-4">
-            @foreach (var book in _books)
-            {
-                <div class="col"><BookCard Book="book" SelectionMode="_selectionMode" IsSelected="_selectedBookIds.Contains(book.Id)" IsSelectedChanged="@(isSelected => OnBookSelectionChanged(book.Id, isSelected))" /></div>
-            }
-        </div>
-        
-        @if (_hasMore)
-        {
-            <div @ref="_loadMoreElement" class="load-more-trigger mt-4 text-center p-3">
-                @if (_isLoading)
-                {
-                    <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Medium" />
-                }
-            </div>
-        }
+        <Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize ItemsProvider="ProvideBookChunks" Context="chunk" OverscanCount="3" @ref="_virtualizeComponent">
+            <ItemContent>
+                <div class="row m-0 row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-4 row-cols-xl-5 g-4 mb-4">
+                    @foreach (var book in chunk)
+                    {
+                        <div class="col">
+                            <BookCard Book="book" SelectionMode="_selectionMode" IsSelected="_selectedBookIds.Contains(book.Id)" IsSelectedChanged="@(isSelected => OnBookSelectionChanged(book.Id, isSelected))" />
+                        </div>
+                    }
+                </div>
+            </ItemContent>
+            <Placeholder>
+                <div class="row m-0 row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-4 row-cols-xl-5 g-4 mb-4">
+                    @for (int i = 0; i < 5; i++)
+                    {
+                        <div class="col">
+                            <div style="height: 350px; background: var(--bg-card); border-radius: 8px; opacity: 0.5;"></div>
+                        </div>
+                    }
+                </div>
+            </Placeholder>
+        </Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize>
     }
 </div>
 
 <style>
+    .library-container {
+        max-width: 100%;
+        overflow-x: hidden;
+    }
     .netflix-row {
+        width: 100%;
+        box-sizing: border-box;
         display: flex;
         overflow-x: auto;
         scroll-snap-type: x mandatory;
@@ -146,16 +177,51 @@
     [Parameter]
     public string? QueryParam { get; set; }
 
-    private List<Book> _books = new();
+    private Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize<List<Book>> _virtualizeComponent;
+
+    private async ValueTask<Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderResult<List<Book>>> ProvideBookChunks(Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderRequest request)
+    {
+        int chunkSize = 5;
+        int skip = request.StartIndex * chunkSize;
+        int take = request.Count * chunkSize;
+
+        var result = await BookService.GetBooksAsync(1, 50, _searchQuery, _selectedCategories?.ToArray(), null, skip, take);
+        var totalChunks = (int)Math.Ceiling((double)result.Total / chunkSize);
+
+        var chunks = new List<List<Book>>();
+        for (int i = 0; i < result.Data.Length; i += chunkSize)
+        {
+            chunks.Add(result.Data.Skip(i).Take(chunkSize).ToList());
+        }
+
+        return new Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderResult<List<Book>>(chunks, totalChunks);
+    }
+
+    
+    // Pagination fields for carousels
+    private List<Book> _readingBooks = new();
+    private int _readingPage = 1;
+    private bool _hasMoreReading = false;
+    private bool _isLoadingReading = false;
+    private ElementReference _loadMoreReadingElement;
+    private bool _readingScrollInitialized = false;
+
+    private List<Book> _nextToReadBooks = new();
+    private int _nextToReadPage = 1;
+    private bool _hasMoreNextToRead = false;
+    private bool _isLoadingNextToRead = false;
+    private ElementReference _loadMoreNextToReadElement;
+    private bool _nextToReadScrollInitialized = false;
+
+    private List<Book> _readBooks = new();
+    private int _readPage = 1;
+    private bool _hasMoreRead = false;
+    private bool _isLoadingRead = false;
+    private ElementReference _loadMoreReadElement;
+    private bool _readScrollInitialized = false;
     private IEnumerable<Book> _recommendations = Array.Empty<Book>();
-    private IEnumerable<Book> _readBooks = Array.Empty<Book>();
-    private IEnumerable<Book> _readingBooks = Array.Empty<Book>();
-    private ElementReference _loadMoreElement;
     private DotNetObjectReference<BookList>? _objRef;
     
-    private int _currentPage = 1;
-    private bool _isLoading = false;
-    private bool _hasMore = true;
     private bool _isUploading = false;
     private CancellationTokenSource _cts = new();
     
@@ -184,7 +250,7 @@
             await BookService.BulkUpdateStatusAsync(_selectedBookIds.ToList(), status);
             ToastService.ShowSuccess("Libros actualizados");
             ToggleSelectionMode();
-            await LoadBooksAsync(); // Reload
+            if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync(); // Reload
         }
         catch(Exception ex)
         {
@@ -213,23 +279,27 @@
     {
         if (_selectedBookIds.Count == 0) return;
         
-        foreach (var id in _selectedBookIds.ToList())
+        var result = await _dialogService.Confirm(
+            $"ATENCION! Vas a borrar {_selectedBookIds.Count} libros. Esta accion ELIMINARA PERMANENTEMENTE los archivos fisicos (EPUBs, audios, portadas).", 
+            "Eliminar Libros", 
+            new ConfirmOptions() { OkButtonText = "Si, ELIMINAR", CancelButtonText = "Cancelar" });
+
+        if (result == true)
         {
             try
             {
-                await BookService.DeleteEpubAsync(id);
-                _books.RemoveAll(b => b.Id == id);
+                await BookService.DeleteBooksAsync(_selectedBookIds.ToArray());
+                _selectedBookIds.Clear();
+                _selectionMode = false;
+                ToastService.ShowSuccess("Libros borrados correctamente de forma permanente");
+                if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync(); 
+                StateHasChanged();
             }
             catch (Exception ex)
             {
-                ToastService.ShowError($"Error al borrar libro {id}: {ex.Message}");
+                ToastService.ShowError($"Error al borrar libros: {ex.Message}");
             }
         }
-        
-        _selectedBookIds.Clear();
-        _selectionMode = false;
-        ToastService.ShowSuccess("Libros borrados correctamente");
-        StateHasChanged();
     }
 
     private async Task HandleFileUpload(InputFileChangeEventArgs e)
@@ -247,7 +317,7 @@
             {
                 try
                 {
-                    await BookService.UploadEpubAsync(file.OpenReadStream(maxAllowedSize: 104857600), file.Name);
+                    await BookService.UploadEpubAsync(file.OpenReadStream(maxAllowedSize: 1073741824), file.Name);
                     successCount++;
                 }
                 catch (Exception fileEx)
@@ -259,10 +329,7 @@
             if (successCount > 0)
             {
                 ToastService.ShowSuccess($"{successCount} libro(s) subido(s) correctamente!");
-                _currentPage = 1;
-                _hasMore = true;
-                _books.Clear();
-                await LoadBooksAsync();
+                                if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
             }
         }
         catch (Exception ex)
@@ -277,10 +344,16 @@
     }
     private IEnumerable<QuimeraReader.Shared.Models.Category> _availableCategories = Array.Empty<QuimeraReader.Shared.Models.Category>();
     private IEnumerable<int> _selectedCategories = new List<int>();
-    private IEnumerable<QuimeraReader.Shared.Models.Book> _nextToReadBooks = Array.Empty<QuimeraReader.Shared.Models.Book>();
+
+    
+    private bool _isInitialized = false;
+
+    protected override bool ShouldRender() => _isInitialized;
 
     protected override async Task OnInitializedAsync()
     {
+        if (_isInitialized) return;
+
         try
         {
             _availableCategories = await BookService.GetCategoriesAsync();
@@ -293,12 +366,8 @@
         _debounceTimer.AutoReset = false;
         _debounceTimer.Elapsed += async (sender, args) =>
         {
-            _currentPage = 1;
-            _hasMore = true;
-            _books.Clear();
             await InvokeAsync(async () => {
-                await LoadBooksAsync();
-                StateHasChanged();
+                if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync(); StateHasChanged();
             });
         };
         
@@ -306,14 +375,25 @@
         
         try
         {
-            var initialBooks = await BookService.GetBooksAsync(1, 1000, "");
-            _readingBooks = initialBooks.Data.Where(b => b.ReadingStatus == "Reading" || (b.PercentageCompleted > 0 && b.PercentageCompleted < 100) || (!string.IsNullOrEmpty(b.CurrentEpubCfi) && b.PercentageCompleted != 100 && b.ReadingStatus != "Read")).OrderByDescending(b => b.LastReadAt).Take(30).ToList();
-                        _nextToReadBooks = initialBooks.Data.Where(b => b.ReadingStatus == "NextToRead").OrderByDescending(b => b.LastReadAt).Take(30).ToList();
-            _readBooks = initialBooks.Data.Where(b => b.ReadingStatus == "Read").OrderByDescending(b => b.LastReadAt).Take(30).ToList();
+            var readingTask = BookService.GetBooksAsync(1, 20, "", readingStatus: "Reading");
+            var nextToReadTask = BookService.GetBooksAsync(1, 20, "", readingStatus: "NextToRead");
+            var readTask = BookService.GetBooksAsync(1, 20, "", readingStatus: "Read");
+            
+            await Task.WhenAll(readingTask, nextToReadTask, readTask);
+            
+            _readingBooks = readingTask.Result?.Data?.ToList() ?? new List<Book>();
+            _hasMoreReading = readingTask.Result?.Data?.Length >= 20;
+
+            _nextToReadBooks = nextToReadTask.Result?.Data?.ToList() ?? new List<Book>();
+            _hasMoreNextToRead = nextToReadTask.Result?.Data?.Length >= 20;
+
+            _readBooks = readTask.Result?.Data?.ToList() ?? new List<Book>();
+            _hasMoreRead = readTask.Result?.Data?.Length >= 20;
         }
         catch { }
 
         _ = PollNewBooksAsync();
+        _isInitialized = true;
     }
 
     protected override async Task OnParametersSetAsync()
@@ -321,21 +401,17 @@
         if (!string.IsNullOrWhiteSpace(QueryParam) && QueryParam != _searchQuery)
         {
             _searchQuery = QueryParam;
-            _currentPage = 1;
-            _hasMore = true;
-            _books.Clear();
-            await LoadBooksAsync();
+            if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
         }
-        else if (string.IsNullOrWhiteSpace(QueryParam) && _books.Count == 0 && !_isLoading)
+        else if (string.IsNullOrWhiteSpace(QueryParam) && _virtualizeComponent != null)
         {
-            await LoadBooksAsync();
+            // await _virtualizeComponent.RefreshDataAsync();
         }
     }
 
         private async Task OnCategoryChanged(object value)
     {
-        _currentPage = 1;
-        await LoadBooksAsync();
+        if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
     }
 
     private void OnSearchInput(string value)
@@ -350,25 +426,82 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_hasMore && _loadMoreElement.Id != null)
+        try
         {
-            try
+            
+
+            if (_hasMoreReading && _loadMoreReadingElement.Id != null && !_readingScrollInitialized)
             {
-                await JSRuntime.InvokeVoidAsync("infiniteScroll.initialize", _loadMoreElement, _objRef);
+                await JSRuntime.InvokeVoidAsync("infiniteScroll.initialize", _loadMoreReadingElement, _objRef, "LoadMoreReadingRequested");
+                _readingScrollInitialized = true;
             }
-            catch { }
+            if (_hasMoreNextToRead && _loadMoreNextToReadElement.Id != null && !_nextToReadScrollInitialized)
+            {
+                await JSRuntime.InvokeVoidAsync("infiniteScroll.initialize", _loadMoreNextToReadElement, _objRef, "LoadMoreNextToReadRequested");
+                _nextToReadScrollInitialized = true;
+            }
+            if (_hasMoreRead && _loadMoreReadElement.Id != null && !_readScrollInitialized)
+            {
+                await JSRuntime.InvokeVoidAsync("infiniteScroll.initialize", _loadMoreReadElement, _objRef, "LoadMoreReadRequested");
+                _readScrollInitialized = true;
+            }
         }
+        catch { }
+    }
+
+
+    [JSInvokable]
+    public async Task LoadMoreReadingRequested()
+    {
+        if (_isLoadingReading || !_hasMoreReading) return;
+        _isLoadingReading = true; StateHasChanged();
+        try
+        {
+            _readingPage++;
+            var result = await BookService.GetBooksAsync(_readingPage, 20, "", readingStatus: "Reading");
+            if (result.Data.Length > 0) _readingBooks.AddRange(result.Data);
+            _hasMoreReading = result.Data.Length >= 20;
+            _readingScrollInitialized = false; // re-init on next render if needed
+        }
+        catch { }
+        finally { _isLoadingReading = false; StateHasChanged(); }
     }
 
     [JSInvokable]
-    public async Task LoadMoreRequested()
+    public async Task LoadMoreNextToReadRequested()
     {
-        if (!_isLoading && _hasMore)
+        if (_isLoadingNextToRead || !_hasMoreNextToRead) return;
+        _isLoadingNextToRead = true; StateHasChanged();
+        try
         {
-            await LoadMoreAsync();
-            StateHasChanged();
+            _nextToReadPage++;
+            var result = await BookService.GetBooksAsync(_nextToReadPage, 20, "", readingStatus: "NextToRead");
+            if (result.Data.Length > 0) _nextToReadBooks.AddRange(result.Data);
+            _hasMoreNextToRead = result.Data.Length >= 20;
+            _nextToReadScrollInitialized = false;
         }
+        catch { }
+        finally { _isLoadingNextToRead = false; StateHasChanged(); }
     }
+
+    [JSInvokable]
+    public async Task LoadMoreReadRequested()
+    {
+        if (_isLoadingRead || !_hasMoreRead) return;
+        _isLoadingRead = true; StateHasChanged();
+        try
+        {
+            _readPage++;
+            var result = await BookService.GetBooksAsync(_readPage, 20, "", readingStatus: "Read");
+            if (result.Data.Length > 0) _readBooks.AddRange(result.Data);
+            _hasMoreRead = result.Data.Length >= 20;
+            _readScrollInitialized = false;
+        }
+        catch { }
+        finally { _isLoadingRead = false; StateHasChanged(); }
+    }
+
+
 
     private async Task PollNewBooksAsync()
     {
@@ -377,74 +510,28 @@
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
             while (await timer.WaitForNextTickAsync(_cts.Token))
             {
-                if (!string.IsNullOrWhiteSpace(_searchQuery)) continue;
-                
-                if (_books.Count > 0 && _currentPage > 1)
+                // We could poll to check for new books, but Virtualize handles its own data loading.
+                // We'll just refresh it periodically if not searching.
+                if (string.IsNullOrWhiteSpace(_searchQuery) && _virtualizeComponent != null)
                 {
-                    try
-                    {
-                        var result = await BookService.GetBooksAsync(1, 1);
-                        if (result.Data.Length > 0 && result.Data[0].Id > _books[0].Id)
-                        {
-                            _currentPage = 1;
-                            _hasMore = true;
-                            _books.Clear();
-                            await LoadBooksAsync();
-                        }
-                    }
-                    catch { }
+                    // For performance, we shouldn't force refresh every 10s if user is scrolling. 
+                    // Let's omit aggressive polling for the virtualized list.
                 }
             }
         }
         catch (OperationCanceledException) { }
     }
 
-    private async Task LoadBooksAsync()
-    {
-        if (_isLoading || !_hasMore) return;
 
-        _isLoading = true;
-        StateHasChanged();
 
-        try
-        {
-            var result = await BookService.GetBooksAsync(_currentPage, 20, _searchQuery, _selectedCategories?.ToArray());
-            
-            if (result.Data.Length > 0)
-            {
-                _books.AddRange(result.Data);
-                _currentPage++;
-                
-                if (result.Data.Length < 20)
-                {
-                    _hasMore = false;
-                }
-            }
-            else
-            {
-                _hasMore = false;
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error cargando libros: {ex.Message}");
-        }
-        finally
-        {
-            _isLoading = false;
-            StateHasChanged();
-        }
-    }
-
-    private async Task LoadMoreAsync()
-    {
-        await LoadBooksAsync();
-    }
-
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         _cts.Cancel();
         _cts.Dispose();
+        _debounceTimer?.Stop();
+        _debounceTimer?.Dispose();
+        try { await JSRuntime.InvokeVoidAsync("infiniteScroll.cleanup"); } catch { }
         _objRef?.Dispose();
     }
 }
+

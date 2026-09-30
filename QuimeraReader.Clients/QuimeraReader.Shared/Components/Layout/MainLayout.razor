@@ -1,6 +1,10 @@
 ﻿@inherits LayoutComponentBase
+@inject QuimeraReader.Shared.Interfaces.INetworkStateService NetworkStateService
+@implements IDisposable
+
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @inject IJSRuntime JSRuntime
+@inject IServiceProvider ServiceProvider
 @inject QuimeraReader.Shared.Services.IServerConfigService ServerConfig
 @inject NavigationManager NavManager
 @inject QuimeraReader.Shared.Services.IBookService BookService
@@ -21,73 +25,66 @@
         </div>
     </div>
 }
+else if (!_isLoaded)
+{
+    <div class="d-flex justify-content-center align-items-center vh-100" style="background-color: var(--bg-body); color: var(--text-color);">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
+}
 else
 {
-<div class="page @(IsReadingMode ? "reading-mode" : "")">
-    @if (!IsReadingMode)
-    {
-        <div class="sidebar">
-            <NavMenu />
-        </div>
-    }
-
-    <main class="@(IsReadingMode ? "p-0" : "")">
+    <RadzenLayout Style="grid-template-areas: 'rz-header rz-header' 'rz-sidebar rz-body';">
         @if (!IsReadingMode)
         {
-            <div class="top-row px-4 py-2" style="justify-content: flex-end; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--border-color); background-color: var(--bg-card);">
+            <!-- Add pt-safe to give space for mobile status bar -->
+            <RadzenHeader style="border-bottom: 1px solid var(--border-color); background-color: var(--bg-card); display: flex; align-items: center; justify-content: space-between; padding: 0 1rem; min-height: 60px;">
+                <div class="d-flex align-items-center">
+                    <RadzenSidebarToggle Click="@(() => _sidebarExpanded = !_sidebarExpanded)" />
+                    <span class="ms-2 fw-bold" style="font-size: 1.2rem;">QuimeraReader</span>
+                </div>
                 
-                @if (_scanStatus != null && _scanStatus.IsScanning)
-                {
-                    <div class="d-flex align-items-center gap-2 me-auto ms-2 text-primary fw-bold pulse-animation">
-                        <div class="spinner-grow spinner-grow-sm text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    @if (_scanStatus != null && _scanStatus.IsScanning)
+                    {
+                        <div class="d-flex align-items-center gap-2 d-none d-md-flex text-primary fw-bold pulse-animation">
+                            <div class="spinner-grow spinner-grow-sm text-primary" role="status"></div>
+                            <span style="font-size: 0.9rem;">@(_scanStatus.TotalFilesFound > 0 ? $"{(_scanStatus.FilesProcessed * 100) / _scanStatus.TotalFilesFound}%" : "...")</span>
                         </div>
-                        <span style="font-size: 0.9rem;">Analizando biblioteca... @(_scanStatus.TotalFilesFound > 0 ? $"{(_scanStatus.FilesProcessed * 100) / _scanStatus.TotalFilesFound}%" : "")</span>
-                    </div>
-                }
+                    }
 
-                                <Radzen.Blazor.RadzenDropDown TValue="string" Value="@_currentLang" Data="@_languages" ValueProperty="Code" TextProperty="Name" Change="OnLanguageChanged" Style="width: 130px;" />
-                <button class="btn btn-outline-secondary metadata-btn" @onclick="FetchMissingMetadata" disabled="@_isFetchingMetadata" style="border-radius: 20px; display: flex; align-items: center; gap: 6px;">
-                    @if (_isFetchingMetadata)
-                    {
-                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                        <span>Buscando...</span>
-                    }
-                    else
-                    {
-                        <span class="bi bi-cloud-download" aria-hidden="true"></span> <span>Metadatos</span>
-                    }
-                </button>
+                    <RadzenDropDown TValue="string" Value="@_currentLang" Data="@_languages" ValueProperty="Code" TextProperty="Name" Change="OnLanguageChanged" Style="width: 110px;" />
+                    
+                    <RadzenButton Icon="cloud_download" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Size="ButtonSize.Small" Click="FetchMissingMetadata" IsBusy="@_isFetchingMetadata" title="Metadatos" />
 
-                <button class="btn btn-outline-primary theme-toggle" @onclick="ToggleThemeAsync" style="border-radius: 20px; display: flex; align-items: center; gap: 6px;">
-                    @if (isDarkTheme)
-                    {
-                        <span class="bi bi-moon-fill" aria-hidden="true"></span> <span>Modo Oscuro</span>
-                    }
-                    else
-                    {
-                        <span class="bi bi-sun-fill" aria-hidden="true"></span> <span>Modo Claro</span>
-                    }
-                </button>
-            </div>
+                    <RadzenButton Icon="@(isDarkTheme ? "light_mode" : "dark_mode")" ButtonStyle="ButtonStyle.Primary" Variant="Variant.Outlined" Size="ButtonSize.Small" Click="ToggleThemeAsync" title="Tema" />
+                </div>
+            </RadzenHeader>
+
+            <RadzenSidebar @bind-Expanded="@_sidebarExpanded" style="background-color: var(--bg-card); border-right: 1px solid var(--border-color);">
+                <NavMenu />
+            </RadzenSidebar>
         }
 
-        <article class="content @(IsReadingMode ? "p-0 m-0" : "px-4 mt-3")">
+        <RadzenBody class="@(IsReadingMode ? "p-0" : "p-4")">
             @Body
-        </article>
-    </main>
-</div>
-<QuimeraReader.Shared.Components.ToastContainer />
-<Radzen.Blazor.RadzenDialog />
+        </RadzenBody>
+    </RadzenLayout>
+
+    <QuimeraReader.Shared.Components.ToastContainer />
+    <RadzenDialog />
 }
 
 @code {
+    private bool _sidebarExpanded = true; private bool _isMobile = false;
     private bool isDarkTheme = true;
+    private bool _isLoaded = false;
     private string _currentLang = "es";
     private List<dynamic> _languages = new List<dynamic>
     {
-        new { Code = "es", Name = "Español" },
-        new { Code = "en", Name = "English" }
+        new { Code = "es", Name = "ES" },
+        new { Code = "en", Name = "EN" }
     };
 
     private async Task OnLanguageChanged(object value)
@@ -107,10 +104,30 @@ else
 
     protected override void OnInitialized()
     {
-        NavManager.LocationChanged += (s, e) => StateHasChanged();
+        NetworkStateService.OnNetworkStateChanged += HandleNetworkChange;
+        _ = NetworkStateService.InitializeAsync();
+
+        NavManager.LocationChanged += (s, e) => { if (_isMobile) _sidebarExpanded = false; StateHasChanged(); };
         if (!ServerConfig.NeedsConfiguration)
         {
             _ = PollScanStatusAsync();
+        }
+        
+        var worker = (QuimeraReader.Shared.Interfaces.IOfflineSyncWorker?)ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.IOfflineSyncWorker));
+        if (worker != null) {
+            _ = worker.SyncNowAsync();
+        }
+    }
+
+    private void HandleNetworkChange()
+    {
+        InvokeAsync(StateHasChanged);
+        if (!NetworkStateService.IsOffline)
+        {
+            var worker = (QuimeraReader.Shared.Interfaces.IOfflineSyncWorker?)ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.IOfflineSyncWorker));
+            if (worker != null) {
+                _ = worker.SyncNowAsync();
+            }
         }
     }
     
@@ -133,6 +150,7 @@ else
     
     public void Dispose()
     {
+        NetworkStateService.OnNetworkStateChanged -= HandleNetworkChange;
         _cts.Cancel();
         _cts.Dispose();
     }
@@ -145,7 +163,6 @@ else
         try
         {
             await ScanService.RescanMetadataAsync();
-            // Mostrar notificación global? Wait, ToastService is not injected in MainLayout yet. 
         }
         catch (Exception ex)
         {
@@ -174,13 +191,22 @@ else
             await TranslationService.InitializeAsync();
             var storedLang = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "preferredLanguage");
             if (!string.IsNullOrEmpty(storedLang)) _currentLang = storedLang;
-            StateHasChanged();
+            
             var theme = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "theme");
             if (theme == "light")
             {
                 isDarkTheme = false;
-                StateHasChanged();
             }
+            
+            // Auto collapse sidebar on mobile
+            var screenWidth = await JSRuntime.InvokeAsync<int>("eval", "window.innerWidth");
+            if (screenWidth < 768) { _isMobile = true; } if (screenWidth < 768)
+            {
+                _sidebarExpanded = false;
+            }
+
+            _isLoaded = true;
+            StateHasChanged();
         }
     }
 

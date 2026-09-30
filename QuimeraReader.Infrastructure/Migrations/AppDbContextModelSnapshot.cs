@@ -33,6 +33,9 @@ namespace QuimeraReader.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Name")
+                        .IsUnique();
+
                     b.ToTable("Authors");
                 });
 
@@ -66,6 +69,9 @@ namespace QuimeraReader.Infrastructure.Migrations
 
                     b.Property<string>("EpubLocationsCache")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsAvailableOffline")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsMetadataComplete")
                         .HasColumnType("INTEGER");
@@ -109,6 +115,42 @@ namespace QuimeraReader.Infrastructure.Migrations
                     b.HasIndex("SeriesId");
 
                     b.ToTable("Books");
+                });
+
+            modelBuilder.Entity("QuimeraReader.Domain.Entities.BookAnnotation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BookId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CfiRange")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorHex")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SelectedText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookId");
+
+                    b.ToTable("BookAnnotations");
                 });
 
             modelBuilder.Entity("QuimeraReader.Domain.Entities.BookAudioTrack", b =>
@@ -189,6 +231,9 @@ namespace QuimeraReader.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Name")
+                        .IsUnique();
+
                     b.ToTable("Categories");
                 });
 
@@ -265,6 +310,31 @@ namespace QuimeraReader.Infrastructure.Migrations
                     b.ToTable("Universes");
                 });
 
+            modelBuilder.Entity("QuimeraReader.Domain.Entities.UnmatchedAudioTrack", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PhysicalPath")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("UnmatchedAudioTracks");
+                });
+
             modelBuilder.Entity("QuimeraReader.Domain.Entities.Book", b =>
                 {
                     b.HasOne("QuimeraReader.Domain.Entities.Series", "Series")
@@ -272,6 +342,17 @@ namespace QuimeraReader.Infrastructure.Migrations
                         .HasForeignKey("SeriesId");
 
                     b.Navigation("Series");
+                });
+
+            modelBuilder.Entity("QuimeraReader.Domain.Entities.BookAnnotation", b =>
+                {
+                    b.HasOne("QuimeraReader.Domain.Entities.Book", "Book")
+                        .WithMany("Annotations")
+                        .HasForeignKey("BookId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Book");
                 });
 
             modelBuilder.Entity("QuimeraReader.Domain.Entities.BookAudioTrack", b =>
@@ -350,6 +431,8 @@ namespace QuimeraReader.Infrastructure.Migrations
 
             modelBuilder.Entity("QuimeraReader.Domain.Entities.Book", b =>
                 {
+                    b.Navigation("Annotations");
+
                     b.Navigation("AudioTracks");
 
                     b.Navigation("Authors");

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components;
 using QuimeraReader.Shared.Models;
 using QuimeraReader.Shared.Services;
 
@@ -30,6 +30,7 @@ public partial class SettingsPanel : ComponentBase
     private string _whisperMode = "LocalServer";
     private string _openAiEndpoint = "https://api.openai.com/v1/";
     private bool _isDownloadingWhisper = false;
+    private bool _isWhisperDownloaded = false;
 
     private class OptionItem
     {
@@ -64,6 +65,8 @@ public partial class SettingsPanel : ComponentBase
             if (settings.TryGetValue("WhisperModelPath", out var whisper)) _whisperModelPath = whisper;
             if (settings.TryGetValue("WhisperMode", out var wMode)) _whisperMode = wMode;
             if (settings.TryGetValue("OpenAIEndpoint", out var wEndpoint)) _openAiEndpoint = wEndpoint;
+
+            _isWhisperDownloaded = await SettingsService.CheckWhisperModelStatusAsync();
         }
         catch (Exception ex)
         {
@@ -138,7 +141,8 @@ public partial class SettingsPanel : ComponentBase
         try
         {
             await SettingsService.DownloadWhisperModelAsync();
-            ShowMessage("Modelo descargado con éxito.", true);
+            _isWhisperDownloaded = true;
+            ShowMessage("Modelo descargado y sincronización reanudada.", true);
         }
         catch (Exception ex)
         {

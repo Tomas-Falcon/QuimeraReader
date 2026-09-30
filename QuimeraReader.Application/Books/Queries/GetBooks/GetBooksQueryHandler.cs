@@ -20,18 +20,34 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
     public async Task<PaginatedListDto<BookDto>> Handle(GetBooksQuery request, CancellationToken cancellationToken)
     {
         int page = request.Page < 1 ? 1 : request.Page;
-        int pageSize = request.PageSize < 1 ? 50 : (request.PageSize > 100 ? 100 : request.PageSize);
+        int pageSize = request.PageSize < 1 ? 50 : (request.PageSize > 1000 ? 1000 : request.PageSize);
+        int skip = request.Skip ?? ((page - 1) * pageSize);
+        int take = request.Take ?? pageSize;
 
         var query = _dbContext.Books.AsQueryable();
 
         // Ocultar libros "fantasma" que no tienen archivo asociado (ni EPUB ni Audio)
         query = query.Where(b => !string.IsNullOrEmpty(b.EpubFilePath) || b.AudioTracks.Any());
 
+                if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
+        {
+            query = query.Where(b => b.ReadingStatus == request.ReadingStatus);
+        }
+
                 if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var s = request.Search.ToLower();
-            query = query.Where(b => b.Title.ToLower().Contains(s) || 
-                                     b.Authors.Any(a => a.Author!.Name.ToLower().Contains(s)) || b.Categories.Any(c => c.Category!.Name.ToLower().Contains(s)));
+            var s = request.Search.Trim();
+            if (!string.IsNullOrEmpty(s))
+            {
+                var ftsSearch = s + "*";
+                var ftsQuery = _dbContext.Books.FromSqlInterpolated($"SELECT b.* FROM Books b INNER JOIN BooksFTS fts ON b.Id = fts.rowid WHERE BooksFTS MATCH {ftsSearch}");
+                
+                // Unimos la busqueda FTS con el IQueryable original usando un join virtual o aplicando los filtros encima.
+                // Como FromSqlInterpolated devuelve un IQueryable, podemos seguir encadenando los filtros.
+                query = query.Where(b => ftsQuery.Select(f => f.Id).Contains(b.Id) || 
+                                         b.Authors.Any(a => a.Author!.Name.ToLower().Contains(s.ToLower())) || 
+                                         b.Categories.Any(c => c.Category!.Name.ToLower().Contains(s.ToLower())));
+            }
         }
 
         if (request.CategoryIds != null && request.CategoryIds.Any())
@@ -41,13 +57,21 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
 
         var totalBooks = await query.CountAsync(cancellationToken);
 
+if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
+        {
+            query = query.OrderByDescending(b => b.LastReadAt).ThenByDescending(b => b.Id);
+        }
+        else
+        {
+            query = query.OrderByDescending(b => b.Id);
+        }
+
         var booksList = await query
             .Include(b => b.Authors).ThenInclude(ba => ba.Author)
             .Include(b => b.Categories).ThenInclude(bc => bc.Category)
             .Include(b => b.Series).ThenInclude(s => s.Universe)
-            .OrderByDescending(b => b.Id)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
+            .Skip(skip)
+            .Take(take)
             .ToListAsync(cancellationToken);
 
         var books = booksList.Select(b => new BookDto
@@ -84,3 +108,4 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
         };
     }
 }
+

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Domain.Entities;
 using QuimeraReader.Application.Interfaces;
 
@@ -21,11 +21,16 @@ public class AppDbContext : DbContext, IAppDbContext
     {
     }
 
-    public DbSet<BookAudioTrack> BookAudioTracks { get; set; } = null!;
+    public DbSet<BookAudioTrack> BookAudioTracks { get; set; }
+    public DbSet<UnmatchedAudioTrack> UnmatchedAudioTracks { get; set; } = null!;
+        public DbSet<BookAnnotation> BookAnnotations { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<Author>().HasIndex(a => a.Name).IsUnique();
+        modelBuilder.Entity<Category>().HasIndex(c => c.Name).IsUnique();
         
         modelBuilder.Entity<BookAudioTrack>()
             .HasOne(t => t.Book)

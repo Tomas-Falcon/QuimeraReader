@@ -1,4 +1,4 @@
-﻿namespace QuimeraReader.Shared.Models;
+namespace QuimeraReader.Shared.Models;
 
 public record Book
 {
@@ -14,6 +14,7 @@ public record Book
     public string? Universe { get; init; }
     
     public bool HasCover { get; init; }
+    public bool IsAvailableOffline { get; set; }
     public bool HasEpub { get; init; }
     public bool HasAudio { get; init; }
     public bool IsAligned { get; init; }
@@ -29,9 +30,14 @@ public record Book
     public int? TotalPages { get; set; }
     
     // Virtual URLs para el frontend (generadas por MediaController)
-    public string CoverUrl => $"api/media/books/{Id}/cover";
-    public string EpubUrl => $"api/media/books/{Id}/file.epub";
-    public string AudioUrl => $"api/media/books/{Id}/audio";
+    public long CoverCacheBuster { get; set; } = 0;
+    public string? LocalEpubPath { get; set; }
+    public string? LocalCoverPath { get; set; }
+    public string? LocalAudioPath { get; set; }
+
+    public string CoverUrl => LocalCoverPath ?? ($"api/media/books/{Id}/cover" + (CoverCacheBuster > 0 ? $"?t={CoverCacheBuster}" : ""));
+    public string EpubUrl => LocalEpubPath ?? $"api/media/books/{Id}/file.epub";
+    public string AudioUrl => LocalAudioPath ?? $"api/media/books/{Id}/audio";
     public string PackageUrl => $"api/media/books/{Id}/package?format=audiobook";
 }
 
@@ -117,4 +123,14 @@ public class CoverSearchResult
 {
     public string ImageUrl { get; set; } = string.Empty;
     public string Source { get; set; } = string.Empty;
+}
+
+public class AnnotationDto
+{
+    public int Id { get; set; }
+    public string CfiRange { get; set; } = string.Empty;
+    public string SelectedText { get; set; } = string.Empty;
+    public string? ColorHex { get; set; }
+    public string? Note { get; set; }
+    public DateTime CreatedAt { get; set; }
 }

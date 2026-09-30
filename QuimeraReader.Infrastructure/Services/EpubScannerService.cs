@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,6 +19,7 @@ public class EpubScannerService
     private readonly AppDbContext _dbContext;
     private readonly AudioAlignmentQueue _queue;
     private readonly ILogger<EpubScannerService> _logger;
+    private static readonly SemaphoreSlim _scanLock = new(1, 1);
 
     public EpubScannerService(IEnumerable<IMetadataProvider> providers, HttpClient httpClient, AppDbContext dbContext, AudioAlignmentQueue queue, ILogger<EpubScannerService> logger)
     {
@@ -317,13 +318,13 @@ public class EpubScannerService
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Error creando Symlink, cayendo de nuevo a Copia para: {File}", sourceFilePath);
-                File.Copy(sourceFilePath, newEpubPath, overwrite: true);
+                if (File.Exists(newEpubPath)) File.Delete(newEpubPath); File.Copy(sourceFilePath, newEpubPath, overwrite: true);
             }
             book.EpubFilePath = newEpubPath;
         }
         else
         {
-            File.Copy(sourceFilePath, newEpubPath, overwrite: true);
+            if (File.Exists(newEpubPath)) File.Delete(newEpubPath); File.Copy(sourceFilePath, newEpubPath, overwrite: true);
             try { File.Delete(sourceFilePath); } catch (Exception ex) { _logger.LogWarning(ex, "No se pudo borrar el archivo original: {File}", sourceFilePath); }
             book.EpubFilePath = newEpubPath;
         }
@@ -354,13 +355,13 @@ public class EpubScannerService
                     catch (Exception ex)
                     {
                         _logger.LogWarning(ex, "Error creando Symlink Audio, usando copia para: {File}", possibleAudioPath);
-                        File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
+                        if (File.Exists(newAudioPath)) File.Delete(newAudioPath); File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
                     }
                     hasAudio = true;
                 }
                 else
                 {
-                    File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
+                    if (File.Exists(newAudioPath)) File.Delete(newAudioPath); File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
                     try { File.Delete(possibleAudioPath); } catch (Exception ex) { _logger.LogWarning(ex, "No se pudo borrar el audio original: {File}", possibleAudioPath); }
                 }
                 
@@ -412,6 +413,28 @@ public class EpubScannerService
         bool ratingSatisfied = !needsRating || book.AverageRating.HasValue;
 
         book.IsMetadataComplete = hasTitle && hasAuthor && hasSynopsis && hasCover && ratingSatisfied;
+        if (!book.IsMetadataComplete)
+        {
+            var faltaMetaCat = await _dbContext.Categories.FirstOrDefaultAsync(c => c.Name == "Falta Metadatos");
+            if (faltaMetaCat == null)
+            {
+                faltaMetaCat = new Category { Name = "Falta Metadatos", IsUserGenerated = false };
+                _dbContext.Add(faltaMetaCat);
+            }
+            if (!book.Categories.Any(c => c.Category.Name == "Falta Metadatos"))
+            {
+                book.Categories.Add(new BookCategory { Category = faltaMetaCat });
+            }
+        }
+        else
+        {
+            var faltaMetaCat = book.Categories.FirstOrDefault(c => c.Category.Name == "Falta Metadatos");
+            if (faltaMetaCat != null)
+            {
+                book.Categories.Remove(faltaMetaCat);
+            }
+        }
+
 
         return book;
     }
@@ -547,6 +570,28 @@ public class EpubScannerService
         bool ratingSatisfied = !needsRating || book.AverageRating.HasValue;
 
         book.IsMetadataComplete = hasTitle && hasAuthor && hasSynopsis && hasCover && ratingSatisfied;
+        if (!book.IsMetadataComplete)
+        {
+            var faltaMetaCat = await _dbContext.Categories.FirstOrDefaultAsync(c => c.Name == "Falta Metadatos");
+            if (faltaMetaCat == null)
+            {
+                faltaMetaCat = new Category { Name = "Falta Metadatos", IsUserGenerated = false };
+                _dbContext.Add(faltaMetaCat);
+            }
+            if (!book.Categories.Any(c => c.Category.Name == "Falta Metadatos"))
+            {
+                book.Categories.Add(new BookCategory { Category = faltaMetaCat });
+            }
+        }
+        else
+        {
+            var faltaMetaCat = book.Categories.FirstOrDefault(c => c.Category.Name == "Falta Metadatos");
+            if (faltaMetaCat != null)
+            {
+                book.Categories.Remove(faltaMetaCat);
+            }
+        }
+
     }
 
     private string GetSafeFilename(string filename)

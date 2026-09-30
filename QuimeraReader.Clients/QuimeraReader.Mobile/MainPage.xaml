@@ -3,12 +3,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:QuimeraReader.Mobile"
              xmlns:components="clr-namespace:QuimeraReader.Mobile.Components"
+             xmlns:ios="clr-namespace:Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;assembly=Microsoft.Maui.Controls"
+             ios:Page.UseSafeArea="True"
              x:Class="QuimeraReader.Mobile.MainPage">
 
-    <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html">
-        <BlazorWebView.RootComponents>
-            <RootComponent Selector="#app" ComponentType="{x:Type components:Routes}" />
-        </BlazorWebView.RootComponents>
-    </BlazorWebView>
+    <Grid>
+        <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html" Margin="{OnPlatform Android='0,24,0,0', iOS='0,0,0,0'}">
+            <BlazorWebView.RootComponents>
+                <RootComponent Selector="#app" ComponentType="{x:Type components:Routes}" />
+            </BlazorWebView.RootComponents>
+        </BlazorWebView>
+    </Grid>
 
 </ContentPage>
