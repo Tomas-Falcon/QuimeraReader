@@ -46,8 +46,8 @@
                     <!-- Progress Footer (Kindle Style) -->
                     <div class="reading-progress px-4 py-2" style="background: var(--bg-card); font-size: 0.85rem; color: var(--text-muted); border-top: 1px solid rgba(255,255,255,0.1);">
                         <div class="d-flex align-items-center justify-content-between mb-1" style="font-size: 0.75rem;">
-                            <span class="fw-bold text-white-50">@(_totalPages > 0 ? $"PÃ¡g. {_currentPage}" : "")</span>
-                            <span class="fw-bold text-white-50">@(_totalPages > 0 ? $"{_totalPages} pÃ¡ginas -" : "") @($"{Math.Round(Book.PercentageCompleted ?? 0, 1)}%")</span>
+                            <span class="fw-bold text-white-50">@(_totalPages > 0 ? $"Pág. {_currentPage}" : "")</span>
+                            <span class="fw-bold text-white-50">@(_totalPages > 0 ? $"{_totalPages} páginas -" : "") @($"{Math.Round(Book.PercentageCompleted ?? 0, 1)}%")</span>
                         </div>
                         <input type="range" class="form-range custom-progress-bar" min="0" max="100" step="0.1" value="@(Book.PercentageCompleted ?? 0)" @onchange="OnProgressSliderChanged" />
                     </div>
@@ -71,7 +71,7 @@
                     <div class="no-sync-map text-center pt-5" style="flex: 1;">
                         <img src="@(BookService.BaseAddress + @Book.CoverUrl)" class="fallback-cover mb-4" style="max-width: 200px; border-radius: 8px;" />
                         <h3>Modo Audiolibro Puro</h3>
-                        <p class="text-muted">No se encontraron transcripciones o texto para este tÃ­tulo.</p>
+                        <p class="text-muted">No se encontraron transcripciones o texto para este título.</p>
                     </div>
                 }
             </div>
@@ -81,7 +81,7 @@
     {
         <div class="annotation-dialog position-fixed" style="bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--bg-card); padding: 15px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 9999; width: 90%; max-width: 400px; border: 1px solid rgba(255,255,255,0.1);">
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <h6 class="mb-0 text-white"><i class="bi bi-pencil-square me-2"></i> Nueva AnotaciÃ³n</h6>
+                <h6 class="mb-0 text-white"><i class="bi bi-pencil-square me-2"></i> Nueva Anotación</h6>
                 <button class="btn-close btn-close-white" @onclick="CloseAnnotationDialog"></button>
             </div>
             <p class="text-white-50 small mb-3 text-truncate" style="font-style: italic;">"@_selectedText"</p>
@@ -243,7 +243,8 @@
                 {
                     try
                     {
-                        _bookAnnotations = await BookService.GetAnnotationsAsync(BookId);`n                        var annotations = _bookAnnotations;
+                        _bookAnnotations = await BookService.GetAnnotationsAsync(BookId);
+                        var annotations = _bookAnnotations;
                         if (annotations.Any() && _epubJsModule != null)
                         {
                             var json = System.Text.Json.JsonSerializer.Serialize(annotations);
@@ -459,7 +460,7 @@
         {
             _lastSavedTime = time;
             // Solo mandamos el audioPosition, dejamos el epubCfi intacto o null. 
-            // Percentage se podrÃ­a calcular si tuviÃ©ramos el total duration.
+            // Percentage se podría calcular si tuviéramos el total duration.
             _ = BookService.UpdatePositionAsync(BookId, audioPosition: time, audioTrackNumber: _currentTrackNumber);
         }
 
@@ -547,6 +548,8 @@
         public string Text { get; set; } = string.Empty;
     }
 }
+
+
 
 
 
