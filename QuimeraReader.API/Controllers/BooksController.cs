@@ -994,6 +994,37 @@ public partial class BooksController : ControllerBase
         
         return NoContent();
     }
+
+    [HttpGet("unmatched-audios")]
+    public async Task<ActionResult<IEnumerable<QuimeraReader.Domain.Entities.UnmatchedAudioTrack>>> GetUnmatchedAudios()
+    {
+        return await _dbContext.UnmatchedAudioTracks.OrderByDescending(u => u.UploadedAt).ToListAsync();
+    }
+
+    [HttpDelete("unmatched-audios/{id}")]
+    public async Task<IActionResult> DeleteUnmatchedAudio(int id)
+    {
+        var audio = await _dbContext.UnmatchedAudioTracks.FindAsync(id);
+        if (audio == null) return NotFound();
+        try { if (System.IO.File.Exists(audio.PhysicalPath)) System.IO.File.Delete(audio.PhysicalPath); } catch { }
+        _dbContext.UnmatchedAudioTracks.Remove(audio);
+        await _dbContext.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpPost("unmatched-audios/{id}/match/{bookId}")]
+    public async Task<IActionResult> MatchUnmatchedAudio(int id, int bookId)
+    {
+        var audio = await _dbContext.UnmatchedAudioTracks.FindAsync(id);
+        var book = await _dbContext.Books.Include(b => b.AudioTracks).FirstOrDefaultAsync(b => b.Id == bookId);
+        if (audio == null || book == null) return NotFound();
+        
+        int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
+        book.AudioTracks.Add(new QuimeraReader.Domain.Entities.BookAudioTrack { FilePath = audio.PhysicalPath, TrackNumber = nextTrack });
+        _dbContext.UnmatchedAudioTracks.Remove(audio);
+        await _dbContext.SaveChangesAsync();
+        return Ok();
+    }
 }
 public class ScanRequest 
 { 
