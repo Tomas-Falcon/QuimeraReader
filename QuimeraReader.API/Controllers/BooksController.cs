@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Infrastructure;
 using QuimeraReader.Infrastructure.Services;
@@ -143,7 +143,7 @@ public partial class BooksController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null, [FromQuery] int[]? categoryIds = null, [FromQuery] string? readingStatus = null, [FromQuery] int? skip = null, [FromQuery] int? take = null)
+    public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null, [FromQuery] int[]? categoryIds = null, [FromQuery] string? readingStatus = null, [FromQuery] int? skip = null, [FromQuery] int? take = null, [FromQuery] bool? isAvailableOffline = null)
     {
         try 
         {
@@ -156,7 +156,8 @@ public partial class BooksController : ControllerBase
                 Take = take,
                 Search = search,
                 CategoryIds = categoryIds?.ToList(),
-                  ReadingStatus = readingStatus 
+                ReadingStatus = readingStatus,
+                IsAvailableOffline = isAvailableOffline
             });
             return Ok(result);
         }
@@ -1062,5 +1063,6 @@ public class ScanRequest
 { 
     public string FolderPath { get; set; } = string.Empty; 
 }
+
 
 
