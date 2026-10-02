@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -146,6 +146,25 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
                 }
             }
 
+            // 1.5 PUSH: Sync Annotations
+            var queuedAnnotations = await localRepo.GetQueuedAnnotationsAsync();
+            foreach (var ann in queuedAnnotations)
+            {
+                try
+                {
+                    var payload = new { CfiRange = ann.CfiRange, SelectedText = ann.SelectedText, ColorHex = ann.ColorHex, Note = ann.Note };
+                    var response = await httpClient.PostAsJsonAsync($"api/Books/{ann.BookId}/annotations", payload);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        await localRepo.RemoveQueuedAnnotationAsync(ann.Id);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Failed to sync queued annotation {ann.Id}");
+                }
+            }
+
             // 2. DELETE: Local books no longer available offline
             var offlineBooks = serverBooks.Where(b => b.IsAvailableOffline).ToList();
             var offlineBooksIds = offlineBooks.Select(b => b.Id).ToHashSet();
@@ -236,6 +255,7 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
         return serverPath; 
     }
 }
+
 
 
 

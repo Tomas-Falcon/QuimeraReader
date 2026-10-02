@@ -199,7 +199,33 @@ public class LocalBookRepository : ILocalBookRepository
             await _dbContext.SaveChangesAsync();
         }
     }
+
+    public Task QueueAnnotationAsync(int bookId, string cfiRange, string selectedText, string colorHex, string note)
+    {
+        var queueStr = Microsoft.Maui.Storage.Preferences.Get("AnnotationQueue", "[]");
+        var queue = System.Text.Json.JsonSerializer.Deserialize<List<AnnotationQueueItem>>(queueStr) ?? new List<AnnotationQueueItem>();
+        queue.Add(new AnnotationQueueItem { BookId = bookId, CfiRange = cfiRange, SelectedText = selectedText, ColorHex = colorHex, Note = note });
+        Microsoft.Maui.Storage.Preferences.Set("AnnotationQueue", System.Text.Json.JsonSerializer.Serialize(queue));
+        return Task.CompletedTask;
+    }
+
+    public Task<List<AnnotationQueueItem>> GetQueuedAnnotationsAsync()
+    {
+        var queueStr = Microsoft.Maui.Storage.Preferences.Get("AnnotationQueue", "[]");
+        var queue = System.Text.Json.JsonSerializer.Deserialize<List<AnnotationQueueItem>>(queueStr) ?? new List<AnnotationQueueItem>();
+        return Task.FromResult(queue);
+    }
+
+    public Task RemoveQueuedAnnotationAsync(string id)
+    {
+        var queueStr = Microsoft.Maui.Storage.Preferences.Get("AnnotationQueue", "[]");
+        var queue = System.Text.Json.JsonSerializer.Deserialize<List<AnnotationQueueItem>>(queueStr) ?? new List<AnnotationQueueItem>();
+        queue.RemoveAll(a => a.Id == id);
+        Microsoft.Maui.Storage.Preferences.Set("AnnotationQueue", System.Text.Json.JsonSerializer.Serialize(queue));
+        return Task.CompletedTask;
+    }
 }
+
 
 
 
