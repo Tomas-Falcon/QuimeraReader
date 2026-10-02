@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using QuimeraReader.Application.Books.DTOs;
 
 namespace QuimeraReader.Application.Books.Queries.GetBooks;
@@ -12,4 +12,5 @@ public record GetBooksQuery : IRequest<PaginatedListDto<BookDto>>
     public string? Search { get; init; }
     public string? ReadingStatus { get; init; }
     public System.Collections.Generic.List<int>? CategoryIds { get; init; }
+    public bool? IsAvailableOffline { get; init; }
 }

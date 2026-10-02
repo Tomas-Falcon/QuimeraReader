@@ -35,9 +35,9 @@ public record Book
     public string? LocalCoverPath { get; set; }
     public string? LocalAudioPath { get; set; }
 
-    public string CoverUrl => LocalCoverPath ?? ($"api/media/books/{Id}/cover" + (CoverCacheBuster > 0 ? $"?t={CoverCacheBuster}" : ""));
-    public string EpubUrl => LocalEpubPath ?? $"api/media/books/{Id}/file.epub";
-    public string AudioUrl => LocalAudioPath ?? $"api/media/books/{Id}/audio";
+    public string CoverUrl => string.IsNullOrEmpty(LocalCoverPath) ? ($"api/media/books/{Id}/cover" + (CoverCacheBuster > 0 ? $"?t={CoverCacheBuster}" : "")) : LocalCoverPath;
+    public string EpubUrl => string.IsNullOrEmpty(LocalEpubPath) ? $"api/media/books/{Id}/file.epub" : LocalEpubPath;
+    public string AudioUrl => string.IsNullOrEmpty(LocalAudioPath) ? $"api/media/books/{Id}/audio" : LocalAudioPath;
     public string PackageUrl => $"api/media/books/{Id}/package?format=audiobook";
 }
 

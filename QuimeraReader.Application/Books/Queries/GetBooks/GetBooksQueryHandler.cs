@@ -55,6 +55,8 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
             query = query.Where(b => b.Categories.Any(c => request.CategoryIds.Contains(c.CategoryId)));
         }
 
+        if (request.IsAvailableOffline == true) { query = query.Where(b => b.IsAvailableOffline == true); }
+
         var totalBooks = await query.CountAsync(cancellationToken);
 
 if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
@@ -86,6 +88,7 @@ if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
             Categories = b.Categories.Where(c => c.Category != null).Select(c => c.Category!.Name).ToList(),
             Series = b.Series?.Name,
             Universe = b.Series?.Universe?.Name,
+            IsAvailableOffline = b.IsAvailableOffline,
             HasCover = !string.IsNullOrEmpty(b.CoverImagePath),
             HasEpub = !string.IsNullOrEmpty(b.EpubFilePath),
             HasAudio = b.AudioTracks.Any(),
@@ -108,4 +111,8 @@ if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
         };
     }
 }
+
+
+
+
 

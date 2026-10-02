@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Radzen;
 #if ANDROID
 using Android.Webkit;
@@ -37,6 +37,10 @@ public static class MauiProgram
         builder.Services.AddBlazorWebViewDeveloperTools();
 		builder.Logging.AddDebug();
 #endif
+
+#if ANDROID || IOS
+        builder.Logging.AddProvider(new QuimeraReader.Mobile.Logging.MauiDbLoggerProvider());
+#endif
 		
         builder.Services.AddScoped<QuimeraReader.Shared.Services.IServerConfigService, QuimeraReader.Mobile.Services.MobileServerConfigService>();
         
@@ -61,3 +65,5 @@ public static class MauiProgram
 		return builder.Build();
 	}
 }
+
+

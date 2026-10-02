@@ -1,5 +1,15 @@
+﻿export async function initializeEpubFromStream(elementId, streamRef, dotNetRef, lastCfi, epubLocationsCache) {
+    var arrayBuffer = await streamRef.arrayBuffer();
+    var book = ePub(arrayBuffer);
+    initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache);
+}
+
 export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi, epubLocationsCache) {
     var book = ePub(epubUrl);
+    initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache);
+}
+
+function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache) {
     var rendition = book.renderTo(elementId, {
         width: "100%",
         height: "100%",
@@ -119,7 +129,7 @@ export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi, epubLocat
     rendition.on("mouseup", event => { if (!isDragging) return; isDragging = false; endX = event.screenX; handleSwipe(); });
     
     function handleSwipe() {
-        // Ignorar click/swipe si el usuario seleccionó texto
+        // Ignorar click/swipe si el usuario seleccionÃƒÂ³ texto
         let isTextSelected = false;
         try {
             const contents = rendition.getContents();
@@ -258,7 +268,7 @@ export function highlightKaraokePhrase(text) {
     if (!text || text.trim().length === 0) return;
     
     // Normalize string for fuzzy matching (Whisper text vs EPUB text)
-    var searchStr = text.toLowerCase().replace(/[^a-z0-9áéíóúñ]/gi, '').trim();
+    var searchStr = text.toLowerCase().replace(/[^a-z0-9ÃƒÂ¡ÃƒÂ©ÃƒÂ­ÃƒÂ³ÃƒÂºÃƒÂ±]/gi, '').trim();
     if(searchStr.length < 5) return; // Too short to accurately match
 
     var treeWalker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
@@ -267,7 +277,7 @@ export function highlightKaraokePhrase(text) {
 
     while (currentNode && !matchFound) {
         var nodeText = currentNode.nodeValue;
-        var nodeTextNorm = nodeText.toLowerCase().replace(/[^a-z0-9áéíóúñ]/gi, '');
+        var nodeTextNorm = nodeText.toLowerCase().replace(/[^a-z0-9ÃƒÂ¡ÃƒÂ©ÃƒÂ­ÃƒÂ³ÃƒÂºÃƒÂ±]/gi, '');
         
         // Simple subset matching for now (Whisper sentence often fits inside a paragraph's text node)
         if (nodeTextNorm.includes(searchStr) || searchStr.includes(nodeTextNorm)) {
@@ -291,3 +301,7 @@ export function highlightKaraokePhrase(text) {
         currentNode = treeWalker.nextNode();
     }
 }
+
+
+
+

@@ -8,7 +8,7 @@ namespace QuimeraReader.Shared.Services;
 
 public interface IBookService
 {
-    Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null);
+    Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null, bool? isAvailableOffline = null);
     Task<Book?> GetBookAsync(int id);
     Task<IEnumerable<Category>> GetCategoriesAsync();
     Task<IEnumerable<Author>> GetAuthorsAsync();
@@ -53,7 +53,7 @@ public class BookService : IBookService
 
     public string BaseAddress => _httpClient.BaseAddress?.ToString() ?? "";
 
-        public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null)
+        public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null, bool? isAvailableOffline = null)
     {
         try
         {
@@ -92,7 +92,21 @@ public class BookService : IBookService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[BookService] Error obteniendo lista de libros.");
+            _logger.LogError(ex, "[BookService] Error obteniendo lista de libros. Intentando recuperar versi贸n local.");
+            var localRepo = _serviceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
+            if (localRepo != null)
+            {
+                try 
+                {
+                    var localBooks = await localRepo.GetOfflineBooksAsync();
+                    var filtered = localBooks.AsEnumerable();
+                    if (!string.IsNullOrWhiteSpace(search)) filtered = filtered.Where(b => b.Title.Contains(search, StringComparison.OrdinalIgnoreCase));
+                    if (!string.IsNullOrWhiteSpace(readingStatus)) filtered = filtered.Where(b => b.ReadingStatus == readingStatus);
+                    var data = filtered.Skip(skip ?? ((page - 1) * pageSize)).Take(take ?? pageSize).ToArray();
+                    return new PaginatedResult<Book> { Page = page, PageSize = pageSize, Total = filtered.Count(), Data = data };
+                }
+                catch { }
+            }
             return new PaginatedResult<Book> { Page = page, PageSize = pageSize, Total = 0, Data = [] };
         }
     }
@@ -101,12 +115,27 @@ public class BookService : IBookService
     {
         try
         {
+            if (_networkState.IsOffline)
+            {
+                var localRepo = GetLocalRepo();
+                if (localRepo != null)
+                {
+                    return await localRepo.GetBookByIdAsync(id);
+                }
+            }
             _logger.LogInformation("[BookService] Obteniendo detalles del libro ID: {BookId}", id);
             return await _httpClient.GetFromJsonAsync<Book>($"api/Books/{id}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[BookService] Error obteniendo libro ID: {BookId}", id);
+            _logger.LogError(ex, "[BookService] Error obteniendo libro ID: {BookId}. Intentando recuperar versi贸n local.", id);
+            var localRepo = GetLocalRepo();
+            if (localRepo != null)
+            {
+                try {
+                    return await localRepo.GetBookByIdAsync(id);
+                } catch { }
+            }
             return null;
         }
     }
@@ -119,7 +148,7 @@ public class BookService : IBookService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[BookService] Error obteniendo categor韆s.");
+            _logger.LogError(ex, "[BookService] Error obteniendo categor铆as.");
             return Array.Empty<Category>();
         }
     }
@@ -163,7 +192,7 @@ public class BookService : IBookService
             var response = await _httpClient.PostAsync("api/Books/upload", content);
             response.EnsureSuccessStatusCode();
 
-            return await response.Content.ReadFromJsonAsync<Book>() ?? throw new InvalidOperationException("Respuesta inv醠ida del servidor");
+            return await response.Content.ReadFromJsonAsync<Book>() ?? throw new InvalidOperationException("Respuesta inv谩lida del servidor");
         }
         catch (Exception ex)
         {
@@ -191,7 +220,14 @@ public class BookService : IBookService
         }
         catch (Exception ex)
         { 
-            _logger.LogError(ex, "[BookService] Error actualizando posici髇 para libro ID: {BookId}", bookId);
+            _logger.LogError(ex, "[BookService] Error actualizando posici贸n para libro ID: {BookId}. Intentando guardar localmente.", bookId);
+            var localRepo = GetLocalRepo();
+            if (localRepo != null) 
+            {
+                try {
+                    await localRepo.UpdateProgressAsync(bookId, epubCfi ?? "", audioPosition, percentage);
+                } catch { }
+            }
         }
     }
 
@@ -272,28 +308,63 @@ public class BookService : IBookService
 
     public async Task CreateAnnotationAsync(int bookId, string cfiRange, string selectedText, string colorHex, string note)
     {
-        var payload = new { CfiRange = cfiRange, SelectedText = selectedText, ColorHex = colorHex, Note = note };
-        var response = await _httpClient.PostAsJsonAsync($"api/Books/{bookId}/annotations", payload);
-        response.EnsureSuccessStatusCode();
+        try
+        {
+            if (_networkState.IsOffline)
+            {
+                var localRepo = GetLocalRepo();
+                if (localRepo != null) 
+                {
+                    await localRepo.QueueAnnotationAsync(bookId, cfiRange, selectedText, colorHex, note);
+                    return;
+                }
+            }
+
+            var payload = new { CfiRange = cfiRange, SelectedText = selectedText, ColorHex = colorHex, Note = note };
+            var response = await _httpClient.PostAsJsonAsync($"api/Books/{bookId}/annotations", payload);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[BookService] Error creating annotation online. Queueing locally.");
+            var localRepo = GetLocalRepo();
+            if (localRepo != null) 
+            {
+                await localRepo.QueueAnnotationAsync(bookId, cfiRange, selectedText, colorHex, note);
+            }
+        }
     }
 
     public async Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId)
     {
         try
         {
+            if (_networkState.IsOffline)
+            {
+                var localRepo = GetLocalRepo();
+                if (localRepo != null) 
+                {
+                    return await localRepo.GetAnnotationsAsync(bookId);
+                }
+            }
             _logger.LogInformation("[BookService] Obteniendo anotaciones del libro ID: {BookId}", bookId);
             return await _httpClient.GetFromJsonAsync<List<AnnotationDto>>($"api/Books/{bookId}/annotations") ?? new();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[BookService] Error obteniendo anotaciones del libro ID: {BookId}", bookId);
+            _logger.LogWarning(ex, "[BookService] Error obteniendo anotaciones del libro ID: {BookId}. Intentando recuperar versi贸n local.", bookId);
+            var localRepo = GetLocalRepo();
+            if (localRepo != null) 
+            {
+                try { return await localRepo.GetAnnotationsAsync(bookId); } catch { }
+            }
             return new();
         }
     }
 
     public async Task UpdateAnnotationAsync(int bookId, int annotationId, string colorHex, string note)
     {
-        _logger.LogInformation("[BookService] Actualizando anotaci髇 {AnnotationId} del libro {BookId}", annotationId, bookId);
+        _logger.LogInformation("[BookService] Actualizando anotaci贸n {AnnotationId} del libro {BookId}", annotationId, bookId);
         var payload = new { colorHex, note };
         var response = await _httpClient.PutAsJsonAsync($"api/Books/{bookId}/annotations/{annotationId}", payload);
         response.EnsureSuccessStatusCode();
@@ -301,7 +372,7 @@ public class BookService : IBookService
 
     public async Task DeleteAnnotationAsync(int bookId, int annotationId)
     {
-        _logger.LogInformation("[BookService] Eliminando anotaci髇 {AnnotationId} del libro {BookId}", annotationId, bookId);
+        _logger.LogInformation("[BookService] Eliminando anotaci贸n {AnnotationId} del libro {BookId}", annotationId, bookId);
         var response = await _httpClient.DeleteAsync($"api/Books/{bookId}/annotations/{annotationId}");
         response.EnsureSuccessStatusCode();
     }
@@ -325,3 +396,6 @@ public class BookService : IBookService
         response.EnsureSuccessStatusCode();
     }
 }
+
+
+

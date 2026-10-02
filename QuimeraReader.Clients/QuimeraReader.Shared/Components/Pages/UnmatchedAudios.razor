@@ -10,7 +10,10 @@
 <RadzenCard class="m-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3>Audios Huérfanos</h3>
-        <RadzenButton Icon="refresh" Text="Recargar" Click="LoadAudios" IsBusy="@_isLoading" />
+                <div>
+            <RadzenButton Icon="auto_fix_high" Text="Auto-vincular" ButtonStyle="ButtonStyle.Secondary" class="me-2" Click="AutoMatchAudios" IsBusy="@_isAutoMatching" />
+            <RadzenButton Icon="refresh" Text="Recargar" Click="LoadAudios" IsBusy="@_isLoading" />
+        </div>
     </div>
 
     @if (_isLoading)
@@ -34,6 +37,11 @@
                         @(Math.Round((double)audio.FileSizeBytes / 1024 / 1024, 2)) MB
                     </Template>
                 </RadzenDataGridColumn>
+                                <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Title="Escuchar" Width="260px">
+                    <Template Context="audio">
+                        <audio controls src="@(Http.BaseAddress)api/books/unmatched-audios/@(audio.Id)/stream" style="height: 30px; width: 230px;"></audio>
+                    </Template>
+                </RadzenDataGridColumn>
                 <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Property="UploadedAt" Title="Fecha Subida" FormatString="{0:dd/MM/yyyy HH:mm}" />
                 <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Title="Acciones" Width="200px" TextAlign="TextAlign.Center">
                     <Template Context="audio">
@@ -45,3 +53,5 @@
         </RadzenDataGrid>
     }
 </RadzenCard>
+
+

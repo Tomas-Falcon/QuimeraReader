@@ -1,4 +1,4 @@
-﻿@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @using Radzen
 @using Radzen.Blazor
@@ -181,20 +181,27 @@
 
     private async ValueTask<Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderResult<List<Book>>> ProvideBookChunks(Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderRequest request)
     {
-        int chunkSize = 5;
-        int skip = request.StartIndex * chunkSize;
-        int take = request.Count * chunkSize;
-
-        var result = await BookService.GetBooksAsync(1, 50, _searchQuery, _selectedCategories?.ToArray(), null, skip, take);
-        var totalChunks = (int)Math.Ceiling((double)result.Total / chunkSize);
-
-        var chunks = new List<List<Book>>();
-        for (int i = 0; i < result.Data.Length; i += chunkSize)
+        try 
         {
-            chunks.Add(result.Data.Skip(i).Take(chunkSize).ToList());
-        }
+            int chunkSize = 5;
+            int skip = request.StartIndex * chunkSize;
+            int take = request.Count * chunkSize;
 
-        return new Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderResult<List<Book>>(chunks, totalChunks);
+            var result = await BookService.GetBooksAsync(1, 50, _searchQuery, _selectedCategories?.ToArray(), null, skip, take);
+            var totalChunks = (int)Math.Ceiling((double)result.Total / chunkSize);
+
+            var chunks = new List<List<Book>>();
+            for (int i = 0; i < result.Data.Length; i += chunkSize)
+            {
+                chunks.Add(result.Data.Skip(i).Take(chunkSize).ToList());
+            }
+
+            return new Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderResult<List<Book>>(chunks, totalChunks);
+        }
+        catch (Exception ex)
+        {
+            return new Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderResult<List<Book>>(new List<List<Book>>(), 0);
+        }
     }
 
     
@@ -360,7 +367,12 @@
         }
         catch { }
         _objRef = DotNetObjectReference.Create(this);
-        var fetchRecs = BookService.GetRecommendationsAsync();
+        
+        try
+        {
+            _recommendations = await BookService.GetRecommendationsAsync();
+        }
+        catch { }
         
         _debounceTimer = new System.Timers.Timer(500);
         _debounceTimer.AutoReset = false;
@@ -370,8 +382,6 @@
                 if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync(); StateHasChanged();
             });
         };
-        
-        _recommendations = await fetchRecs;
         
         try
         {

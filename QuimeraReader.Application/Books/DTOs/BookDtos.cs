@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace QuimeraReader.Application.Books.DTOs;
@@ -17,6 +17,7 @@ public record BookDto
     public string? Series { get; init; }
     public string? Universe { get; init; }
     
+    public bool IsAvailableOffline { get; init; }
     public bool HasCover { get; init; }
     public bool HasEpub { get; init; }
     public bool HasAudio { get; init; }
@@ -56,4 +57,5 @@ public record CategoryDto
     public int BookCount { get; init; }
     public string? SampleCoverUrl { get; init; }
 }
+
 

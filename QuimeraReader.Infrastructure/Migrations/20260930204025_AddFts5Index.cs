@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -20,8 +20,7 @@ namespace QuimeraReader.Infrastructure.Migrations
 
             // Populate it
             migrationBuilder.Sql(@"
-                INSERT INTO BooksFTS(BooksFTS, rowid, Title) 
-                SELECT 'rebuild', Id, Title FROM Books;
+                INSERT INTO BooksFTS(BooksFTS) VALUES('rebuild');
             ");
 
             // Create Triggers to keep it updated
@@ -48,3 +47,4 @@ namespace QuimeraReader.Infrastructure.Migrations
         }
     }
 }
+

@@ -1,4 +1,4 @@
-{
+﻿{
   "App_Title": "QuimeraReader",
   "Filter_Placeholder": "Seleccionar filtro...",
   "Filter_RecentlyAdded": "Añadido recientemente",
@@ -94,5 +94,8 @@
   "Message_PlayingFromSelection": "Reproduciendo desde la selección.",
   "Error_AudioNotFoundForSelection": "No se encontró el audio para este fragmento.",
   "Message_AnnotationSaved": "Anotación guardada.",
-  "Error_SavingAnnotation": "Error guardando anotación:"
+  "Error_SavingAnnotation": "Error guardando anotación:",
+  "Nav_OfflineLibrary": "Descargas",
+  "OfflineLibrary_Title": "Libros Descargados"
 }
+

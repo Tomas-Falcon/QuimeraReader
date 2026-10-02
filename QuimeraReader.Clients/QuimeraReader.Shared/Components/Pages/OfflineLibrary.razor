@@ -1,0 +1,67 @@
+﻿@page "/offline-library"
+@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Interfaces
+@inject NavigationManager NavManager
+@inject ITranslationService TranslationService
+@inject IServiceProvider ServiceProvider
+
+<div class="p-4" style="background: var(--bg-body); min-height: 100vh; overflow-x: hidden; max-width: 100%; box-sizing: border-box;">
+    <div class="d-flex align-items-center mb-4 gap-3">
+        <RadzenButton Icon="arrow_back" ButtonStyle="ButtonStyle.Light" Click="@(() => NavManager.NavigateTo(""))" />
+        <h2 class="mb-0" style="color: var(--text-color);">@TranslationService["OfflineLibrary_Title"]</h2>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="text-center p-5">
+            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+            <p class="mt-3 text-muted">Cargando descargas...</p>
+        </div>
+    }
+    else if (_books.Count == 0)
+    {
+        <div class="text-center p-5">
+            <RadzenIcon Icon="cloud_off" Style="font-size: 3rem; color: var(--rz-text-disabled-color);" />
+            <p class="text-muted mt-2">No tienes libros descargados para leer sin conexión.</p>
+            <p>DEBUG DB Path: @(System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "quimerareader_local.db"))</p>
+        </div>
+    }
+    else
+    {
+        <div class="row m-0 row-cols-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-5 g-4">
+            @foreach (var book in _books)
+            {
+                <div class="col">
+                    <BookCard Book="book" />
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<Book> _books = new();
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var localRepo = ServiceProvider.GetService(typeof(ILocalBookRepository)) as ILocalBookRepository;
+            if (localRepo != null)
+            {
+                var offlineBooks = await localRepo.GetOfflineBooksAsync();
+                _books = offlineBooks?.ToList() ?? new List<Book>();
+            }
+        }
+        catch (Exception ex)
+        {
+            _books = new List<Book> { new Book { Title = "ERROR: " + ex.Message } };
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
+

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Domain.Entities;
 using System.IO;
 
@@ -10,6 +10,7 @@ namespace QuimeraReader.Mobile.Data
         public DbSet<BookAudioTrack> BookAudioTracks { get; set; } = null!;
         public DbSet<BookAnnotation> BookAnnotations { get; set; } = null!;
         public DbSet<BookCategory> Categories { get; set; } = null!;
+        public DbSet<ClientLog> ClientLogs { get; set; } = null!;
 
         public LocalAppDbContext()
         {
@@ -25,6 +26,9 @@ namespace QuimeraReader.Mobile.Data
         {
             base.OnModelCreating(modelBuilder);
             
+            modelBuilder.Entity<BookAuthor>().HasKey(ba => new { ba.BookId, ba.AuthorId });
+            modelBuilder.Entity<BookCategory>().HasKey(bc => new { bc.BookId, bc.CategoryId });
+
             // Replicate necessary relationships
             modelBuilder.Entity<Book>()
                 .HasMany(b => b.AudioTracks)
@@ -40,3 +44,4 @@ namespace QuimeraReader.Mobile.Data
         }
     }
 }
+

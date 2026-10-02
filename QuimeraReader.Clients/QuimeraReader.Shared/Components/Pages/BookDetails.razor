@@ -8,6 +8,7 @@
 @inject ToastService ToastService
 @inject IJSRuntime JS
 @inject Radzen.DialogService DialogService
+@inject IServiceProvider ServiceProvider
 @inject QuimeraReader.Shared.Interfaces.ITranslationService Translation
 
 <PageTitle>Detalles del Libro</PageTitle>
@@ -42,7 +43,7 @@ else
             <div class="d-flex flex-column flex-md-row gap-5 align-items-center align-items-md-start">
                 <!-- Cover -->
                 <div class="cover-section" style="flex: 0 0 auto; width: 100%; max-width: 300px;">
-                    <img src="@(BookService.BaseAddress + @_book.CoverUrl)" alt="Portada" class="img-fluid rounded shadow-lg" style="width: 100%;" onerror="this.outerHTML='<div class=\'placeholder-cover shadow-lg rounded d-flex align-items-center justify-content-center\' style=\'width:100%;aspect-ratio:2/3;background:#2a2a2a;color:#888;\'><span>Sin Portada</span></div>'" />
+                    <img src="@QuimeraReader.Shared.Helpers.ImageHelper.GetImageSource(_book.CoverUrl, BookService.BaseAddress)" alt="Portada" class="img-fluid rounded shadow-lg" style="width: 100%;" onerror="this.outerHTML='<div class=\'placeholder-cover shadow-lg rounded d-flex align-items-center justify-content-center\' style=\'width:100%;aspect-ratio:2/3;background:#2a2a2a;color:#888;\'><span>Sin Portada</span></div>'" />
                 </div>
                 
                 <!-- Metadata -->
@@ -232,6 +233,14 @@ else
     {
         _isLoading = true;
         _book = await BookService.GetBookAsync(Id);
+        if (_book == null)
+        {
+            var localRepo = ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
+            if (localRepo != null)
+            {
+                _book = await localRepo.GetBookByIdAsync(Id);
+            }
+        }
         _isLoading = false;
         StateHasChanged();
     }
@@ -364,5 +373,12 @@ else
         }
     }
 }
+
+
+
+
+
+
+
 
 
