@@ -36,9 +36,10 @@ public static class MauiProgram
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();
 		builder.Logging.AddDebug();
+#endif
+
 #if ANDROID || IOS
         builder.Logging.AddProvider(new QuimeraReader.Mobile.Logging.MauiDbLoggerProvider());
-#endif
 #endif
 		
         builder.Services.AddScoped<QuimeraReader.Shared.Services.IServerConfigService, QuimeraReader.Mobile.Services.MobileServerConfigService>();
@@ -64,3 +65,5 @@ public static class MauiProgram
 		return builder.Build();
 	}
 }
+
+
