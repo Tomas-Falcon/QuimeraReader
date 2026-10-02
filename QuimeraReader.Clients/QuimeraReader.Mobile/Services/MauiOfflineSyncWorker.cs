@@ -1,7 +1,8 @@
-ï»¿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Net.Http.Json;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Storage;
@@ -37,14 +38,42 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
         try
         {
             _isSyncing = true;
-            _logger.LogInformation("Iniciando sincronizaciÃ³n offline...");
+            _logger.LogInformation("Iniciando sincronización offline...");
 
             using var scope = _serviceProvider.CreateScope();
+            var httpClient = scope.ServiceProvider.GetRequiredService<HttpClient>();
             var bookService = scope.ServiceProvider.GetRequiredService<IBookService>();
             var localRepo = scope.ServiceProvider.GetRequiredService<ILocalBookRepository>();
             var dbContext = scope.ServiceProvider.GetRequiredService<LocalAppDbContext>();
             
             await localRepo.EnsureCreatedAsync();
+
+            // 0. SYNC LOGS: Push local logs to Server
+            try
+            {
+                var localLogs = await dbContext.ClientLogs.ToListAsync();
+                if (localLogs.Any())
+                {
+                    /* REMOVED VAR */ httpClient = scope.ServiceProvider.GetRequiredService<HttpClient>();
+                    var logDtos = localLogs.Select(l => new QuimeraReader.Shared.Models.ClientLogDto 
+                    { 
+                        Level = l.Level, Message = l.Message, Exception = l.Exception, CreatedAt = l.CreatedAt 
+                    }).ToList();
+                    
+                    var response = await httpClient.PostAsJsonAsync("api/Logs", logDtos);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        dbContext.ClientLogs.RemoveRange(localLogs);
+                        await dbContext.SaveChangesAsync();
+                        _logger.LogInformation("Sincronizados {Count} logs con el servidor.", localLogs.Count);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // No loguear esto con el logger para no hacer loop, o loguearlo y se intentara despues
+                Console.WriteLine("Error syncing logs: " + ex.Message);
+            }
 
             // 1. PUSH: Local -> Server
             var localBooks = await localRepo.GetOfflineBooksAsync();
@@ -90,7 +119,7 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
             // 2. PULL: Server -> Local
             var offlineBooks = serverBooks.Where(b => b.IsAvailableOffline).ToList();
 
-            var httpClient = scope.ServiceProvider.GetRequiredService<HttpClient>();
+            /* REMOVED VAR */ httpClient = scope.ServiceProvider.GetRequiredService<HttpClient>();
 
             foreach (var book in offlineBooks)
             {
@@ -118,11 +147,11 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
                 } catch { }
             }
             
-            _logger.LogInformation("SincronizaciÃ³n offline completada.");
+            _logger.LogInformation("Sincronización offline completada.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error durante la sincronizaciÃ³n offline.");
+            _logger.LogError(ex, "Error durante la sincronización offline.");
         }
         finally
         {
@@ -157,4 +186,7 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
         return serverPath; 
     }
 }
+
+
+
 

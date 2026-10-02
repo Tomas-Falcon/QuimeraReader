@@ -22,6 +22,7 @@ public class LocalBookRepository : ILocalBookRepository
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN ReadingStatus TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN EpubLocationsCache TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN TotalPages INTEGER;"); } catch { }
+        try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS ClientLogs (Id INTEGER PRIMARY KEY AUTOINCREMENT, Level TEXT, Message TEXT, Exception TEXT, CreatedAt TEXT);"); } catch { }
     }
 
     private Book MapToShared(QuimeraReader.Domain.Entities.Book domainBook)
@@ -186,3 +187,4 @@ public class LocalBookRepository : ILocalBookRepository
         }
     }
 }
+

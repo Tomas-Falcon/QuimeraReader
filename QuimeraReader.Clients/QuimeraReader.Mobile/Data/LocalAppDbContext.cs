@@ -10,6 +10,7 @@ namespace QuimeraReader.Mobile.Data
         public DbSet<BookAudioTrack> BookAudioTracks { get; set; } = null!;
         public DbSet<BookAnnotation> BookAnnotations { get; set; } = null!;
         public DbSet<BookCategory> Categories { get; set; } = null!;
+        public DbSet<ClientLog> ClientLogs { get; set; } = null!;
 
         public LocalAppDbContext()
         {
@@ -43,3 +44,4 @@ namespace QuimeraReader.Mobile.Data
         }
     }
 }
+
