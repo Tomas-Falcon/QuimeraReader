@@ -43,6 +43,9 @@ public class LocalBookRepository : ILocalBookRepository
             Description = domainBook.Description,
             LocalCoverPath = domainBook.CoverImagePath,
             LocalEpubPath = domainBook.EpubFilePath,
+            HasCover = !string.IsNullOrEmpty(domainBook.CoverImagePath),
+            HasEpub = !string.IsNullOrEmpty(domainBook.EpubFilePath),
+            HasAudio = domainBook.AudioTracks != null && domainBook.AudioTracks.Any(),
             IsAvailableOffline = domainBook.IsAvailableOffline,
             CurrentEpubCfi = domainBook.CurrentEpubCfi,
             PercentageCompleted = domainBook.PercentageCompleted,
@@ -197,6 +200,8 @@ public class LocalBookRepository : ILocalBookRepository
         }
     }
 }
+
+
 
 
 
