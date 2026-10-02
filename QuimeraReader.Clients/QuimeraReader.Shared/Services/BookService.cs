@@ -92,7 +92,21 @@ public class BookService : IBookService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[BookService] Error obteniendo lista de libros.");
+            _logger.LogError(ex, "[BookService] Error obteniendo lista de libros. Intentando recuperar versión local.");
+            var localRepo = _serviceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
+            if (localRepo != null)
+            {
+                try 
+                {
+                    var localBooks = await localRepo.GetOfflineBooksAsync();
+                    var filtered = localBooks.AsEnumerable();
+                    if (!string.IsNullOrWhiteSpace(search)) filtered = filtered.Where(b => b.Title.Contains(search, StringComparison.OrdinalIgnoreCase));
+                    if (!string.IsNullOrWhiteSpace(readingStatus)) filtered = filtered.Where(b => b.ReadingStatus == readingStatus);
+                    var data = filtered.Skip(skip ?? ((page - 1) * pageSize)).Take(take ?? pageSize).ToArray();
+                    return new PaginatedResult<Book> { Page = page, PageSize = pageSize, Total = filtered.Count(), Data = data };
+                }
+                catch { }
+            }
             return new PaginatedResult<Book> { Page = page, PageSize = pageSize, Total = 0, Data = [] };
         }
     }
@@ -114,7 +128,14 @@ public class BookService : IBookService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[BookService] Error obteniendo libro ID: {BookId}", id);
+            _logger.LogError(ex, "[BookService] Error obteniendo libro ID: {BookId}. Intentando recuperar versión local.", id);
+            var localRepo = GetLocalRepo();
+            if (localRepo != null)
+            {
+                try {
+                    return await localRepo.GetBookByIdAsync(id);
+                } catch { }
+            }
             return null;
         }
     }
