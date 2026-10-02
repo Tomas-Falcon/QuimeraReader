@@ -8,6 +8,7 @@
 @inject ToastService ToastService
 @inject IJSRuntime JS
 @inject Radzen.DialogService DialogService
+@inject IServiceProvider ServiceProvider
 @inject QuimeraReader.Shared.Interfaces.ITranslationService Translation
 
 <PageTitle>Detalles del Libro</PageTitle>
@@ -232,6 +233,14 @@ else
     {
         _isLoading = true;
         _book = await BookService.GetBookAsync(Id);
+        if (_book == null)
+        {
+            var localRepo = ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
+            if (localRepo != null)
+            {
+                _book = await localRepo.GetBookByIdAsync(Id);
+            }
+        }
         _isLoading = false;
         StateHasChanged();
     }
@@ -364,6 +373,10 @@ else
         }
     }
 }
+
+
+
+
 
 
 
