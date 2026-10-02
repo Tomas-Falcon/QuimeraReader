@@ -27,7 +27,8 @@ namespace QuimeraReader.Shared.Helpers
             
             var baseUri = baseAddress.TrimEnd('/');
             var relative = coverUrl.TrimStart('/');
-            return "$"{baseUri}/{relative}";
+            return $"{baseUri}/{relative}";
         }
     }
 }
+
