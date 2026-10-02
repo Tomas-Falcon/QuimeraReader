@@ -55,6 +55,8 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
             query = query.Where(b => b.Categories.Any(c => request.CategoryIds.Contains(c.CategoryId)));
         }
 
+        if (request.IsAvailableOffline == true) { query = query.Where(b => b.IsAvailableOffline == true); }
+
         var totalBooks = await query.CountAsync(cancellationToken);
 
 if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
@@ -109,6 +111,7 @@ if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
         };
     }
 }
+
 
 
 
