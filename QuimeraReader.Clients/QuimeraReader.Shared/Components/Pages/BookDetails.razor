@@ -1,4 +1,4 @@
-锘緻page "/book/{Id:int}"
+@page "/book/{Id:int}"
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @inject QuimeraReader.Shared.Services.IBookService BookService
@@ -84,7 +84,7 @@ else
                     <div class="badges mb-4 d-flex gap-2 flex-wrap align-items-center">
                         @if (_book.AverageRating.HasValue && _book.AverageRating.Value > 0)
                         {
-                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" class="text-dark fs-6" title="Puntuaci贸n Media">
+                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" class="text-dark fs-6" title="Puntuaci髇 Media">
                                 <i class="bi bi-star-fill"></i> @_book.AverageRating.Value.ToString("0.0")
                             </RadzenBadge>
                         }
@@ -164,12 +164,12 @@ else
                     <div class="mt-4 pt-4" style="border-top: 1px solid rgba(255,255,255,0.1);">
                         <div class="d-flex justify-content-between align-items-center mb-4">
                             <div>
-                                <h6 class="text-white mb-0"><i class="bi bi-cloud-arrow-down me-2"></i> Disponible sin conexi贸n</h6>
+                                <h6 class="text-white mb-0"><i class="bi bi-cloud-arrow-down me-2"></i> Disponible sin conexi髇</h6>
                                 <small class="text-white-50">Descarga los archivos a tu dispositivo para leer y escuchar sin internet.</small>
                             </div>
                             <RadzenSwitch @bind-Value="_book.IsAvailableOffline" Change="@ToggleOfflineAsync" />
                         </div>
-                        <h6 class="text-white-50 mb-3"><i class="bi bi-gear me-2"></i> Gesti贸n de archivos</h6>
+                        <h6 class="text-white-50 mb-3"><i class="bi bi-gear me-2"></i> Gesti髇 de archivos</h6>
                         <div class="d-flex gap-2 flex-wrap">
                             @if (_book.HasEpub)
                             {
@@ -267,7 +267,7 @@ else
         try
         {
             await BookService.ToggleOfflineAvailabilityAsync(Id, value);
-            ToastService.ShowSuccess(value ? "Libro marcado para leer sin conexi贸n." : "Libro eliminado de descargas autom谩ticas.");
+            ToastService.ShowSuccess(value ? "Libro marcado para leer sin conexi髇." : "Libro eliminado de descargas autom醫icas.");
         }
         catch (Exception ex)
         {
@@ -284,7 +284,7 @@ else
 
     private async Task DeleteEpubAsync()
     {
-        bool confirmed = await JS.InvokeAsync<bool>("confirm", "驴Seguro que deseas borrar el archivo EPUB de este libro?");
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", "縎eguro que deseas borrar el archivo EPUB de este libro?");
         if (!confirmed) return;
 
         try
@@ -316,7 +316,7 @@ else
 
     private async Task DeleteAudioAsync()
     {
-        bool confirmed = await JS.InvokeAsync<bool>("confirm", "驴Seguro que deseas borrar el Audiolibro de este libro?");
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", "縎eguro que deseas borrar el Audiolibro de este libro?");
         if (!confirmed) return;
 
         try
@@ -364,5 +364,6 @@ else
         }
     }
 }
+
 
 
