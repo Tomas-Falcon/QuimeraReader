@@ -23,9 +23,12 @@ public class LocalBookRepository : ILocalBookRepository
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN EpubLocationsCache TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN TotalPages INTEGER;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS ClientLogs (Id INTEGER PRIMARY KEY AUTOINCREMENT, Level TEXT, Message TEXT, Exception TEXT, CreatedAt TEXT);"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS Author (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT);"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS Category (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT);"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS BookAuthor (BookId INTEGER, AuthorId INTEGER, PRIMARY KEY(BookId, AuthorId));"); } catch { }
+        try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS Author (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, FileAs TEXT);"); } catch { }
+        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Author ADD COLUMN FileAs TEXT;"); } catch { }
+        try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS Category (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, IsUserGenerated INTEGER);"); } catch { }
+        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Category ADD COLUMN IsUserGenerated INTEGER;"); } catch { }
+        try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS BookAuthor (BookId INTEGER, AuthorId INTEGER, Role TEXT, PRIMARY KEY(BookId, AuthorId));"); } catch { }
+        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE BookAuthor ADD COLUMN Role TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS BookCategory (BookId INTEGER, CategoryId INTEGER, PRIMARY KEY(BookId, CategoryId));"); } catch { }
     }
 
@@ -191,5 +194,6 @@ public class LocalBookRepository : ILocalBookRepository
         }
     }
 }
+
 
 
