@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using QuimeraReader.Shared.Models;
 
@@ -16,5 +16,6 @@ public interface ILocalBookRepository
     Task<List<AnnotationQueueItem>> GetQueuedAnnotationsAsync();
     Task RemoveQueuedAnnotationAsync(string id);
     Task EnsureCreatedAsync();
+    Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId);
+    Task SyncAnnotationsAsync(int bookId, List<AnnotationDto> annotations);
 }
-

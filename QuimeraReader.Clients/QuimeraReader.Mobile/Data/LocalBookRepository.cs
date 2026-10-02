@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -196,6 +196,8 @@ public class LocalBookRepository : ILocalBookRepository
         {
             if (!string.IsNullOrEmpty(cfi)) book.CurrentEpubCfi = cfi;
             if (percentage.HasValue) book.PercentageCompleted = percentage.Value;
+            if (audioPosition.HasValue) book.CurrentAudioPosition = audioPosition.Value;
+            book.LastReadAt = System.DateTime.UtcNow;
             await _dbContext.SaveChangesAsync();
         }
     }
@@ -224,12 +226,32 @@ public class LocalBookRepository : ILocalBookRepository
         Microsoft.Maui.Storage.Preferences.Set("AnnotationQueue", System.Text.Json.JsonSerializer.Serialize(queue));
         return Task.CompletedTask;
     }
+
+
+
+
+
+
+
+
+
+    public async Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId)
+    {
+        var queued = await GetQueuedAnnotationsAsync();
+        var dbAnns = await _dbContext.Books.Where(b => b.Id == bookId).SelectMany(b => b.Annotations).Select(a => new AnnotationDto { Id = a.Id, BookId = a.BookId, CfiRange = a.CfiRange, SelectedText = a.SelectedText, Note = a.Note, ColorHex = a.ColorHex, CreatedAt = a.CreatedAt }).ToListAsync();
+        foreach(var q in queued.Where(x => x.BookId == bookId)) {
+            dbAnns.Add(new AnnotationDto { BookId = q.BookId, CfiRange = q.CfiRange, SelectedText = q.SelectedText, Note = q.Note, ColorHex = q.ColorHex });
+        }
+        return dbAnns;
+    }
+
+    public async Task SyncAnnotationsAsync(int bookId, List<AnnotationDto> annotations)
+    {
+        var book = await _dbContext.Books.Include(b => b.Annotations).FirstOrDefaultAsync(b => b.Id == bookId);
+        if (book != null) {
+            _dbContext.RemoveRange(book.Annotations);
+            book.Annotations = annotations.Select(a => new QuimeraReader.Domain.Entities.BookAnnotation { BookId = a.BookId, CfiRange = a.CfiRange, SelectedText = a.SelectedText, Note = a.Note, ColorHex = a.ColorHex, CreatedAt = a.CreatedAt }).ToList();
+            await _dbContext.SaveChangesAsync();
+        }
+    }
 }
-
-
-
-
-
-
-
-

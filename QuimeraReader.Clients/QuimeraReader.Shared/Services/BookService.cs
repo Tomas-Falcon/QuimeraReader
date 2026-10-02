@@ -220,7 +220,14 @@ public class BookService : IBookService
         }
         catch (Exception ex)
         { 
-            _logger.LogError(ex, "[BookService] Error actualizando posición para libro ID: {BookId}", bookId);
+            _logger.LogError(ex, "[BookService] Error actualizando posición para libro ID: {BookId}. Intentando guardar localmente.", bookId);
+            var localRepo = GetLocalRepo();
+            if (localRepo != null) 
+            {
+                try {
+                    await localRepo.UpdateProgressAsync(bookId, epubCfi ?? "", audioPosition, percentage);
+                } catch { }
+            }
         }
     }
 
@@ -301,21 +308,56 @@ public class BookService : IBookService
 
     public async Task CreateAnnotationAsync(int bookId, string cfiRange, string selectedText, string colorHex, string note)
     {
-        var payload = new { CfiRange = cfiRange, SelectedText = selectedText, ColorHex = colorHex, Note = note };
-        var response = await _httpClient.PostAsJsonAsync($"api/Books/{bookId}/annotations", payload);
-        response.EnsureSuccessStatusCode();
+        try
+        {
+            if (_networkState.IsOffline)
+            {
+                var localRepo = GetLocalRepo();
+                if (localRepo != null) 
+                {
+                    await localRepo.QueueAnnotationAsync(bookId, cfiRange, selectedText, colorHex, note);
+                    return;
+                }
+            }
+
+            var payload = new { CfiRange = cfiRange, SelectedText = selectedText, ColorHex = colorHex, Note = note };
+            var response = await _httpClient.PostAsJsonAsync($"api/Books/{bookId}/annotations", payload);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[BookService] Error creating annotation online. Queueing locally.");
+            var localRepo = GetLocalRepo();
+            if (localRepo != null) 
+            {
+                await localRepo.QueueAnnotationAsync(bookId, cfiRange, selectedText, colorHex, note);
+            }
+        }
     }
 
     public async Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId)
     {
         try
         {
+            if (_networkState.IsOffline)
+            {
+                var localRepo = GetLocalRepo();
+                if (localRepo != null) 
+                {
+                    return await localRepo.GetAnnotationsAsync(bookId);
+                }
+            }
             _logger.LogInformation("[BookService] Obteniendo anotaciones del libro ID: {BookId}", bookId);
             return await _httpClient.GetFromJsonAsync<List<AnnotationDto>>($"api/Books/{bookId}/annotations") ?? new();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[BookService] Error obteniendo anotaciones del libro ID: {BookId}", bookId);
+            _logger.LogWarning(ex, "[BookService] Error obteniendo anotaciones del libro ID: {BookId}. Intentando recuperar versión local.", bookId);
+            var localRepo = GetLocalRepo();
+            if (localRepo != null) 
+            {
+                try { return await localRepo.GetAnnotationsAsync(bookId); } catch { }
+            }
             return new();
         }
     }

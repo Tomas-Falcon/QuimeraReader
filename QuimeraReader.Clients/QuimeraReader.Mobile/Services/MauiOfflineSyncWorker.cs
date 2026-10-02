@@ -117,8 +117,21 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
 
                 if (serverBook != null)
                 {
-                    // Si el local fue leido despues que el server, hacer PUSH al server
-                    if (localBook.LastReadAt > serverBook.LastReadAt || (localBook.LastReadAt != null && serverBook.LastReadAt == null))
+                    // Estrategia de sincronización pedida por el usuario:
+                    // Quedarnos con el que esté más adelantado (PercentageCompleted mayor).
+                    bool shouldPush = false;
+                    
+                    if (localBook.PercentageCompleted > (serverBook.PercentageCompleted ?? 0))
+                    {
+                        shouldPush = true;
+                    }
+                    else if (localBook.PercentageCompleted == serverBook.PercentageCompleted && 
+                            (localBook.LastReadAt > serverBook.LastReadAt || (localBook.LastReadAt != null && serverBook.LastReadAt == null)))
+                    {
+                        shouldPush = true;
+                    }
+
+                    if (shouldPush)
                     {
                         try
                         {
@@ -212,6 +225,13 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
                             else existingMap.SyncMap.SyncMapJson = syncMapStr;
                             await dbContext.SaveChangesAsync();
                         }
+                    }
+                } catch { }
+
+                try {
+                    var serverAnnotations = await bookService.GetAnnotationsAsync(book.Id);
+                    if (serverAnnotations != null && serverAnnotations.Any()) {
+                        await localRepo.SyncAnnotationsAsync(book.Id, serverAnnotations);
                     }
                 } catch { }
             }
