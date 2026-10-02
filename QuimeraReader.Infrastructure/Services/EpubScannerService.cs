@@ -424,7 +424,7 @@ public class EpubScannerService
                 faltaMetaCat = new Category { Name = "Falta Metadatos", IsUserGenerated = false };
                 _dbContext.Add(faltaMetaCat);
             }
-            if (!book.Categories.Any(c => c.Category.Name == "Falta Metadatos"))
+            if (!book.Categories.Any(c => c.Category?.Name == "Falta Metadatos"))
             {
                 book.Categories.Add(new BookCategory { Category = faltaMetaCat });
             }
@@ -581,7 +581,7 @@ public class EpubScannerService
                 faltaMetaCat = new Category { Name = "Falta Metadatos", IsUserGenerated = false };
                 _dbContext.Add(faltaMetaCat);
             }
-            if (!book.Categories.Any(c => c.Category.Name == "Falta Metadatos"))
+            if (!book.Categories.Any(c => c.Category?.Name == "Falta Metadatos"))
             {
                 book.Categories.Add(new BookCategory { Category = faltaMetaCat });
             }
@@ -602,6 +602,9 @@ public class EpubScannerService
         return string.Join("_", filename.Split(Path.GetInvalidFileNameChars()));
     }
 }
+
+
+
 
 
 
