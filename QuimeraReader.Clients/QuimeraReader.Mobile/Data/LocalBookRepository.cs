@@ -34,6 +34,9 @@ public class LocalBookRepository : ILocalBookRepository
             CurrentEpubCfi = domainBook.CurrentEpubCfi,
             PercentageCompleted = domainBook.PercentageCompleted,
             LastReadAt = domainBook.LastReadAt,
+            ReadingStatus = domainBook.ReadingStatus,
+            EpubLocationsCache = domainBook.EpubLocationsCache,
+            TotalPages = domainBook.TotalPages,
             CurrentAudioPosition = domainBook.CurrentAudioPosition,
             CurrentAudioTrackNumber = domainBook.CurrentAudioTrackNumber,
             Authors = domainBook.Authors?.Select(a => a.Author?.Name ?? "").ToList() ?? new List<string>(),
@@ -53,6 +56,9 @@ public class LocalBookRepository : ILocalBookRepository
             CurrentEpubCfi = sharedBook.CurrentEpubCfi ?? "",
             PercentageCompleted = sharedBook.PercentageCompleted,
             LastReadAt = sharedBook.LastReadAt,
+            ReadingStatus = sharedBook.ReadingStatus,
+            EpubLocationsCache = sharedBook.EpubLocationsCache,
+            TotalPages = sharedBook.TotalPages,
             CurrentAudioPosition = sharedBook.CurrentAudioPosition,
             CurrentAudioTrackNumber = sharedBook.CurrentAudioTrackNumber
         };
