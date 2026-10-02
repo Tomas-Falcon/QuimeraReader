@@ -1,4 +1,4 @@
-@page "/offline-library"
+﻿@page "/offline-library"
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Interfaces
 @inject NavigationManager NavManager
@@ -22,7 +22,8 @@
     {
         <div class="text-center p-5">
             <RadzenIcon Icon="cloud_off" Style="font-size: 3rem; color: var(--rz-text-disabled-color);" />
-            <p class="text-muted mt-2">No tienes libros descargados para leer sin conexi�n.</p>
+            <p class="text-muted mt-2">No tienes libros descargados para leer sin conexión.</p>
+            <p>DEBUG DB Path: @(System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "quimerareader_local.db"))</p>
         </div>
     }
     else
@@ -53,9 +54,9 @@
                 _books = offlineBooks?.ToList() ?? new List<Book>();
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // fallback if anything goes wrong
+            _books = new List<Book> { new Book { Title = "ERROR: " + ex.Message } };
         }
         finally
         {
@@ -63,3 +64,4 @@
         }
     }
 }
+
