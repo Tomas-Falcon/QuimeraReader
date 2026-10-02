@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Application.Interfaces;
 using QuimeraReader.Application.Books.DTOs;
@@ -86,6 +86,7 @@ if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
             Categories = b.Categories.Where(c => c.Category != null).Select(c => c.Category!.Name).ToList(),
             Series = b.Series?.Name,
             Universe = b.Series?.Universe?.Name,
+            IsAvailableOffline = b.IsAvailableOffline,
             HasCover = !string.IsNullOrEmpty(b.CoverImagePath),
             HasEpub = !string.IsNullOrEmpty(b.EpubFilePath),
             HasAudio = b.AudioTracks.Any(),
@@ -108,4 +109,5 @@ if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
         };
     }
 }
+
 
