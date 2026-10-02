@@ -1,5 +1,15 @@
-﻿export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi, epubLocationsCache) {
+export async function initializeEpubFromStream(elementId, streamRef, dotNetRef, lastCfi, epubLocationsCache) {
+    var arrayBuffer = await streamRef.arrayBuffer();
+    var book = ePub(arrayBuffer);
+    initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache);
+}
+
+export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi, epubLocationsCache) {
     var book = ePub(epubUrl);
+    initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache);
+}
+
+function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache) {
     var rendition = book.renderTo(elementId, {
         width: "100%",
         height: "100%",
@@ -291,4 +301,6 @@ export function highlightKaraokePhrase(text) {
         currentNode = treeWalker.nextNode();
     }
 }
+
+
 

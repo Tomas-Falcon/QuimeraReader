@@ -1,4 +1,4 @@
-﻿@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @using Microsoft.JSInterop
 @using System.Text.Json
@@ -234,10 +234,25 @@
                 if (_dotNetRef == null) _dotNetRef = DotNetObjectReference.Create(this);
                 _epubJsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/QuimeraReader.Shared/epubInterop.js");
                 // Construct the absolute URL to the EPUB file via API
-                var baseUrl = BookService.BaseAddress.TrimEnd('/');
-                var epubApiUrl = $"{baseUrl}/{Book.EpubUrl}";
-                
-                await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubApiUrl, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache);
+                if (!string.IsNullOrEmpty(Book.LocalEpubPath) && System.IO.File.Exists(Book.LocalEpubPath))
+                {
+                    try 
+                    {
+                        var fileStream = System.IO.File.OpenRead(Book.LocalEpubPath);
+                        using var streamRef = new DotNetStreamReference(stream: fileStream);
+                        await _epubJsModule.InvokeVoidAsync("initializeEpubFromStream", "epub-viewer", streamRef, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Console.WriteLine($"Error reading local EPUB: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    var baseUrl = BookService.BaseAddress.TrimEnd('/');
+                    var epubApiUrl = $"{baseUrl}/{Book.EpubUrl}";
+                    await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubApiUrl, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache);
+                }
 
                 // Cargar y pintar anotaciones guardadas
                 _ = Task.Run(async () =>

@@ -1,6 +1,19 @@
-﻿@page "/"
+@page "/"
 @using QuimeraReader.Shared.Components
+@using QuimeraReader.Shared.Interfaces
+@inject INetworkStateService NetworkState
+@inject NavigationManager NavManager
 
 <h1>Tu Biblioteca Móvil</h1>
 
 <BookList />
+
+@code {
+    protected override void OnInitialized()
+    {
+        if (NetworkState.IsOffline)
+        {
+            NavManager.NavigateTo("/offline-library");
+        }
+    }
+}
