@@ -1,6 +1,7 @@
 @page "/"
 @using QuimeraReader.Shared.Components
 @using QuimeraReader.Shared.Interfaces
+@implements IDisposable
 @inject INetworkStateService NetworkState
 @inject NavigationManager NavManager
 
@@ -11,9 +12,27 @@
 @code {
     protected override void OnInitialized()
     {
-        if (NetworkState.IsOffline)
+        NetworkState.OnNetworkStateChanged += StateChanged;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && NetworkState.IsOffline)
         {
             NavManager.NavigateTo("/offline-library");
         }
+    }
+
+    private void StateChanged()
+    {
+        if (NetworkState.IsOffline)
+        {
+            InvokeAsync(() => NavManager.NavigateTo("/offline-library"));
+        }
+    }
+
+    public void Dispose()
+    {
+        NetworkState.OnNetworkStateChanged -= StateChanged;
     }
 }
