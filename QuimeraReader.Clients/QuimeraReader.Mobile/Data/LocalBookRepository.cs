@@ -61,8 +61,8 @@ public class LocalBookRepository : ILocalBookRepository
         {
             Id = sharedBook.Id,
             Title = sharedBook.Title,
-            CoverImagePath = sharedBook.LocalCoverPath,
-            EpubFilePath = sharedBook.LocalEpubPath,
+            CoverImagePath = sharedBook.LocalCoverPath ?? "",
+            EpubFilePath = sharedBook.LocalEpubPath ?? "",
             IsAvailableOffline = sharedBook.IsAvailableOffline,
             CurrentEpubCfi = sharedBook.CurrentEpubCfi ?? "",
             PercentageCompleted = sharedBook.PercentageCompleted,
@@ -194,6 +194,7 @@ public class LocalBookRepository : ILocalBookRepository
         }
     }
 }
+
 
 
 
