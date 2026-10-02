@@ -19,6 +19,9 @@ public class LocalBookRepository : ILocalBookRepository
     public async Task EnsureCreatedAsync()
     {
         await _dbContext.Database.EnsureCreatedAsync();
+        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN ReadingStatus TEXT;"); } catch { }
+        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN EpubLocationsCache TEXT;"); } catch { }
+        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN TotalPages INTEGER;"); } catch { }
     }
 
     private Book MapToShared(QuimeraReader.Domain.Entities.Book domainBook)
