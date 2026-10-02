@@ -1025,6 +1025,38 @@ public partial class BooksController : ControllerBase
         await _dbContext.SaveChangesAsync();
         return Ok();
     }
+
+    [HttpGet("unmatched-audios/{id}/stream")]
+    public async Task<IActionResult> StreamUnmatchedAudio(int id)
+    {
+        var audio = await _dbContext.UnmatchedAudioTracks.FindAsync(id);
+        if (audio == null || !System.IO.File.Exists(audio.PhysicalPath)) return NotFound();
+        return PhysicalFile(audio.PhysicalPath, "audio/mpeg", enableRangeProcessing: true);
+    }
+
+    [HttpPost("unmatched-audios/auto-match")]
+    public async Task<IActionResult> AutoMatchUnmatchedAudios([FromServices] QuimeraReader.Infrastructure.Services.AudioMatchingService audioMatchingService)
+    {
+        var unmatched = await _dbContext.UnmatchedAudioTracks.ToListAsync();
+        int successCount = 0;
+        foreach (var audio in unmatched)
+        {
+            var matchId = await audioMatchingService.TryMatchAudioToBookAsync(audio.PhysicalPath);
+            if (matchId.HasValue)
+            {
+                var book = await _dbContext.Books.Include(b => b.AudioTracks).FirstOrDefaultAsync(b => b.Id == matchId.Value);
+                if (book != null)
+                {
+                    int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
+                    book.AudioTracks.Add(new QuimeraReader.Domain.Entities.BookAudioTrack { FilePath = audio.PhysicalPath, TrackNumber = nextTrack });
+                    _dbContext.UnmatchedAudioTracks.Remove(audio);
+                    await _dbContext.SaveChangesAsync();
+                    successCount++;
+                }
+            }
+        }
+        return Ok(successCount.ToString());
+    }
 }
 public class ScanRequest 
 { 

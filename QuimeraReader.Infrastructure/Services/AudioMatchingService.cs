@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -24,11 +24,19 @@ public class AudioMatchingService
 
     public async Task<int?> TryMatchAudioToBookAsync(string audioFilePath, CancellationToken cancellationToken = default)
     {
-        string fileName = Path.GetFileNameWithoutExtension(audioFilePath);
-        var books = await _dbContext.Books.Include(b => b.Authors).ThenInclude(a => a.Author).ToListAsync(cancellationToken);
+        string fileName = Path.GetFileNameWithoutExtension(audioFilePath).ToLowerInvariant();
         
-        var bestMatch = books
-            .Select(b => new { Book = b, Score = CalculateSimilarity(fileName.ToLower(), b.Title.ToLower()) })
+        var allBooks = await _dbContext.Books.Select(b => new { b.Id, b.Title }).ToListAsync(cancellationToken);
+        
+        var explicitMatch = allBooks.FirstOrDefault(b => b.Title.Length > 5 && fileName.Contains(b.Title.ToLower()));
+        if (explicitMatch != null)
+        {
+            _logger.LogInformation("Audio emparejado por contención de título: {File} -> {BookTitle}", fileName, explicitMatch.Title);
+            return explicitMatch.Id;
+        }
+
+        var bestMatch = allBooks
+            .Select(b => new { Book = b, Score = CalculateSimilarity(fileName, b.Title.ToLower()) })
             .OrderByDescending(x => x.Score)
             .FirstOrDefault();
 
@@ -39,18 +47,11 @@ public class AudioMatchingService
             return bestMatch.Book.Id;
         }
 
-        var explicitMatch = books.FirstOrDefault(b => fileName.ToLower().Contains(b.Title.ToLower()) && b.Title.Length > 5);
-        if (explicitMatch != null)
-        {
-            _logger.LogInformation("Audio emparejado por contención de título: {File} -> {BookTitle}", fileName, explicitMatch.Title);
-            return explicitMatch.Id;
-        }
-
         _logger.LogInformation("Iniciando emparejamiento por contenido (Whisper Parcial) para {File}...", fileName);
-        return await MatchByContentAsync(audioFilePath, books, cancellationToken);
+        return await MatchByContentAsync(audioFilePath, cancellationToken);
     }
 
-    private async Task<int?> MatchByContentAsync(string audioFilePath, System.Collections.Generic.List<Book> allBooks, CancellationToken cancellationToken)
+    private async Task<int?> MatchByContentAsync(string audioFilePath, CancellationToken cancellationToken)
     {
         var modelPathSetting = await _dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "WhisperModelPath", cancellationToken);
         string modelPath = modelPathSetting?.Value ?? "ggml-base.bin";
@@ -91,12 +92,13 @@ public class AudioMatchingService
             if (string.IsNullOrWhiteSpace(extractedText)) return null;
             string normalizedAudioText = extractedText.ToLowerInvariant();
 
-            var contentMatch = allBooks
+            var allTitles = await _dbContext.Books.Select(b => new { b.Id, b.Title }).ToListAsync(cancellationToken);
+            var contentMatch = allTitles
                 .Select(b => new 
                 { 
-                    Book = b, 
-                    Hits = (normalizedAudioText.Contains(b.Title.ToLower()) ? 10 : 0) + 
-                           (b.Authors.Any(a => a.Author != null && normalizedAudioText.Contains(a.Author.Name.ToLower())) ? 5 : 0)
+                    Id = b.Id, 
+                    Title = b.Title,
+                    Hits = (normalizedAudioText.Contains(b.Title.ToLower()) && b.Title.Length > 4) ? 10 : 0
                 })
                 .Where(x => x.Hits >= 10)
                 .OrderByDescending(x => x.Hits)
@@ -104,9 +106,31 @@ public class AudioMatchingService
 
             if (contentMatch != null)
             {
-                _logger.LogInformation("Audio emparejado por CONTENIDO: {File} -> {BookTitle}", Path.GetFileName(audioFilePath), contentMatch.Book.Title);
-                return contentMatch.Book.Id;
+                _logger.LogInformation("Audio emparejado por CONTENIDO (Título en audio): {File} -> {BookTitle}", Path.GetFileName(audioFilePath), contentMatch.Title);
+                return contentMatch.Id;
             }
+            
+            // Si el título no está explícitamente, busquemos palabras clave largas en BooksFTS
+            var words = normalizedAudioText.Split(new[] { ' ', '.', ',', ':', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                                           .Where(w => w.Length > 5)
+                                           .Distinct()
+                                           .Take(8)
+                                           .ToList();
+                                           
+            if (words.Any())
+            {
+                string matchQuery = string.Join(" OR ", words.Select(w => $"\"{w}*\""));
+                var ftsMatch = await _dbContext.Books
+                    .FromSqlRaw($"SELECT b.* FROM Books b INNER JOIN BooksFTS fts ON b.Id = fts.rowid WHERE BooksFTS MATCH {{0}} LIMIT 1", matchQuery)
+                    .FirstOrDefaultAsync(cancellationToken);
+                    
+                if (ftsMatch != null)
+                {
+                    _logger.LogInformation("Audio emparejado por FTS Múltiple: {File} -> {BookTitle}", Path.GetFileName(audioFilePath), ftsMatch.Title);
+                    return ftsMatch.Id;
+                }
+            }
+            
             return null;
         }
         catch (Exception ex)

@@ -8,7 +8,35 @@ namespace QuimeraReader.Shared.Components.Pages;
 
 public partial class UnmatchedAudios : ComponentBase
 {
-    private bool _isLoading = false;
+        private bool _isLoading = false;
+    private bool _isAutoMatching = false;
+
+    private async Task AutoMatchAudios()
+    {
+        _isAutoMatching = true;
+        try
+        {
+            var response = await Http.PostAsync("api/books/unmatched-audios/auto-match", null);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadAsStringAsync();
+                ToastService.ShowSuccess($"Proceso iniciado: {result}");
+                await LoadAudios();
+            }
+            else
+            {
+                ToastService.ShowError("Error al iniciar el proceso automático.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error: " + ex.Message);
+        }
+        finally
+        {
+            _isAutoMatching = false;
+        }
+    }
     private List<UnmatchedAudioTrack> _audios = new();
 
     protected override async Task OnInitializedAsync()
@@ -87,3 +115,4 @@ public partial class UnmatchedAudios : ComponentBase
         }
     }
 }
+
