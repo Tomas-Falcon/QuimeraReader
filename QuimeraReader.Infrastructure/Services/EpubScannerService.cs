@@ -314,13 +314,15 @@ public class EpubScannerService
             {
                 if (File.Exists(newEpubPath)) File.Delete(newEpubPath);
                 File.CreateSymbolicLink(newEpubPath, sourceFilePath);
+                book.EpubFilePath = newEpubPath;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Error creando Symlink, cayendo de nuevo a Copia para: {File}", sourceFilePath);
-                if (File.Exists(newEpubPath)) File.Delete(newEpubPath); File.Copy(sourceFilePath, newEpubPath, overwrite: true);
+                _logger.LogWarning(ex, "Error creando Symlink para {File}. En modo torrent NO se copiará el archivo para ahorrar espacio. Se guardará la ruta original.", sourceFilePath);
+                // Si falla el symlink en Docker/Windows, no copiamos (evitamos duplicar 140k libros).
+                // Guardamos la ruta original del torrent.
+                book.EpubFilePath = sourceFilePath;
             }
-            book.EpubFilePath = newEpubPath;
         }
         else
         {
@@ -351,11 +353,12 @@ public class EpubScannerService
                     {
                         if (File.Exists(newAudioPath)) File.Delete(newAudioPath);
                         File.CreateSymbolicLink(newAudioPath, possibleAudioPath);
+                        newAudioPath = newAudioPath; // keep same variable for next steps if needed
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Error creando Symlink Audio, usando copia para: {File}", possibleAudioPath);
-                        if (File.Exists(newAudioPath)) File.Delete(newAudioPath); File.Copy(possibleAudioPath, newAudioPath, overwrite: true);
+                        _logger.LogWarning(ex, "Error creando Symlink Audio. No se copiará el archivo. Se mantendrá la ruta original: {File}", possibleAudioPath);
+                        newAudioPath = possibleAudioPath; // usar la ruta original del torrent
                     }
                     hasAudio = true;
                 }
