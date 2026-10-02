@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Json;
+using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using QuimeraReader.Shared.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -101,6 +101,14 @@ public class BookService : IBookService
     {
         try
         {
+            if (_networkState.IsOffline)
+            {
+                var localRepo = GetLocalRepo();
+                if (localRepo != null)
+                {
+                    return await localRepo.GetBookByIdAsync(id);
+                }
+            }
             _logger.LogInformation("[BookService] Obteniendo detalles del libro ID: {BookId}", id);
             return await _httpClient.GetFromJsonAsync<Book>($"api/Books/{id}");
         }
