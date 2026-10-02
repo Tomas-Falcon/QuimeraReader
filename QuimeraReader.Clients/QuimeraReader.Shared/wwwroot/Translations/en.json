@@ -94,5 +94,7 @@
   "Message_PlayingFromSelection": "Playing from selection.",
   "Error_AudioNotFoundForSelection": "Audio not found for this segment.",
   "Message_AnnotationSaved": "Annotation saved.",
-  "Error_SavingAnnotation": "Error saving annotation:"
+  "Error_SavingAnnotation": "Error saving annotation:",
+  "Nav_OfflineLibrary": "Downloads",
+  "OfflineLibrary_Title": "Downloaded Books"
 }

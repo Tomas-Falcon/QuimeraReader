@@ -1,5 +1,6 @@
-﻿@namespace QuimeraReader.Shared.Components.Layout
+@namespace QuimeraReader.Shared.Components.Layout
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
+@inject IServiceProvider ServiceProvider
 
 <div class="d-flex flex-column h-100 position-relative">
     <div style="flex-grow: 1; overflow-y: auto;">
@@ -8,6 +9,10 @@
             <RadzenPanelMenuItem Text="@TranslationService["Nav_Authors"]" Icon="people" Path="authors" />
             <RadzenPanelMenuItem Text="@TranslationService["Nav_Genres"]" Icon="local_offer" Path="categories" />
             <RadzenPanelMenuItem Text="@TranslationService["Nav_ReadBooks"]" Icon="check_circle" Path="read-books" />
+            @if (ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) != null)
+            {
+                <RadzenPanelMenuItem Text="@TranslationService["Nav_OfflineLibrary"]" Icon="cloud_download" Path="offline-library" />
+            }
             <RadzenPanelMenuItem Text="@TranslationService["Nav_Settings"]" Icon="settings" Path="settings" />
             <RadzenPanelMenuItem Text="Audios Huerfanos" Path="unmatched-audios" Icon="audio_file" />
         </RadzenPanelMenu>
@@ -43,3 +48,4 @@
         }
     }
 }
+
