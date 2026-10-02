@@ -79,9 +79,24 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
             var localBooks = await localRepo.GetOfflineBooksAsync();
             // Get ALL offline books from the server directly! 
             // (We request up to 10,000 to ensure we get all offline books)
-            var paginatedBooks = await bookService.GetBooksAsync(1, 10000, isAvailableOffline: true);
+            // To prevent catastrophic deletion if the API fails or returns empty unexpectedly,
+            // we will catch exceptions specifically here.
+            QuimeraReader.Shared.Models.PaginatedResult<QuimeraReader.Shared.Models.Book> paginatedBooks = null;
+            try {
+                // Manually make the HTTP call here to ensure we catch network errors that BookService swallows
+                httpClient = scope.ServiceProvider.GetRequiredService<HttpClient>();
+                var response = await httpClient.GetAsync("api/Books?page=1&pageSize=10000&isAvailableOffline=true");
+                if (!response.IsSuccessStatusCode) {
+                    _logger.LogWarning("API failed with status {Status}. Aborting sync to prevent deletion.", response.StatusCode);
+                    return;
+                }
+                paginatedBooks = await response.Content.ReadFromJsonAsync<QuimeraReader.Shared.Models.PaginatedResult<QuimeraReader.Shared.Models.Book>>();
+            } catch (Exception ex) {
+                _logger.LogError(ex, "Network error during sync pull. Aborting sync.");
+                return;
+            }
+
             if (paginatedBooks == null || paginatedBooks.Data == null) return;
-            
             var serverBooks = paginatedBooks.Data;
 
             // Also we need to get the status of currently local books, even if they are no longer offline on the server.
@@ -221,6 +236,8 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
         return serverPath; 
     }
 }
+
+
 
 
 
