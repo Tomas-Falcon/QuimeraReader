@@ -1032,31 +1032,49 @@ public partial class BooksController : ControllerBase
     {
         var audio = await _dbContext.UnmatchedAudioTracks.FindAsync(id);
         if (audio == null || !System.IO.File.Exists(audio.PhysicalPath)) return NotFound();
-        return PhysicalFile(audio.PhysicalPath, "audio/mpeg", enableRangeProcessing: true);
+        
+        string ext = System.IO.Path.GetExtension(audio.PhysicalPath).ToLower();
+        string mimeType = ext switch {
+            ".mp3" => "audio/mpeg",
+            ".m4a" => "audio/mp4",
+            ".m4b" => "audio/mp4",
+            ".ogg" => "audio/ogg",
+            ".wav" => "audio/wav",
+            _ => "application/octet-stream"
+        };
+        return PhysicalFile(audio.PhysicalPath, mimeType, enableRangeProcessing: true);
     }
 
     [HttpPost("unmatched-audios/auto-match")]
-    public async Task<IActionResult> AutoMatchUnmatchedAudios([FromServices] QuimeraReader.Infrastructure.Services.AudioMatchingService audioMatchingService)
+    public IActionResult AutoMatchUnmatchedAudios([FromServices] Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory)
     {
-        var unmatched = await _dbContext.UnmatchedAudioTracks.ToListAsync();
-        int successCount = 0;
-        foreach (var audio in unmatched)
-        {
-            var matchId = await audioMatchingService.TryMatchAudioToBookAsync(audio.PhysicalPath);
-            if (matchId.HasValue)
-            {
-                var book = await _dbContext.Books.Include(b => b.AudioTracks).FirstOrDefaultAsync(b => b.Id == matchId.Value);
-                if (book != null)
+        _ = Task.Run(async () => {
+            try {
+                using var scope = scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<QuimeraReader.Infrastructure.Data.AppDbContext>();
+                var audioMatchingService = scope.ServiceProvider.GetRequiredService<QuimeraReader.Infrastructure.Services.AudioMatchingService>();
+                
+                var unmatched = await db.UnmatchedAudioTracks.ToListAsync();
+                foreach (var audio in unmatched)
                 {
-                    int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
-                    book.AudioTracks.Add(new QuimeraReader.Domain.Entities.BookAudioTrack { FilePath = audio.PhysicalPath, TrackNumber = nextTrack });
-                    _dbContext.UnmatchedAudioTracks.Remove(audio);
-                    await _dbContext.SaveChangesAsync();
-                    successCount++;
+                    var matchId = await audioMatchingService.TryMatchAudioToBookAsync(audio.PhysicalPath);
+                    if (matchId.HasValue)
+                    {
+                        var book = await db.Books.Include(b => b.AudioTracks).FirstOrDefaultAsync(b => b.Id == matchId.Value);
+                        if (book != null)
+                        {
+                            int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
+                            book.AudioTracks.Add(new QuimeraReader.Domain.Entities.BookAudioTrack { FilePath = audio.PhysicalPath, TrackNumber = nextTrack });
+                            db.UnmatchedAudioTracks.Remove(audio);
+                            await db.SaveChangesAsync();
+                        }
+                    }
                 }
+            } catch (Exception ex) {
+                System.Console.WriteLine($"Error en auto-match: {ex.Message}");
             }
-        }
-        return Ok(successCount.ToString());
+        });
+        return Ok("El proceso ha iniciado en segundo plano. Esto tardará unos minutos.");
     }
 }
 public class ScanRequest 

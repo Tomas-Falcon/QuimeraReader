@@ -1,4 +1,4 @@
-ï»¿@page "/unmatched-audios"
+@page "/unmatched-audios"
 
 @using QuimeraReader.Shared.Services
 @using QuimeraReader.Shared.Models
@@ -9,7 +9,7 @@
 
 <RadzenCard class="m-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3>Audios HuÃ©rfanos</h3>
+        <h3>Audios Huérfanos</h3>
                 <div>
             <RadzenButton Icon="auto_fix_high" Text="Auto-vincular" ButtonStyle="ButtonStyle.Secondary" class="me-2" Click="AutoMatchAudios" IsBusy="@_isAutoMatching" />
             <RadzenButton Icon="refresh" Text="Recargar" Click="LoadAudios" IsBusy="@_isLoading" />
@@ -23,16 +23,16 @@
     else if (!_audios.Any())
     {
         <RadzenAlert AlertStyle="AlertStyle.Success" ShowIcon="true" Variant="Variant.Flat">
-            No hay audios huÃ©rfanos en la base de datos. Â¡Todo estÃ¡ en orden!
+            No hay audios huérfanos en la base de datos. ¡Todo está en orden!
         </RadzenAlert>
     }
     else
     {
-        <RadzenDataGrid Data="@_audios" TItem="UnmatchedAudioTrack" AllowPaging="true" PageSize="10" AllowSorting="true">
+        <div style="overflow-x: auto; width: 100%;"><RadzenDataGrid Data="@_audios" TItem="UnmatchedAudioTrack" AllowPaging="true" PageSize="10" AllowSorting="true" Style="min-width: 800px;">
             <Columns>
                 <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Property="Id" Title="ID" Width="70px" />
                 <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Property="OriginalFileName" Title="Archivo Original" />
-                <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Property="FileSizeBytes" Title="TamaÃ±o">
+                <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Property="FileSizeBytes" Title="Tamaño">
                     <Template Context="audio">
                         @(Math.Round((double)audio.FileSizeBytes / 1024 / 1024, 2)) MB
                     </Template>
@@ -50,7 +50,7 @@
                     </Template>
                 </RadzenDataGridColumn>
             </Columns>
-        </RadzenDataGrid>
+        </RadzenDataGrid></div>
     }
 </RadzenCard>
 
