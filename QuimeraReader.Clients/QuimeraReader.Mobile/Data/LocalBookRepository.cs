@@ -93,16 +93,67 @@ public class LocalBookRepository : ILocalBookRepository
 
     public async Task SaveBookAsync(Book book)
     {
-        var existing = await _dbContext.Books.FindAsync(book.Id);
+        var existing = await _dbContext.Books
+            .Include(b => b.Authors).ThenInclude(a => a.Author)
+            .Include(b => b.Categories).ThenInclude(c => c.Category)
+            .FirstOrDefaultAsync(b => b.Id == book.Id);
+
+        var dom = MapToDomain(book);
         if (existing == null)
         {
-            _dbContext.Books.Add(MapToDomain(book));
+            _dbContext.Books.Add(dom);
+            existing = dom;
         }
         else
         {
-            var dom = MapToDomain(book);
             _dbContext.Entry(existing).CurrentValues.SetValues(dom);
         }
+        
+        // Handle Authors and Categories carefully for SQLite cache
+        if (existing.Authors != null && existing.Authors.Any()) {
+            _dbContext.RemoveRange(existing.Authors);
+            existing.Authors.Clear();
+        } else {
+            existing.Authors = new List<QuimeraReader.Domain.Entities.BookAuthor>();
+        }
+        
+        if (existing.Categories != null && existing.Categories.Any()) {
+            _dbContext.RemoveRange(existing.Categories);
+            existing.Categories.Clear();
+        } else {
+            existing.Categories = new List<QuimeraReader.Domain.Entities.BookCategory>();
+        }
+        
+        await _dbContext.SaveChangesAsync();
+
+        if (book.Authors != null)
+        {
+            foreach (var authorName in book.Authors)
+            {
+                var author = await _dbContext.Set<QuimeraReader.Domain.Entities.Author>().FirstOrDefaultAsync(a => a.Name == authorName);
+                if (author == null) {
+                    author = new QuimeraReader.Domain.Entities.Author { Name = authorName };
+                    _dbContext.Set<QuimeraReader.Domain.Entities.Author>().Add(author);
+                    await _dbContext.SaveChangesAsync(); 
+                }
+                existing.Authors.Add(new QuimeraReader.Domain.Entities.BookAuthor { BookId = existing.Id, AuthorId = author.Id });
+            }
+        }
+        
+        if (book.Categories != null)
+        {
+            foreach (var catName in book.Categories)
+            {
+                var cat = await _dbContext.Set<QuimeraReader.Domain.Entities.Category>().FirstOrDefaultAsync(c => c.Name == catName);
+                if (cat == null) {
+                    cat = new QuimeraReader.Domain.Entities.Category { Name = catName };
+                    _dbContext.Set<QuimeraReader.Domain.Entities.Category>().Add(cat);
+                    await _dbContext.SaveChangesAsync();
+                }
+                existing.Categories.Add(new QuimeraReader.Domain.Entities.BookCategory { BookId = existing.Id, CategoryId = cat.Id });
+            }
+        }
+
         await _dbContext.SaveChangesAsync();
     }
 
@@ -135,4 +186,3 @@ public class LocalBookRepository : ILocalBookRepository
         }
     }
 }
-
