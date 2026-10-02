@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +22,7 @@ public class LocalBookRepository : ILocalBookRepository
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN ReadingStatus TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN EpubLocationsCache TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN TotalPages INTEGER;"); } catch { }
+        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN Description TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS ClientLogs (Id INTEGER PRIMARY KEY AUTOINCREMENT, Level TEXT, Message TEXT, Exception TEXT, CreatedAt TEXT);"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS Author (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, FileAs TEXT);"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Author ADD COLUMN FileAs TEXT;"); } catch { }
@@ -39,6 +40,7 @@ public class LocalBookRepository : ILocalBookRepository
         {
             Id = domainBook.Id,
             Title = domainBook.Title,
+            Description = domainBook.Description,
             LocalCoverPath = domainBook.CoverImagePath,
             LocalEpubPath = domainBook.EpubFilePath,
             IsAvailableOffline = domainBook.IsAvailableOffline,
@@ -61,6 +63,7 @@ public class LocalBookRepository : ILocalBookRepository
         {
             Id = sharedBook.Id,
             Title = sharedBook.Title,
+            Description = sharedBook.Description ?? "",
             CoverImagePath = sharedBook.LocalCoverPath ?? "",
             EpubFilePath = sharedBook.LocalEpubPath ?? "",
             IsAvailableOffline = sharedBook.IsAvailableOffline,
@@ -194,6 +197,7 @@ public class LocalBookRepository : ILocalBookRepository
         }
     }
 }
+
 
 
 
