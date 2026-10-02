@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -38,7 +38,7 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
         try
         {
             _isSyncing = true;
-            _logger.LogInformation("Iniciando sincronización offline...");
+            _logger.LogInformation("Iniciando sincronizaciÃ³n offline...");
 
             using var scope = _serviceProvider.CreateScope();
             var httpClient = scope.ServiceProvider.GetRequiredService<HttpClient>();
@@ -116,8 +116,28 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
                 }
             }
 
-            // 2. PULL: Server -> Local
+            // 2. DELETE: Local books no longer available offline
             var offlineBooks = serverBooks.Where(b => b.IsAvailableOffline).ToList();
+            var offlineBooksIds = offlineBooks.Select(b => b.Id).ToHashSet();
+            
+            var booksToDelete = localBooks.Where(b => !offlineBooksIds.Contains(b.Id)).ToList();
+            foreach (var b in booksToDelete)
+            {
+                try
+                {
+                    if (!string.IsNullOrEmpty(b.LocalEpubPath) && File.Exists(b.LocalEpubPath)) File.Delete(b.LocalEpubPath);
+                    if (!string.IsNullOrEmpty(b.LocalCoverPath) && File.Exists(b.LocalCoverPath)) File.Delete(b.LocalCoverPath);
+                    if (!string.IsNullOrEmpty(b.LocalAudioPath) && File.Exists(b.LocalAudioPath)) File.Delete(b.LocalAudioPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error eliminando archivos locales para el libro {Id}", b.Id);
+                }
+                await localRepo.DeleteBookAsync(b.Id);
+                _logger.LogInformation("Eliminado localmente libro {Id} porque ya no estÃ¡ offline.", b.Id);
+            }
+
+            // 3. PULL: Server -> Local
 
             /* REMOVED VAR */ httpClient = scope.ServiceProvider.GetRequiredService<HttpClient>();
 
@@ -147,11 +167,11 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
                 } catch { }
             }
             
-            _logger.LogInformation("Sincronización offline completada.");
+            _logger.LogInformation("SincronizaciÃ³n offline completada.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error durante la sincronización offline.");
+            _logger.LogError(ex, "Error durante la sincronizaciÃ³n offline.");
         }
         finally
         {
@@ -186,6 +206,7 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
         return serverPath; 
     }
 }
+
 
 
 
