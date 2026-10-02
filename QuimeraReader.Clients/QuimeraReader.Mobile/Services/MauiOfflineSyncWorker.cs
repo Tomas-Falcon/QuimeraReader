@@ -77,14 +77,29 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
 
             // 1. PUSH: Local -> Server
             var localBooks = await localRepo.GetOfflineBooksAsync();
-            var paginatedBooks = await bookService.GetBooksAsync(1, 1000);
+            // Get ALL offline books from the server directly! 
+            // (We request up to 10,000 to ensure we get all offline books)
+            var paginatedBooks = await bookService.GetBooksAsync(1, 10000, isAvailableOffline: true);
             if (paginatedBooks == null || paginatedBooks.Data == null) return;
             
             var serverBooks = paginatedBooks.Data;
 
+            // Also we need to get the status of currently local books, even if they are no longer offline on the server.
+            // But wait, if they are no longer offline, they won't be in serverBooks.
+            // We should fetch the specific local books that are no longer in serverBooks to update their progress?
+            // Progress push is step 1. If it's no longer offline, maybe we should push it first?
+            // We can just push progress blindly to the API for all local books, since they have their IDs.
+            
             foreach (var localBook in localBooks)
             {
                 var serverBook = serverBooks.FirstOrDefault(b => b.Id == localBook.Id);
+                if (serverBook == null)
+                {
+                    try {
+                        serverBook = await bookService.GetBookAsync(localBook.Id);
+                    } catch { }
+                }
+
                 if (serverBook != null)
                 {
                     // Si el local fue leido despues que el server, hacer PUSH al server
@@ -206,6 +221,8 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
         return serverPath; 
     }
 }
+
+
 
 
 

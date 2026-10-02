@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Infrastructure;
 using QuimeraReader.Infrastructure.Services;
@@ -354,7 +354,7 @@ public partial class BooksController : ControllerBase
             }
             finally
             {
-                // Limpieza de huÃ©rfanos generados durante la actualización de metadatos
+                // Limpieza de huÃƒÂ©rfanos generados durante la actualizaciÃ³n de metadatos
                 try
                 {
                     using var scope = scopeFactory.CreateScope();
@@ -377,7 +377,7 @@ public partial class BooksController : ControllerBase
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error en la limpieza de huÃ©rfanos post-escaneo");
+                    _logger.LogError(ex, "Error en la limpieza de huÃƒÂ©rfanos post-escaneo");
                 }
 
                 try
@@ -388,7 +388,7 @@ public partial class BooksController : ControllerBase
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error en la sincronización con Hardcover");
+                    _logger.LogError(ex, "Error en la sincronizaciÃ³n con Hardcover");
                 }
 
                 scanState.IsScanning = false;
@@ -435,15 +435,15 @@ public partial class BooksController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error crÃ­tico durante MergeDuplicates");
-            return StatusCode(500, new { Message = "Error interno durante la fusión", Details = ex.Message, Inner = ex.InnerException?.Message });
+            _logger.LogError(ex, "Error crÃƒÂ­tico durante MergeDuplicates");
+            return StatusCode(500, new { Message = "Error interno durante la fusiÃ³n", Details = ex.Message, Inner = ex.InnerException?.Message });
         }
     }
 
     [HttpPost("{bookId}/categories")]
     public async Task<IActionResult> AddCustomCategory(int bookId, [FromBody] string categoryName)
     {
-        if (string.IsNullOrWhiteSpace(categoryName)) return BadRequest("El nombre de la categorÃ­a no puede estar vacÃ­o.");
+        if (string.IsNullOrWhiteSpace(categoryName)) return BadRequest("El nombre de la categorÃƒÂ­a no puede estar vacÃƒÂ­o.");
 
         var book = await _dbContext.Books.Include(b => b.Categories).ThenInclude(bc => bc.Category).FirstOrDefaultAsync(b => b.Id == bookId);
         if (book == null) return NotFound();
@@ -462,7 +462,7 @@ public partial class BooksController : ControllerBase
             await _dbContext.SaveChangesAsync();
         }
 
-        return Ok(new { Message = "CategorÃ­a aÃ±adida exitosamente." });
+        return Ok(new { Message = "CategorÃƒÂ­a aÃƒÂ±adida exitosamente." });
     }
 
     [HttpPost("upload")]
@@ -471,7 +471,7 @@ public partial class BooksController : ControllerBase
     public async Task<IActionResult> UploadEpub(IFormFile file)
     {
         if (file == null || file.Length == 0)
-            return BadRequest("No se proporcionó ningún archivo.");
+            return BadRequest("No se proporcionÃ³ ningÃºn archivo.");
 
         string[] audioExtensions = { ".mp3", ".m4b", ".m4a", ".wav", ".ogg" };
         bool isAudio = audioExtensions.Contains(Path.GetExtension(file.FileName).ToLowerInvariant());
@@ -516,7 +516,7 @@ public partial class BooksController : ControllerBase
                 System.IO.File.Move(tempPath, orphanPath, true);
                 _dbContext.UnmatchedAudioTracks.Add(new UnmatchedAudioTrack { OriginalFileName = file.FileName, PhysicalPath = orphanPath, FileSizeBytes = file.Length, UploadedAt = DateTime.UtcNow });
                 await _dbContext.SaveChangesAsync();
-                return Ok(new { Message = "El audio fue guardado como huérfano porque no se encontró coincidencia." });
+                return Ok(new { Message = "El audio fue guardado como huÃ©rfano porque no se encontrÃ³ coincidencia." });
             }
 
             var scannerService = HttpContext.RequestServices.GetRequiredService<QuimeraReader.Infrastructure.Services.EpubScannerService>();
@@ -568,7 +568,7 @@ public partial class BooksController : ControllerBase
     [RequestFormLimits(MultipartBodyLengthLimit = 1073741824)]
     public async Task<IActionResult> UploadAudio(int id, IFormFile file)
     {
-        if (file == null || file.Length == 0) return BadRequest("No se proporcionó ningún archivo de audio.");
+        if (file == null || file.Length == 0) return BadRequest("No se proporcionÃ³ ningÃºn archivo de audio.");
         
         string[] audioExtensions = { ".mp3", ".m4b", ".m4a", ".wav", ".ogg" };
         string ext = Path.GetExtension(file.FileName).ToLowerInvariant();
@@ -580,7 +580,7 @@ public partial class BooksController : ControllerBase
         string bookDir;
         if (!string.IsNullOrEmpty(book.EpubFilePath)) bookDir = Path.GetDirectoryName(book.EpubFilePath)!;
         else if (!string.IsNullOrEmpty(book.CoverImagePath)) bookDir = Path.GetDirectoryName(book.CoverImagePath)!;
-        else return BadRequest("El libro no tiene una ruta física establecida.");
+        else return BadRequest("El libro no tiene una ruta fÃ­sica establecida.");
 
         int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
         string safeTitle = string.Join("_", book.Title.Split(Path.GetInvalidFileNameChars()));
@@ -595,11 +595,11 @@ public partial class BooksController : ControllerBase
 
             book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack, FileName = file.FileName });
             await _dbContext.SaveChangesAsync();
-            return Ok(new { Message = "Audio añadido correctamente." });
+            return Ok(new { Message = "Audio aÃ±adido correctamente." });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error añadiendo audio al libro {BookId}", id);
+            _logger.LogError(ex, "Error aÃ±adiendo audio al libro {BookId}", id);
             return StatusCode(500, "Error interno del servidor.");
         }
     }
@@ -679,7 +679,7 @@ public partial class BooksController : ControllerBase
         }
 
         await _dbContext.SaveChangesAsync();
-        return Ok(new { Message = $"Se agregaron {queuedCount} libros a la cola de sincronización." });
+        return Ok(new { Message = $"Se agregaron {queuedCount} libros a la cola de sincronizaciÃ³n." });
     }
 
     [HttpGet("{id}/syncmap")]
@@ -758,7 +758,7 @@ public partial class BooksController : ControllerBase
         _dbContext.Books.Remove(book);
         await _dbContext.SaveChangesAsync();
 
-        // Limpieza de huérfanos
+        // Limpieza de huÃ©rfanos
         foreach(var authorId in authorIds)
         {
             bool authorHasMoreBooks = await _dbContext.Books.AnyAsync(b => b.Authors.Any(a => a.AuthorId == authorId));
@@ -788,13 +788,13 @@ public partial class BooksController : ControllerBase
                 // Borrar carpeta del libro y todo su contenido (cover.jpg, metadata.opf, etc.)
                 Directory.Delete(bookDir, true);
 
-                // Comprobar si la carpeta padre (Autor o Saga) quedÃ³ vacÃ­a
+                // Comprobar si la carpeta padre (Autor o Saga) quedÃƒÂ³ vacÃƒÂ­a
                 var parentDir = Directory.GetParent(bookDir)?.FullName;
                 if (parentDir != null && Directory.Exists(parentDir) && !Directory.EnumerateFileSystemEntries(parentDir).Any())
                 {
                     Directory.Delete(parentDir);
 
-                    // Comprobar si la carpeta abuelo (Autor si estÃ¡bamos dentro de una Saga) quedÃ³ vacÃ­a
+                    // Comprobar si la carpeta abuelo (Autor si estÃƒÂ¡bamos dentro de una Saga) quedÃƒÂ³ vacÃƒÂ­a
                     var grandParentDir = Directory.GetParent(parentDir)?.FullName;
                     if (grandParentDir != null && Directory.Exists(grandParentDir) && !Directory.EnumerateFileSystemEntries(grandParentDir).Any())
                     {
@@ -1062,4 +1062,5 @@ public class ScanRequest
 { 
     public string FolderPath { get; set; } = string.Empty; 
 }
+
 

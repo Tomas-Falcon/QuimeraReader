@@ -1,4 +1,4 @@
-using MediatR;
+﻿using MediatR;
 using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Application.Interfaces;
 using QuimeraReader.Application.Books.DTOs;
@@ -109,5 +109,6 @@ if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
         };
     }
 }
+
 
 

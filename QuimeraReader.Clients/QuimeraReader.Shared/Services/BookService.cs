@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+Ôªøusing System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using QuimeraReader.Shared.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,7 +8,7 @@ namespace QuimeraReader.Shared.Services;
 
 public interface IBookService
 {
-    Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null);
+    Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null, bool? isAvailableOffline = null);
     Task<Book?> GetBookAsync(int id);
     Task<IEnumerable<Category>> GetCategoriesAsync();
     Task<IEnumerable<Author>> GetAuthorsAsync();
@@ -53,7 +53,7 @@ public class BookService : IBookService
 
     public string BaseAddress => _httpClient.BaseAddress?.ToString() ?? "";
 
-        public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null)
+        public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null, bool? isAvailableOffline = null)
     {
         try
         {
@@ -119,7 +119,7 @@ public class BookService : IBookService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[BookService] Error obteniendo categorÌas.");
+            _logger.LogError(ex, "[BookService] Error obteniendo categor√≠as.");
             return Array.Empty<Category>();
         }
     }
@@ -163,7 +163,7 @@ public class BookService : IBookService
             var response = await _httpClient.PostAsync("api/Books/upload", content);
             response.EnsureSuccessStatusCode();
 
-            return await response.Content.ReadFromJsonAsync<Book>() ?? throw new InvalidOperationException("Respuesta inv·lida del servidor");
+            return await response.Content.ReadFromJsonAsync<Book>() ?? throw new InvalidOperationException("Respuesta inv√°lida del servidor");
         }
         catch (Exception ex)
         {
@@ -191,7 +191,7 @@ public class BookService : IBookService
         }
         catch (Exception ex)
         { 
-            _logger.LogError(ex, "[BookService] Error actualizando posiciÛn para libro ID: {BookId}", bookId);
+            _logger.LogError(ex, "[BookService] Error actualizando posici√≥n para libro ID: {BookId}", bookId);
         }
     }
 
@@ -293,7 +293,7 @@ public class BookService : IBookService
 
     public async Task UpdateAnnotationAsync(int bookId, int annotationId, string colorHex, string note)
     {
-        _logger.LogInformation("[BookService] Actualizando anotaciÛn {AnnotationId} del libro {BookId}", annotationId, bookId);
+        _logger.LogInformation("[BookService] Actualizando anotaci√≥n {AnnotationId} del libro {BookId}", annotationId, bookId);
         var payload = new { colorHex, note };
         var response = await _httpClient.PutAsJsonAsync($"api/Books/{bookId}/annotations/{annotationId}", payload);
         response.EnsureSuccessStatusCode();
@@ -301,7 +301,7 @@ public class BookService : IBookService
 
     public async Task DeleteAnnotationAsync(int bookId, int annotationId)
     {
-        _logger.LogInformation("[BookService] Eliminando anotaciÛn {AnnotationId} del libro {BookId}", annotationId, bookId);
+        _logger.LogInformation("[BookService] Eliminando anotaci√≥n {AnnotationId} del libro {BookId}", annotationId, bookId);
         var response = await _httpClient.DeleteAsync($"api/Books/{bookId}/annotations/{annotationId}");
         response.EnsureSuccessStatusCode();
     }
@@ -325,4 +325,5 @@ public class BookService : IBookService
         response.EnsureSuccessStatusCode();
     }
 }
+
 
