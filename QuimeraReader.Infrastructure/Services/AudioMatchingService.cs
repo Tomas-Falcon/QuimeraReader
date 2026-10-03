@@ -24,7 +24,8 @@ public class AudioMatchingService
 
     public async Task<int?> TryMatchAudioToBookAsync(string audioFilePath, CancellationToken cancellationToken = default)
     {
-        string fileName = Path.GetFileNameWithoutExtension(audioFilePath).ToLowerInvariant();
+        string rawFileName = Path.GetFileNameWithoutExtension(audioFilePath).ToLowerInvariant();
+        string fileName = rawFileName.Replace("_", " ").Replace("-", " ");
         
         var allBooks = await _dbContext.Books.Select(b => new { b.Id, b.Title }).ToListAsync(cancellationToken);
         
