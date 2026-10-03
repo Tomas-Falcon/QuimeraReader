@@ -111,16 +111,62 @@ public class AudioMatchingService
                 return contentMatch.Id;
             }
             
-            // Si el título no está explícitamente, buscamos en el contenido real del EPUB
-            var candidateBooks = await _dbContext.Books
-                .Where(b => !b.AudioTracks.Any() && !string.IsNullOrEmpty(b.EpubFilePath))
-                .Select(b => new { b.Id, b.Title, b.EpubFilePath })
-                .ToListAsync(cancellationToken);
+            // 2. Construir un SUBSET de candidatos para evitar extraer el EPUB de toda la biblioteca
+            var candidateIds = new HashSet<int>();
+            
+            string rawFileName = Path.GetFileNameWithoutExtension(audioFilePath).ToLowerInvariant();
+            var fileWords = rawFileName.Split(new[] { ' ', '-', '_' }, StringSplitOptions.RemoveEmptyEntries)
+                                       .Where(w => w.Length > 4)
+                                       .ToList();
 
-            var words = normalizedAudioText.Split(new[] { ' ', '.', ',', ':', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+            // Subset A: Coincidencia parcial del nombre del archivo (ej. "Harry Potter")
+            if (fileWords.Any())
+            {
+                var partialTitleMatches = await _dbContext.Books
+                    .Where(b => !b.AudioTracks.Any())
+                    .Where(b => fileWords.Any(w => b.Title.ToLower().Contains(w)))
+                    .Select(b => b.Id)
+                    .ToListAsync(cancellationToken);
+                
+                foreach(var id in partialTitleMatches) candidateIds.Add(id);
+            }
+
+            var whisperWords = normalizedAudioText.Split(new[] { ' ', '.', ',', ':', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
                                            .Where(w => w.Length > 5)
                                            .Distinct()
                                            .ToList();
+
+            // Subset B: Coincidencia FTS desde el texto de Whisper (Título o Autor mencionado en el audio)
+            var topWhisperWords = whisperWords.Take(15).ToList();
+            if (topWhisperWords.Any())
+            {
+                string matchQuery = string.Join(" OR ", topWhisperWords.Select(w => $"\"{w}*\""));
+                var ftsMatches = await _dbContext.Books
+                    .FromSqlRaw($"SELECT b.* FROM Books b INNER JOIN BooksFTS fts ON b.Id = fts.rowid WHERE BooksFTS MATCH {{0}} LIMIT 20", matchQuery)
+                    .Select(b => b.Id)
+                    .ToListAsync(cancellationToken);
+                    
+                foreach(var id in ftsMatches) candidateIds.Add(id);
+            }
+
+            // Subset C: Fallback a los huérfanos más recientes si fallaron los métodos rápidos
+            if (candidateIds.Count == 0)
+            {
+                var fallbackIds = await _dbContext.Books
+                    .Where(b => !b.AudioTracks.Any() && !string.IsNullOrEmpty(b.EpubFilePath))
+                    .OrderByDescending(b => b.Id)
+                    .Take(100) // Límite de seguridad para evitar cuelgues (O(n))
+                    .Select(b => b.Id)
+                    .ToListAsync(cancellationToken);
+                
+                foreach(var id in fallbackIds) candidateIds.Add(id);
+            }
+
+            // 3. Procesamiento profundo de EPUB SOLO sobre el subset de candidatos
+            var candidateBooks = await _dbContext.Books
+                .Where(b => candidateIds.Contains(b.Id) && !string.IsNullOrEmpty(b.EpubFilePath))
+                .Select(b => new { b.Id, b.Title, b.EpubFilePath })
+                .ToListAsync(cancellationToken);
 
             int bestMatchId = 0;
             int maxHits = 0;
@@ -139,7 +185,7 @@ public class AudioMatchingService
                     }
                     string epubText = System.Text.RegularExpressions.Regex.Replace(sb.ToString(), "<.*?>", string.Empty).ToLowerInvariant();
                     
-                    int matchCount = words.Count(w => epubText.Contains(w));
+                    int matchCount = whisperWords.Count(w => epubText.Contains(w));
                     
                     if (matchCount > maxHits)
                     {
