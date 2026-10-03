@@ -1,4 +1,4 @@
-﻿using Radzen;
+using Radzen;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using QuimeraReader.Web;
@@ -22,4 +22,9 @@ builder.Services.AddSingleton<QuimeraReader.Shared.Interfaces.IOfflineSyncWorker
 builder.Services.AddScoped<IServerConfigService, QuimeraReader.Web.Services.WebServerConfigService>();
 builder.Services.AddRadzenComponents();
 
-await builder.Build().RunAsync();
+var host = builder.Build();
+
+var syncWorker = host.Services.GetRequiredService<QuimeraReader.Shared.Interfaces.IOfflineSyncWorker>() as QuimeraReader.Web.Services.WebOfflineSyncWorker;
+syncWorker?.Start();
+
+await host.RunAsync();

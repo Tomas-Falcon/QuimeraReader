@@ -93,6 +93,10 @@
     <!-- Script de Radzen agregado acá -->
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
-    <script>navigator.serviceWorker.register("service-worker.js");</script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register("service-worker.js");
+        }
+    </script>
 </body>
 </html>
