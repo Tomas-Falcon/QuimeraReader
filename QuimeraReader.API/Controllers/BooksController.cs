@@ -511,7 +511,11 @@ public partial class BooksController : ControllerBase
                         }
                     }
                 }
-                string orphansDir = Path.Combine(Directory.GetCurrentDirectory(), "Library", "Orphans");
+                var settingsDict = await _dbContext.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
+                settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
+                if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+
+                string orphansDir = Path.Combine(libraryRoot, "Orphans");
                 Directory.CreateDirectory(orphansDir);
                 string orphanPath = Path.Combine(orphansDir, file.FileName);
                 System.IO.File.Move(tempPath, orphanPath, true);
