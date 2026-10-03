@@ -1051,7 +1051,7 @@ public partial class BooksController : ControllerBase
         _ = Task.Run(async () => {
             try {
                 using var scope = scopeFactory.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<QuimeraReader.Infrastructure.Data.AppDbContext>();
+                var db = scope.ServiceProvider.GetRequiredService<QuimeraReader.Infrastructure.AppDbContext>();
                 var audioMatchingService = scope.ServiceProvider.GetRequiredService<QuimeraReader.Infrastructure.Services.AudioMatchingService>();
                 
                 var unmatched = await db.UnmatchedAudioTracks.ToListAsync();
