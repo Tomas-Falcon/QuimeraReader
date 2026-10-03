@@ -326,3 +326,26 @@ export function setAudioBookmark(cfiRange) {
         }
     }
 }
+
+export function convertKaraokeToHardMark() {
+    if (!window.epubRendition) return;
+    if (window.lastKaraokeCfi) {
+        setAudioBookmark(window.lastKaraokeCfi);
+    }
+    var contents = window.epubRendition.getContents();
+    if (!contents || contents.length === 0) return;
+    var prev = contents[0].document.querySelectorAll('.karaoke-highlight');
+    prev.forEach(el => {
+        el.style.backgroundColor = 'transparent';
+        el.classList.remove('karaoke-highlight');
+    });
+}
+
+export function clearAudioBookmark() {
+    if (window.epubRendition && window.currentAudioBookmarkCfi) {
+        try {
+            window.epubRendition.annotations.remove(window.currentAudioBookmarkCfi, "underline");
+        } catch(e) {}
+        window.currentAudioBookmarkCfi = null;
+    }
+}

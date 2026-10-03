@@ -557,9 +557,17 @@
     }
 
     [JSInvokable]
-    public void OnPlayStateChanged(bool isPlaying)
+    public async Task OnPlayStateChanged(bool isPlaying)
     {
         _isPlaying = isPlaying;
+        if (!_isPlaying)
+        {
+            if (_epubJsModule != null) await _epubJsModule.InvokeVoidAsync("convertKaraokeToHardMark");
+        }
+        else
+        {
+            if (_epubJsModule != null) await _epubJsModule.InvokeVoidAsync("clearAudioBookmark");
+        }
         StateHasChanged();
     }
 
