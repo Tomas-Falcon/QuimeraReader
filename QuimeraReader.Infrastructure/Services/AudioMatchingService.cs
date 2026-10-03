@@ -29,30 +29,33 @@ public class AudioMatchingService
         
         var allBooks = await _dbContext.Books.Select(b => new { b.Id, b.Title }).ToListAsync(cancellationToken);
         
+        int? preCandidateId = null;
+
         var explicitMatch = allBooks.FirstOrDefault(b => b.Title.Length > 5 && fileName.Contains(b.Title.ToLower()));
         if (explicitMatch != null)
         {
-            _logger.LogInformation("Audio emparejado por contención de título: {File} -> {BookTitle}", fileName, explicitMatch.Title);
-            return explicitMatch.Id;
+            _logger.LogInformation("Candidato inicial por título: {File} -> {BookTitle}. Validando por contenido...", fileName, explicitMatch.Title);
+            preCandidateId = explicitMatch.Id;
         }
-
-        var bestMatch = allBooks
-            .Select(b => new { Book = b, Score = CalculateSimilarity(fileName, b.Title.ToLower()) })
-            .OrderByDescending(x => x.Score)
-            .FirstOrDefault();
-
-        if (bestMatch != null && bestMatch.Score > 85.0)
+        else
         {
-            _logger.LogInformation("Audio emparejado por similitud de nombre ({Score}%): {File} -> {BookTitle}", 
-                Math.Round(bestMatch.Score, 2), fileName, bestMatch.Book.Title);
-            return bestMatch.Book.Id;
+            var bestMatch = allBooks
+                .Select(b => new { Book = b, Score = CalculateSimilarity(fileName, b.Title.ToLower()) })
+                .OrderByDescending(x => x.Score)
+                .FirstOrDefault();
+
+            if (bestMatch != null && bestMatch.Score > 85.0)
+            {
+                _logger.LogInformation("Candidato inicial por similitud ({Score}%): {File} -> {BookTitle}. Validando por contenido...", Math.Round(bestMatch.Score, 2), fileName, bestMatch.Book.Title);
+                preCandidateId = bestMatch.Book.Id;
+            }
         }
 
-        _logger.LogInformation("Iniciando emparejamiento por contenido (Whisper Parcial) para {File}...", fileName);
-        return await MatchByContentAsync(audioFilePath, cancellationToken);
+        _logger.LogInformation("Iniciando extracción Whisper para validación de contenido de {File}...", fileName);
+        return await MatchByContentAsync(audioFilePath, preCandidateId, cancellationToken);
     }
 
-    private async Task<int?> MatchByContentAsync(string audioFilePath, CancellationToken cancellationToken)
+    private async Task<int?> MatchByContentAsync(string audioFilePath, int? preCandidateId, CancellationToken cancellationToken)
     {
         var modelPathSetting = await _dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "WhisperModelPath", cancellationToken);
         string modelPath = modelPathSetting?.Value ?? "ggml-base.bin";
@@ -114,6 +117,8 @@ public class AudioMatchingService
             // 2. Construir un SUBSET de candidatos para evitar extraer el EPUB de toda la biblioteca
             var candidateIds = new HashSet<int>();
             
+            if (preCandidateId.HasValue) candidateIds.Add(preCandidateId.Value);
+
             string rawFileName = Path.GetFileNameWithoutExtension(audioFilePath).ToLowerInvariant();
             var fileWords = rawFileName.Split(new[] { ' ', '-', '_' }, StringSplitOptions.RemoveEmptyEntries)
                                        .Where(w => w.Length > 4)
