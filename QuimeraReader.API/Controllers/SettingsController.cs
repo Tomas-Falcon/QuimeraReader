@@ -115,9 +115,20 @@ public class SettingsController : ControllerBase
     }
 
     [HttpGet("whisper/status")]
-    public IActionResult GetWhisperStatus()
+    public async Task<IActionResult> GetWhisperStatus()
     {
-        bool isDownloaded = System.IO.File.Exists("ggml-base.bin");
+        var settings = await _context.SystemSettings.FirstOrDefaultAsync();
+        bool isDownloaded = false;
+        
+        if (settings != null && !string.IsNullOrEmpty(settings.WhisperModelPath))
+        {
+            isDownloaded = System.IO.File.Exists(settings.WhisperModelPath);
+        }
+        else
+        {
+            isDownloaded = System.IO.File.Exists("ggml-base.bin");
+        }
+        
         return Ok(new { IsDownloaded = isDownloaded });
     }
 [HttpPost("restart")]
