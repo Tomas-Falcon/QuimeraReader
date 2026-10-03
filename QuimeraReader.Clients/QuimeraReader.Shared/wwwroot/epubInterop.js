@@ -305,3 +305,24 @@ export function highlightKaraokePhrase(text) {
 
 
 
+
+export function setAudioBookmark(cfiRange) {
+    if (window.epubRendition) {
+        if (window.currentAudioBookmarkCfi) {
+            try {
+                window.epubRendition.annotations.remove(window.currentAudioBookmarkCfi, "underline");
+            } catch(e) {}
+        }
+        if (cfiRange) {
+            window.currentAudioBookmarkCfi = cfiRange;
+            try {
+                window.epubRendition.annotations.underline(cfiRange, {}, () => {}, "", {
+                    "stroke": "#ff9800",
+                    "stroke-width": "4px",
+                    "stroke-opacity": "1.0",
+                    "stroke-dasharray": "4,4"
+                });
+            } catch(e) {}
+        }
+    }
+}

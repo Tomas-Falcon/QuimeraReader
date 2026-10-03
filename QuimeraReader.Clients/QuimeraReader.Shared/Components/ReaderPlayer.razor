@@ -110,7 +110,10 @@
                 }
                 else if (Book.HasAudio && _segments != null && _segments.Any())
                 {
-                    <RadzenButton Text="Reproducir" Icon="play_circle" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small" Click="PlayFromSelectionAsync" />
+                    <div class="d-flex gap-2">
+                        <RadzenButton Text="Fijar Audio" Icon="push_pin" ButtonStyle="ButtonStyle.Warning" Variant="Variant.Outlined" Size="ButtonSize.Small" Click="@(() => SetAudioBookmarkAsync(false))" />
+                        <RadzenButton Text="Reproducir" Icon="play_circle" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small" Click="PlayFromSelectionAsync" />
+                    </div>
                 }
                 else {
                     <div></div>
@@ -375,7 +378,7 @@
         StateHasChanged();
     }
 
-    private async Task PlayFromSelectionAsync()
+    private async Task SetAudioBookmarkAsync(bool autoPlay = false)
     {
         _showAnnotationDialog = false;
         if (!string.IsNullOrEmpty(_selectedText) && _segments != null && _segments.Any())
@@ -389,14 +392,37 @@
             if (match != null)
             {
                 var startOffset = Math.Max(0, match.Start - 5.0);
-                await SeekToSegmentAsync(startOffset);
-                ToastService.ShowSuccess("Reproduciendo desde la selección.");
+                
+                if (_epubJsModule != null && !string.IsNullOrEmpty(_selectedCfi))
+                {
+                    await _epubJsModule.InvokeVoidAsync("setAudioBookmark", _selectedCfi);
+                }
+                
+                if (autoPlay)
+                {
+                    await SeekToSegmentAsync(startOffset);
+                    ToastService.ShowSuccess("Reproduciendo desde la marca.");
+                }
+                else
+                {
+                    _currentTime = startOffset;
+                    if (_jsModule != null)
+                    {
+                        await _jsModule.InvokeVoidAsync("seekAudio", _audioElement, startOffset);
+                    }
+                    ToastService.ShowSuccess("Marca de audiolibro establecida.");
+                }
             }
             else
             {
                 ToastService.ShowError("No se encontró el audio para este fragmento.");
             }
         }
+    }
+
+    private async Task PlayFromSelectionAsync()
+    {
+        await SetAudioBookmarkAsync(true);
     }
 
     private async Task DeleteAnnotationAsync()
