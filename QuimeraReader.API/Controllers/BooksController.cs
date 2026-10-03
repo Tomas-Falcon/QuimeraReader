@@ -996,6 +996,29 @@ public partial class BooksController : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("all-audios")]
+    public async Task<ActionResult<IEnumerable<QuimeraReader.Shared.Models.ManagedAudioDto>>> GetAllAudios()
+    {
+        var unmatched = await _dbContext.UnmatchedAudioTracks.Select(u => new QuimeraReader.Shared.Models.ManagedAudioDto
+        {
+            Id = u.Id,
+            IsMatched = false,
+            FileName = u.OriginalFileName,
+            BookTitle = ""
+        }).ToListAsync();
+
+        var matched = await _dbContext.BookAudioTracks.Include(t => t.Book).Select(m => new QuimeraReader.Shared.Models.ManagedAudioDto
+        {
+            Id = m.Id,
+            IsMatched = true,
+            FileName = m.FileName,
+            BookId = m.BookId,
+            BookTitle = m.Book != null ? m.Book.Title : ""
+        }).ToListAsync();
+
+        return Ok(unmatched.Concat(matched).OrderBy(x => x.IsMatched).ThenBy(x => x.FileName));
+    }
+
     [HttpGet("unmatched-audios")]
     public async Task<ActionResult<IEnumerable<QuimeraReader.Domain.Entities.UnmatchedAudioTrack>>> GetUnmatchedAudios()
     {

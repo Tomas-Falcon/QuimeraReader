@@ -1,6 +1,5 @@
 ﻿using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
-
 using QuimeraReader.Shared.Models;
 using Radzen;
 
@@ -8,8 +7,73 @@ namespace QuimeraReader.Shared.Components.Pages;
 
 public partial class UnmatchedAudios : ComponentBase
 {
-        private bool _isLoading = false;
+    [Inject] public NavigationManager Navigation { get; set; } = default!;
+
+    private bool _isLoading = false;
     private bool _isAutoMatching = false;
+    private bool? _filterMatched = null;
+
+    private List<dynamic> _filterOptions = new List<dynamic>
+    {
+        new { Text = "Todos los Audios", Value = (bool?)null },
+        new { Text = "Asignados", Value = (bool?)true },
+        new { Text = "Huérfanos", Value = (bool?)false }
+    };
+
+    private List<ManagedAudioDto> _audios = new();
+    private List<ManagedAudioDto> _filteredAudios = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAudios();
+    }
+
+    private async Task LoadAudios()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await Http.GetFromJsonAsync<List<ManagedAudioDto>>("api/books/all-audios");
+            if (result != null)
+            {
+                _audios = result;
+                ApplyFilter();
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al cargar audios: " + ex.Message);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void OnFilterChanged()
+    {
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        if (_filterMatched.HasValue)
+        {
+            _filteredAudios = _audios.Where(a => a.IsMatched == _filterMatched.Value).ToList();
+        }
+        else
+        {
+            _filteredAudios = _audios.ToList();
+        }
+    }
+
+    private void NavigateToBook(int? bookId)
+    {
+        if (bookId.HasValue)
+        {
+            Navigation.NavigateTo($"/books/{bookId.Value}");
+        }
+    }
 
     private async Task AutoMatchAudios()
     {
@@ -37,35 +101,10 @@ public partial class UnmatchedAudios : ComponentBase
             _isAutoMatching = false;
         }
     }
-    private List<UnmatchedAudioTrack> _audios = new();
 
-    protected override async Task OnInitializedAsync()
+    private async Task DeleteAudio(ManagedAudioDto audio)
     {
-        await LoadAudios();
-    }
-
-    private async Task LoadAudios()
-    {
-        _isLoading = true;
-        try
-        {
-            var result = await Http.GetFromJsonAsync<List<UnmatchedAudioTrack>>("api/books/unmatched-audios");
-            if (result != null)
-                _audios = result;
-        }
-        catch (Exception ex)
-        {
-            ToastService.ShowError("Error al cargar audios: " + ex.Message);
-        }
-        finally
-        {
-            _isLoading = false;
-        }
-    }
-
-    private async Task DeleteAudio(UnmatchedAudioTrack audio)
-    {
-        var confirm = await DialogService.Confirm($"¿Eliminar definitivamente '{audio.OriginalFileName}'?", "Eliminar Audio", new ConfirmOptions { OkButtonText = "Sí", CancelButtonText = "No" });
+        var confirm = await DialogService.Confirm($"¿Eliminar definitivamente '{audio.FileName}'?", "Eliminar Audio", new ConfirmOptions { OkButtonText = "Sí", CancelButtonText = "No" });
         if (confirm == true)
         {
             try
@@ -88,7 +127,7 @@ public partial class UnmatchedAudios : ComponentBase
         }
     }
 
-    private async Task OpenMatchDialog(UnmatchedAudioTrack audio)
+    private async Task OpenMatchDialog(ManagedAudioDto audio)
     {
         var bookIdRes = await DialogService.OpenAsync<BookSelectionModal>(TranslationService["BookSelection_Title"], null, new Radzen.DialogOptions() { Width = "500px", Height = "600px" });
         if (bookIdRes is int bookId)
@@ -113,8 +152,3 @@ public partial class UnmatchedAudios : ComponentBase
         }
     }
 }
-
-
-
-
-
