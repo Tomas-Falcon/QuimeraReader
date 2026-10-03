@@ -104,16 +104,26 @@ namespace QuimeraReader.Web.Services
 
                 foreach (var serverBook in serverBooks)
                 {
+                    var localBook = localBooks.FirstOrDefault(b => b.Id == serverBook.Id);
                     var baseUrl = _httpClient.BaseAddress?.ToString().TrimEnd('/');
                     
-                    var epubPath = await DownloadFileToDbAsync(serverBook.Id, "epub", serverBook.EpubUrl, baseUrl);
-                    if (epubPath.StartsWith("blob:")) serverBook.LocalEpubPath = epubPath;
+                    var epubPath = localBook?.LocalEpubPath;
+                    if (string.IsNullOrEmpty(epubPath) || !epubPath.StartsWith("blob:")) {
+                        epubPath = await DownloadFileToDbAsync(serverBook.Id, "epub", serverBook.EpubUrl, baseUrl);
+                    }
+                    if (!string.IsNullOrEmpty(epubPath) && epubPath.StartsWith("blob:")) serverBook.LocalEpubPath = epubPath;
 
-                    var coverPath = await DownloadFileToDbAsync(serverBook.Id, "cover", serverBook.CoverUrl, baseUrl);
-                    if (coverPath.StartsWith("blob:")) serverBook.LocalCoverPath = coverPath;
+                    var coverPath = localBook?.LocalCoverPath;
+                    if (string.IsNullOrEmpty(coverPath) || !coverPath.StartsWith("blob:")) {
+                        coverPath = await DownloadFileToDbAsync(serverBook.Id, "cover", serverBook.CoverUrl, baseUrl);
+                    }
+                    if (!string.IsNullOrEmpty(coverPath) && coverPath.StartsWith("blob:")) serverBook.LocalCoverPath = coverPath;
 
-                    var audioPath = await DownloadFileToDbAsync(serverBook.Id, "audio", serverBook.AudioUrl, baseUrl);
-                    if (audioPath.StartsWith("blob:")) serverBook.LocalAudioPath = audioPath;
+                    var audioPath = localBook?.LocalAudioPath;
+                    if (serverBook.HasAudio && (string.IsNullOrEmpty(audioPath) || !audioPath.StartsWith("blob:"))) {
+                        audioPath = await DownloadFileToDbAsync(serverBook.Id, "audio", serverBook.AudioUrl, baseUrl);
+                    }
+                    if (!string.IsNullOrEmpty(audioPath) && audioPath.StartsWith("blob:")) serverBook.LocalAudioPath = audioPath;
 
                     await _localRepo.SaveBookAsync(serverBook);
                 }
