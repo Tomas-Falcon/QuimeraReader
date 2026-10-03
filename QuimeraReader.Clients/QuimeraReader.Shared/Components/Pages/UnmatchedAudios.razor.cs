@@ -90,10 +90,8 @@ public partial class UnmatchedAudios : ComponentBase
 
     private async Task OpenMatchDialog(UnmatchedAudioTrack audio)
     {
-        // En una implementación completa aquí abriríamos un diálogo para buscar libros.
-        // Por simplicidad, simularemos pedir un ID de libro, o podemos renderizar un componente de búsqueda.
-        var bookIdRes = "1";
-        if (!string.IsNullOrWhiteSpace(bookIdRes) && int.TryParse(bookIdRes, out int bookId))
+        var bookIdRes = await DialogService.OpenAsync<BookSelectionModal>("Seleccionar Libro", null, new Radzen.DialogOptions() { Width = "500px", Height = "600px" });
+        if (bookIdRes is int bookId)
         {
             try
             {
@@ -105,7 +103,7 @@ public partial class UnmatchedAudios : ComponentBase
                 }
                 else
                 {
-                    ToastService.ShowError("No se pudo asociar el audio. Asegúrate de que el ID del libro existe.");
+                    ToastService.ShowError("No se pudo asociar el audio.");
                 }
             }
             catch (Exception ex)
@@ -115,4 +113,7 @@ public partial class UnmatchedAudios : ComponentBase
         }
     }
 }
+
+
+
 
