@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Infrastructure;
 using QuimeraReader.Infrastructure.Services;
 using Microsoft.Extensions.Hosting;
@@ -161,3 +161,4 @@ public class AudioAlignmentBackgroundService : BackgroundService
         }
     }
 }
+

@@ -34,7 +34,7 @@ public class AudioMatchingService
         var explicitMatch = allBooks.FirstOrDefault(b => b.Title.Length > 5 && fileName.Contains(b.Title.ToLower()));
         if (explicitMatch != null)
         {
-            _logger.LogInformation("Candidato inicial por tÃ­tulo: {File} -> {BookTitle}. Validando por contenido...", fileName, explicitMatch.Title);
+            _logger.LogInformation("Candidato inicial por título: {File} -> {BookTitle}. Validando por contenido...", fileName, explicitMatch.Title);
             preCandidateId = explicitMatch.Id;
         }
         else
@@ -51,7 +51,7 @@ public class AudioMatchingService
             }
         }
 
-        _logger.LogInformation("Iniciando extracciÃ³n Whisper para validaciÃ³n de contenido de {File}...", fileName);
+        _logger.LogInformation("Iniciando extracción Whisper para validación de contenido de {File}...", fileName);
         return await MatchByContentAsync(audioFilePath, preCandidateId, cancellationToken);
     }
 
@@ -247,4 +247,5 @@ public class AudioMatchingService
         return (1.0 - ((double)d[n, m] / Math.Max(source.Length, target.Length))) * 100.0;
     }
 }
+
 

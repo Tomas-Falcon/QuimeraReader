@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -148,7 +148,7 @@ public class SettingsController : ControllerBase
     [HttpPost("update-container")]
     public IActionResult UpdateContainer([FromServices] Microsoft.Extensions.Hosting.IHostApplicationLifetime appLifetime)
     {
-        _logger.LogWarning("Se recibió comando de ACTUALIZACIÓN de contenedor desde los ajustes.");
+        _logger.LogWarning("Se recibió comando de ACTUALIZACIÃ“N de contenedor desde los ajustes.");
         
         // Ejecutamos en un hilo separado
         _ = Task.Run(async () =>
@@ -204,4 +204,5 @@ public class SettingsController : ControllerBase
         return Ok(new { Message = "Iniciando proceso de actualización y reinicio..." });
     }
 }
+
 

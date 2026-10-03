@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using QuimeraReader.Shared.Models;
 using Radzen;
@@ -104,7 +104,7 @@ public partial class UnmatchedAudios : ComponentBase
 
     private async Task DeleteAudio(ManagedAudioDto audio)
     {
-        var confirm = await DialogService.Confirm($"¿Eliminar definitivamente '{audio.FileName}'?", "Eliminar Audio", new ConfirmOptions { OkButtonText = "Sí", CancelButtonText = "No" });
+        var confirm = await DialogService.Confirm($"Â¿Eliminar definitivamente '{audio.FileName}'?", "Eliminar Audio", new ConfirmOptions { OkButtonText = "Sí", CancelButtonText = "No" });
         if (confirm == true)
         {
             try
@@ -152,3 +152,4 @@ public partial class UnmatchedAudios : ComponentBase
         }
     }
 }
+
