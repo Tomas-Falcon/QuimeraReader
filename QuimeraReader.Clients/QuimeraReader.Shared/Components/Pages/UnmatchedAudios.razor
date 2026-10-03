@@ -1,4 +1,4 @@
-@page "/unmatched-audios"
+ï»¿@page "/unmatched-audios"
 
 @using QuimeraReader.Shared.Services
 @using QuimeraReader.Shared.Models
@@ -9,7 +9,7 @@
 
 <RadzenCard class="m-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3>Audios Huérfanos</h3>
+        <h3>Audios HuÃ©rfanos</h3>
                 <div>
             <RadzenButton Icon="auto_fix_high" Text="Auto-vincular" ButtonStyle="ButtonStyle.Secondary" class="me-2" Click="AutoMatchAudios" IsBusy="@_isAutoMatching" />
             <RadzenButton Icon="refresh" Text="Recargar" Click="LoadAudios" IsBusy="@_isLoading" />
@@ -23,7 +23,7 @@
     else if (!_audios.Any())
     {
         <RadzenAlert AlertStyle="AlertStyle.Success" ShowIcon="true" Variant="Variant.Flat">
-            No hay audios huérfanos en la base de datos. ¡Todo está en orden!
+            No hay audios huÃ©rfanos en la base de datos. Â¡Todo estÃ¡ en orden!
         </RadzenAlert>
     }
     else
@@ -32,7 +32,7 @@
             <Columns>
                 <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Property="Id" Title="ID" Width="70px" />
                 <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Property="OriginalFileName" Title="Archivo Original" />
-                <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Property="FileSizeBytes" Title="Tamaño">
+                <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Property="FileSizeBytes" Title="TamaÃ±o">
                     <Template Context="audio">
                         @(Math.Round((double)audio.FileSizeBytes / 1024 / 1024, 2)) MB
                     </Template>
