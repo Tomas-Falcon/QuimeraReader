@@ -96,7 +96,7 @@ namespace QuimeraReader.Web.Services
         {
             try
             {
-                var response = await _httpClient.GetFromJsonAsync<PaginatedList<Book>>("api/Books?limit=100");
+                var response = await _httpClient.GetFromJsonAsync<PaginatedResult<Book>>("api/Books?limit=100");
                 if (response == null || response.Items == null) return;
 
                 var serverBooks = response.Items.Where(b => b.IsAvailableOffline).ToList();

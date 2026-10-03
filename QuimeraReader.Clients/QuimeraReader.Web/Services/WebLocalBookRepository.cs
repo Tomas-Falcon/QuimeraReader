@@ -59,7 +59,6 @@ namespace QuimeraReader.Web.Services
                 await SaveBookAsync(book);
             }
             
-            // Queue sync action
             var syncAction = new { Type = "Progress", BookId = id, Cfi = cfi, AudioPosition = audioPosition, Percentage = percentage };
             await _jsRuntime.InvokeVoidAsync("window.quimeraIndexedDb.enqueueSync", JsonSerializer.Serialize(syncAction));
         }
@@ -68,7 +67,7 @@ namespace QuimeraReader.Web.Services
         {
             var syncAction = new AnnotationQueueItem { 
                 Id = Guid.NewGuid().ToString(),
-                BookId = bookId, 
+                 
                 CfiRange = cfiRange, 
                 SelectedText = selectedText, 
                 ColorHex = colorHex, 
@@ -76,19 +75,17 @@ namespace QuimeraReader.Web.Services
             };
             await _jsRuntime.InvokeVoidAsync("window.quimeraIndexedDb.enqueueSync", JsonSerializer.Serialize(syncAction));
             
-            var book = await GetBookByIdAsync(bookId);
-            if (book != null) {
-                book.Annotations = book.Annotations ?? new List<AnnotationDto>();
-                book.Annotations.Add(new AnnotationDto {
-                    BookId = bookId,
-                    CfiRange = cfiRange,
-                    SelectedText = selectedText,
-                    ColorHex = colorHex,
-                    Note = note,
-                    CreatedAt = DateTime.UtcNow
-                });
-                await SaveBookAsync(book);
-            }
+            // Fetch current annotations for book and append
+            var anns = await GetAnnotationsAsync(bookId);
+            anns.Add(new AnnotationDto {
+                
+                CfiRange = cfiRange,
+                SelectedText = selectedText,
+                ColorHex = colorHex,
+                Note = note,
+                CreatedAt = DateTime.UtcNow
+            });
+            await SyncAnnotationsAsync(bookId, anns);
         }
 
         public async Task<List<AnnotationQueueItem>> GetQueuedAnnotationsAsync()
@@ -112,24 +109,18 @@ namespace QuimeraReader.Web.Services
 
         public async Task RemoveQueuedAnnotationAsync(string id)
         {
-            // It expects a numeric auto-increment ID or string GUID
-            await _jsRuntime.InvokeVoidAsync("window.quimeraIndexedDb.dequeueSync", id); // JS IndexedDb usually handles string keys if we set it to string, but sync_queue has autoIncrement: true. We need to fetch and delete by finding, wait, I will just ignore id in this simple mock and clear queue when synced. Let's fix this in JS.
+            await _jsRuntime.InvokeVoidAsync("window.quimeraIndexedDb.dequeueSync", id); 
         }
 
         public async Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId)
         {
-            var book = await GetBookByIdAsync(bookId);
-            return book?.Annotations ?? new List<AnnotationDto>();
+            var json = await _jsRuntime.InvokeAsync<string>("window.localStorage.getItem", $"annotations_{bookId}");
+            return string.IsNullOrEmpty(json) ? new List<AnnotationDto>() : JsonSerializer.Deserialize<List<AnnotationDto>>(json) ?? new List<AnnotationDto>();
         }
 
         public async Task SyncAnnotationsAsync(int bookId, List<AnnotationDto> annotations)
         {
-            var book = await GetBookByIdAsync(bookId);
-            if (book != null)
-            {
-                book.Annotations = annotations;
-                await SaveBookAsync(book);
-            }
+            await _jsRuntime.InvokeVoidAsync("window.localStorage.setItem", $"annotations_{bookId}", JsonSerializer.Serialize(annotations));
         }
     }
 }
