@@ -38,8 +38,7 @@
 
             <!-- Text Area / EPUB Reader -->
             <div class="text-container position-relative" id="text-container" style="flex: 1; display: flex; flex-direction: column;">
-                @if (Book.HasEpub)
-                {
+                <div style="display: @(Book.HasEpub && !_showAudiobookMode ? "flex" : "none"); flex: 1; flex-direction: column; overflow: hidden;">
                     <div id="epub-viewer" style="flex: 1; width: 100%; min-height: 0; overflow: hidden;">
                         <!-- Epub.js will render the book here -->
                     </div>
@@ -52,10 +51,11 @@
                         </div>
                         <input type="range" class="form-range custom-progress-bar" min="0" max="100" step="0.1" value="@(Book.PercentageCompleted ?? 0)" @onchange="OnProgressSliderChanged" />
                     </div>
-                }
-                else if (_segments != null && _segments.Any())
+                </div>
+
+                @if (Book.HasAudio && _segments != null && _segments.Any())
                 {
-                    <div class="sync-text p-4" style="flex: 1; overflow-y: auto;">
+                    <div class="sync-text p-4" style="display: @(!Book.HasEpub || _showAudiobookMode ? "block" : "none"); flex: 1; overflow-y: auto;">
                         @for (int i = 0; i < _segments.Count; i++)
                         {
                             var segment = _segments[i];
@@ -67,7 +67,7 @@
                         }
                     </div>
                 }
-                else
+                else if (!Book.HasEpub)
                 {
                     <div class="no-sync-map text-center pt-5" style="flex: 1;">
                         <img src="@(BookService.BaseAddress + @Book.CoverUrl)" class="fallback-cover mb-4" style="max-width: 200px; border-radius: 8px;" />
@@ -160,6 +160,13 @@
     }
     
     private bool _isLoading = true;
+    private bool _showAudiobookMode = false;
+    
+    private void ToggleAudiobookMode()
+    {
+        _showAudiobookMode = !_showAudiobookMode;
+        StateHasChanged();
+    }
     private ElementReference _audioElement;
     private IJSObjectReference? _jsModule;
     private DotNetObjectReference<ReaderPlayer>? _dotNetRef;
@@ -381,7 +388,7 @@
 
             if (match != null)
             {
-                var startOffset = Math.Max(0, match.Start - 1.5);
+                var startOffset = Math.Max(0, match.Start - 5.0);
                 await SeekToSegmentAsync(startOffset);
                 ToastService.ShowSuccess("Reproduciendo desde la selección.");
             }
