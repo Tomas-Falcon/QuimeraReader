@@ -1007,14 +1007,23 @@ public partial class BooksController : ControllerBase
             BookTitle = ""
         }).ToListAsync();
 
-        var matched = await _dbContext.BookAudioTracks.Include(t => t.Book).Select(m => new QuimeraReader.Application.Books.DTOs.ManagedAudioDto
+        var matchedEntities = await _dbContext.BookAudioTracks.Include(t => t.Book).Select(m => new 
+        {
+            m.Id,
+            m.FileName,
+            m.FilePath,
+            m.BookId,
+            BookTitle = m.Book != null ? m.Book.Title : ""
+        }).ToListAsync();
+
+        var matched = matchedEntities.Select(m => new QuimeraReader.Application.Books.DTOs.ManagedAudioDto
         {
             Id = m.Id,
             IsMatched = true,
-            FileName = m.FileName,
+            FileName = string.IsNullOrEmpty(m.FileName) ? System.IO.Path.GetFileName(m.FilePath) : m.FileName,
             BookId = m.BookId,
-            BookTitle = m.Book != null ? m.Book.Title : ""
-        }).ToListAsync();
+            BookTitle = m.BookTitle
+        }).ToList();
 
         return Ok(unmatched.Concat(matched).OrderBy(x => x.IsMatched).ThenBy(x => x.FileName));
     }

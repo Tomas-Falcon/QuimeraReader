@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Json;
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using QuimeraReader.Shared.Models;
 using Radzen;
@@ -71,7 +71,7 @@ public partial class UnmatchedAudios : ComponentBase
     {
         if (bookId.HasValue)
         {
-            Navigation.NavigateTo($"/books/{bookId.Value}");
+            Navigation.NavigateTo($"/book/{bookId.Value}");
         }
     }
 
