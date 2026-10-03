@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -113,11 +113,14 @@ public class AudioMatchingService
             {
                 if (string.IsNullOrEmpty(b.EpubFilePath)) continue;
                 
-                // Immediate Exact Match shortcut
-                if (b.Title.Length > 4 && normalizedAudioText.Contains(b.Title.ToLowerInvariant()))
+                // Título hablado: solo suma puntos al candidato (NO asigna). Un título de una
+                // palabra común (ej. "Sangre") aparece en casi cualquier transcripción.
+                double spokenTitleBonus = 0;
+                if (b.Title.Length > 4)
                 {
-                    _logger.LogInformation("Audio emparejado por CONTENIDO EXACTO (Título hablado): {File} -> {BookTitle}", Path.GetFileName(audioFilePath), b.Title);
-                    return b.Id;
+                    var titleWordCount = b.Title.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+                    if (normalizedAudioText.Contains(b.Title.ToLowerInvariant()))
+                        spokenTitleBonus = titleWordCount >= 2 ? 100 : 10;
                 }
 
                 // Calculate Fuzzy Score
@@ -127,7 +130,7 @@ public class AudioMatchingService
                 {
                     if (cleanTitle.Contains(w)) score += 50;
                 }
-                score += CalculateSimilarity(cleanFileName, cleanTitle);
+                score += CalculateSimilarity(cleanFileName, cleanTitle) + spokenTitleBonus;
                 
                 if (score > 30) // Arbitrary minimum to avoid sorting 140k
                 {
