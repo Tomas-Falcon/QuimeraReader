@@ -38,8 +38,8 @@ public class EpubScannerService
             : (epubBook.Title ?? "Sin Título");
             
         var book = await _dbContext.Books
-            .Include(b => b.Authors)
-            .Include(b => b.Categories)
+            .Include(b => b.Authors).ThenInclude(ba => ba.Author)
+            .Include(b => b.Categories).ThenInclude(bc => bc.Category)
             .FirstOrDefaultAsync(b => b.Title == bookTitle) 
             ?? new Book { Title = bookTitle };
             
@@ -604,6 +604,7 @@ public class EpubScannerService
         return string.Join("_", filename.Split(Path.GetInvalidFileNameChars()));
     }
 }
+
 
 
 
