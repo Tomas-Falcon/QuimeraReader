@@ -43,23 +43,21 @@ public class EpubScannerService
             .FirstOrDefaultAsync(b => b.Title == bookTitle) 
             ?? new Book { Title = bookTitle };
             
-        // Si el libro ya existe, limpiamos los autores para volver a procesarlos (o podríamos saltarlo)
-        if (book.Id > 0)
-        {
-            book.Authors.Clear();
-        }
-
+        // Evitamos duplicar autores ya existentes
         if (epubBook.AuthorList != null)
         {
             foreach (var authorName in epubBook.AuthorList)
             {
-                var existingAuthor = await _dbContext.Authors.FirstOrDefaultAsync(a => a.Name == authorName);
-                if (existingAuthor == null)
+                if (!book.Authors.Any(a => a.Author != null && a.Author.Name == authorName))
                 {
-                    existingAuthor = new Author { Name = authorName, FileAs = authorName };
-                    _dbContext.Authors.Add(existingAuthor);
+                    var existingAuthor = await _dbContext.Authors.FirstOrDefaultAsync(a => a.Name == authorName);
+                    if (existingAuthor == null)
+                    {
+                        existingAuthor = new Author { Name = authorName, FileAs = authorName };
+                        _dbContext.Authors.Add(existingAuthor);
+                    }
+                    book.Authors.Add(new BookAuthor { Author = existingAuthor });
                 }
-                book.Authors.Add(new BookAuthor { Author = existingAuthor });
             }
         }
 
@@ -223,17 +221,20 @@ public class EpubScannerService
             {
                 foreach (var catName in metadata.Categories)
                 {
-                    var category = _dbContext.ChangeTracker.Entries<Category>()
-                        .Select(e => e.Entity)
-                        .FirstOrDefault(c => c.Name == catName) 
-                        ?? await _dbContext.Set<Category>().FirstOrDefaultAsync(c => c.Name == catName);
-                    
-                    if (category == null)
+                    if (!book.Categories.Any(c => c.Category != null && c.Category.Name == catName))
                     {
-                        category = new Category { Name = catName, IsUserGenerated = false };
-                        _dbContext.Add(category);
+                        var category = _dbContext.ChangeTracker.Entries<Category>()
+                            .Select(e => e.Entity)
+                            .FirstOrDefault(c => c.Name == catName) 
+                            ?? await _dbContext.Set<Category>().FirstOrDefaultAsync(c => c.Name == catName);
+                        
+                        if (category == null)
+                        {
+                            category = new Category { Name = catName, IsUserGenerated = false };
+                            _dbContext.Add(category);
+                        }
+                        book.Categories.Add(new BookCategory { Category = category });
                     }
-                    book.Categories.Add(new BookCategory { Category = category });
                 }
             }
 
@@ -603,6 +604,8 @@ public class EpubScannerService
         return string.Join("_", filename.Split(Path.GetInvalidFileNameChars()));
     }
 }
+
+
 
 
 
