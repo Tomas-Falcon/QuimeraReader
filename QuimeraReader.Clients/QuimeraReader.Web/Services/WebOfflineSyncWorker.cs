@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -96,10 +96,10 @@ namespace QuimeraReader.Web.Services
         {
             try
             {
-                var response = await _httpClient.GetFromJsonAsync<PaginatedResult<Book>>("api/Books?limit=100");
+                var response = await _httpClient.GetFromJsonAsync<PaginatedResult<Book>>("api/Books?page=1&pageSize=10000&isAvailableOffline=true");
                 if (response == null || response.Items == null) return;
 
-                var serverBooks = response.Items.Where(b => b.IsAvailableOffline).ToList();
+                var serverBooks = response.Items.ToList();
                 var localBooks = await _localRepo.GetOfflineBooksAsync();
 
                 foreach (var serverBook in serverBooks)
