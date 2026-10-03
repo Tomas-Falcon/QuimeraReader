@@ -1,3 +1,4 @@
+@inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @using Radzen
@@ -6,8 +7,8 @@
 @inject Radzen.DialogService DialogService
 
 <div class="mb-3">
-    <RadzenLabel Text="Buscar libro" />
-    <RadzenTextBox @bind-Value="_search" class="w-100 mb-2" Placeholder="Escribe un título..." @oninput="OnSearchInput" />
+    <RadzenLabel Text="@TranslationService["BookSelection_SearchLabel"]" />
+    <RadzenTextBox @bind-Value="_search" class="w-100 mb-2" Placeholder="@TranslationService["BookSelection_SearchPlaceholder"]" @oninput="OnSearchInput" />
 </div>
 
 <div style="max-height: 300px; overflow-y: auto;" class="mb-4 border p-2">
@@ -28,13 +29,13 @@
     }
     else
     {
-        <p class="text-muted">No se encontraron libros.</p>
+        <p class="text-muted">@TranslationService["BookSelection_NotFound"]</p>
     }
 </div>
 
 <div class="d-flex justify-content-end gap-2">
-    <RadzenButton Text="Cancelar" ButtonStyle="ButtonStyle.Light" Click="() => DialogService.Close((int?)null)" />
-    <RadzenButton Text="Seleccionar" ButtonStyle="ButtonStyle.Primary" Click="ConfirmSelection" Disabled="@(!_selectedBookId.HasValue)" />
+    <RadzenButton Text="@TranslationService["Button_Cancel"]" ButtonStyle="ButtonStyle.Light" Click="() => DialogService.Close((int?)null)" />
+    <RadzenButton Text="@TranslationService["Button_Select"]" ButtonStyle="ButtonStyle.Primary" Click="ConfirmSelection" Disabled="@(!_selectedBookId.HasValue)" />
 </div>
 
 @code {
@@ -81,3 +82,6 @@
         DialogService.Close(_selectedBookId);
     }
 }
+
+
+

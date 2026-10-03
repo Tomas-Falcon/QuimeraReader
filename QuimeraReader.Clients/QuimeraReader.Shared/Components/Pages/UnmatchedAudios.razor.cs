@@ -90,7 +90,7 @@ public partial class UnmatchedAudios : ComponentBase
 
     private async Task OpenMatchDialog(UnmatchedAudioTrack audio)
     {
-        var bookIdRes = await DialogService.OpenAsync<BookSelectionModal>("Seleccionar Libro", null, new Radzen.DialogOptions() { Width = "500px", Height = "600px" });
+        var bookIdRes = await DialogService.OpenAsync<BookSelectionModal>(TranslationService["BookSelection_Title"], null, new Radzen.DialogOptions() { Width = "500px", Height = "600px" });
         if (bookIdRes is int bookId)
         {
             try
@@ -113,6 +113,7 @@ public partial class UnmatchedAudios : ComponentBase
         }
     }
 }
+
 
 
 
