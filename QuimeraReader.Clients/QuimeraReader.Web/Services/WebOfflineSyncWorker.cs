@@ -19,7 +19,7 @@ namespace QuimeraReader.Web.Services
         private readonly ILogger<WebOfflineSyncWorker> _logger;
         private readonly IJSRuntime _jsRuntime;
         private Timer? _timer;
-        private bool _isSyncing = false;
+        public bool IsSyncing { get; private set; } = false;
 
         public WebOfflineSyncWorker(ILocalBookRepository localRepo, HttpClient httpClient, ILogger<WebOfflineSyncWorker> logger, IJSRuntime jsRuntime)
         {
@@ -31,13 +31,13 @@ namespace QuimeraReader.Web.Services
 
         public void Start()
         {
-            _timer = new Timer(async _ => await SyncAsync(), null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+            _timer = new Timer(async _ => await SyncNowAsync(), null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
         }
 
-        public async Task SyncAsync()
+        public async Task SyncNowAsync()
         {
-            if (_isSyncing) return;
-            _isSyncing = true;
+            if (IsSyncing) return;
+            IsSyncing = true;
 
             try
             {
@@ -53,7 +53,7 @@ namespace QuimeraReader.Web.Services
             }
             finally
             {
-                _isSyncing = false;
+                IsSyncing = false;
             }
         }
 
