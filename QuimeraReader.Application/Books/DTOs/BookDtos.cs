@@ -59,3 +59,13 @@ public record CategoryDto
 }
 
 
+
+public class ManagedAudioDto
+{
+    public int Id { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public bool IsMatched { get; set; }
+    public int? BookId { get; set; }
+    public string BookTitle { get; set; } = string.Empty;
+}
+

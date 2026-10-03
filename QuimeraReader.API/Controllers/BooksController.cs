@@ -997,9 +997,9 @@ public partial class BooksController : ControllerBase
     }
 
     [HttpGet("all-audios")]
-    public async Task<ActionResult<IEnumerable<QuimeraReader.Shared.Models.ManagedAudioDto>>> GetAllAudios()
+    public async Task<ActionResult<IEnumerable<QuimeraReader.Application.Books.DTOs.ManagedAudioDto>>> GetAllAudios()
     {
-        var unmatched = await _dbContext.UnmatchedAudioTracks.Select(u => new QuimeraReader.Shared.Models.ManagedAudioDto
+        var unmatched = await _dbContext.UnmatchedAudioTracks.Select(u => new QuimeraReader.Application.Books.DTOs.ManagedAudioDto
         {
             Id = u.Id,
             IsMatched = false,
@@ -1007,7 +1007,7 @@ public partial class BooksController : ControllerBase
             BookTitle = ""
         }).ToListAsync();
 
-        var matched = await _dbContext.BookAudioTracks.Include(t => t.Book).Select(m => new QuimeraReader.Shared.Models.ManagedAudioDto
+        var matched = await _dbContext.BookAudioTracks.Include(t => t.Book).Select(m => new QuimeraReader.Application.Books.DTOs.ManagedAudioDto
         {
             Id = m.Id,
             IsMatched = true,
