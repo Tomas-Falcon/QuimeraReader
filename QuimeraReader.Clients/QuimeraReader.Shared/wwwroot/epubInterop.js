@@ -198,8 +198,10 @@ export function goToPercentage(pct) {
         var cfi = window.epubBook.locations.cfiFromPercentage(pct / 100.0);
         if (cfi && window.epubRendition) {
             window.epubRendition.display(cfi);
+            return true;
         }
     }
+    return false;
 }
 
 export function applyAnnotation(cfiRange, color, hasNote) {
@@ -348,4 +350,8 @@ export function clearAudioBookmark() {
         } catch(e) {}
         window.currentAudioBookmarkCfi = null;
     }
+}
+
+export function setNavigationLock(isLocked) {
+    window.navigationLocked = isLocked;
 }

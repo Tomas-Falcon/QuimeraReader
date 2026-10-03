@@ -33,7 +33,17 @@
                 <div class="text-center" style="flex: 1;">
                     <h5 class="mb-0 text-truncate" style="max-width: 300px; margin: 0 auto;">@Book.Title</h5>
                 </div>
-                <div style="width: 70px;"></div> <!-- Spacer -->
+                <div style="width: 100px;" class="text-end d-flex justify-content-end gap-2">
+                    <button class="btn btn-sm @(_isNavigationLocked ? "btn-danger" : "btn-outline-light")" @onclick="ToggleNavigationLock" title="Bloquear navegación táctil para seleccionar texto">
+                        <i class="bi @(_isNavigationLocked ? "bi-lock-fill" : "bi-unlock")"></i>
+                    </button>
+                    @if (Book.HasEpub && Book.HasAudio)
+                    {
+                        <button class="btn btn-sm btn-outline-light" @onclick="ToggleAudiobookMode" title="Alternar modo de lectura/audio">
+                            <i class="bi @(_showAudiobookMode ? "bi-book" : "bi-headphones")"></i>
+                        </button>
+                    }
+                </div>
             </div>
 
             <!-- Text Area / EPUB Reader -->
@@ -164,6 +174,17 @@
     
     private bool _isLoading = true;
     private bool _showAudiobookMode = false;
+    private bool _isNavigationLocked = false;
+    
+    private async Task ToggleNavigationLock()
+    {
+        _isNavigationLocked = !_isNavigationLocked;
+        if (_epubJsModule != null)
+        {
+            await _epubJsModule.InvokeVoidAsync("setNavigationLock", _isNavigationLocked);
+        }
+        StateHasChanged();
+    }
     
     private void ToggleAudiobookMode()
     {
