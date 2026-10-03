@@ -23,7 +23,7 @@ namespace QuimeraReader.Shared.Helpers
                 catch { }
             }
             
-            if (coverUrl.StartsWith("http") || coverUrl.StartsWith("data:")) return coverUrl;
+            if (coverUrl.StartsWith("http") || coverUrl.StartsWith("data:") || coverUrl.StartsWith("blob:")) return coverUrl;
             
             var baseUri = baseAddress.TrimEnd('/');
             var relative = coverUrl.TrimStart('/');

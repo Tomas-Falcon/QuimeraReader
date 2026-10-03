@@ -20,8 +20,18 @@ namespace QuimeraReader.Web.Services
 
         public async Task InitializeAsync()
         {
-            // Web implementation simplified for now
-            IsOffline = false;
+            var isOnline = await _jsRuntime.InvokeAsync<bool>("window.quimeraNetwork.isOnline");
+            IsOffline = !isOnline;
+            
+            var dotNetRef = DotNetObjectReference.Create(this);
+            await _jsRuntime.InvokeVoidAsync("window.quimeraNetwork.registerListener", dotNetRef);
+        }
+
+        [JSInvokable]
+        public void OnNetworkStateChangedJS(bool isOnline)
+        {
+            IsOffline = !isOnline;
+            OnNetworkStateChanged?.Invoke();
         }
 
         public void SetForceOffline(bool forceOffline)
