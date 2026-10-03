@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -86,6 +86,15 @@ public class DeepLibraryScannerService
                             _logger.LogError(ex, "Error al renombrar o normalizar el audio colocado manualmente.");
                             book.AudioTracks.Add(new BookAudioTrack { FilePath = audioPath, TrackNumber = nextTrack });
                         }
+                    }
+                    else
+                    {
+                        book.AudioTracks.Add(new BookAudioTrack { FilePath = audioPath, TrackNumber = nextTrack });
+                    }
+
+                    if (book.ProcessingStatus != "SYNCED" && book.ProcessingStatus != "PROCESSING")
+                    {
+                        book.ProcessingStatus = "PENDING_SYNC";
                     }
                 }
             }

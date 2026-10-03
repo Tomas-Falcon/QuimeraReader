@@ -111,25 +111,53 @@ public class AudioMatchingService
                 return contentMatch.Id;
             }
             
-            // Si el título no está explícitamente, busquemos palabras clave largas en BooksFTS
-            var words = normalizedAudioText.Split(new[] { ' ', '.', ',', ':', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            // Si el título no está explícitamente, buscamos en el contenido real del EPUB
+            var candidateBooks = await _dbContext.Books
+                .Where(b => !b.AudioTracks.Any() && !string.IsNullOrEmpty(b.EpubFilePath))
+                .Select(b => new { b.Id, b.Title, b.EpubFilePath })
+                .ToListAsync(cancellationToken);
+
+            var words = normalizedAudioText.Split(new[] { ' ', '.', ',', ':', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
                                            .Where(w => w.Length > 5)
                                            .Distinct()
-                                           .Take(8)
                                            .ToList();
-                                           
-            if (words.Any())
+
+            int bestMatchId = 0;
+            int maxHits = 0;
+
+            foreach (var candidate in candidateBooks)
             {
-                string matchQuery = string.Join(" OR ", words.Select(w => $"\"{w}*\""));
-                var ftsMatch = await _dbContext.Books
-                    .FromSqlRaw($"SELECT b.* FROM Books b INNER JOIN BooksFTS fts ON b.Id = fts.rowid WHERE BooksFTS MATCH {{0}} LIMIT 1", matchQuery)
-                    .FirstOrDefaultAsync(cancellationToken);
-                    
-                if (ftsMatch != null)
+                if (string.IsNullOrEmpty(candidate.EpubFilePath) || !File.Exists(candidate.EpubFilePath)) continue;
+
+                try
                 {
-                    _logger.LogInformation("Audio emparejado por FTS Múltiple: {File} -> {BookTitle}", Path.GetFileName(audioFilePath), ftsMatch.Title);
-                    return ftsMatch.Id;
+                    var book = VersOne.Epub.EpubReader.ReadBook(candidate.EpubFilePath);
+                    var sb = new System.Text.StringBuilder();
+                    foreach (var textContentFile in book.ReadingOrder.Take(4))
+                    {
+                        sb.AppendLine(textContentFile.Content);
+                    }
+                    string epubText = System.Text.RegularExpressions.Regex.Replace(sb.ToString(), "<.*?>", string.Empty).ToLowerInvariant();
+                    
+                    int matchCount = words.Count(w => epubText.Contains(w));
+                    
+                    if (matchCount > maxHits)
+                    {
+                        maxHits = matchCount;
+                        bestMatchId = candidate.Id;
+                    }
                 }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error leyendo EPUB para emparejamiento: {Path}", candidate.EpubFilePath);
+                }
+            }
+
+            if (maxHits > 10 && bestMatchId > 0)
+            {
+                var matchedTitle = candidateBooks.First(b => b.Id == bestMatchId).Title;
+                _logger.LogInformation("Audio emparejado por TEXTO DEL EPUB ({Hits} palabras): {File} -> {BookTitle}", maxHits, Path.GetFileName(audioFilePath), matchedTitle);
+                return bestMatchId;
             }
             
             return null;
