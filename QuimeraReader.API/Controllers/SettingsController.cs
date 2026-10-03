@@ -117,7 +117,7 @@ public class SettingsController : ControllerBase
     [HttpGet("whisper/status")]
     public async Task<IActionResult> GetWhisperStatus()
     {
-        var settings = await _context.SystemSettings.FirstOrDefaultAsync();
+        var settings = await _dbContext.SystemSettings.FirstOrDefaultAsync();
         bool isDownloaded = false;
         
         if (settings != null && !string.IsNullOrEmpty(settings.WhisperModelPath))
