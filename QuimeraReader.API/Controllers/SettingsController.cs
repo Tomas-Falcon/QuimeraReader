@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -66,7 +66,13 @@ public class SettingsController : ControllerBase
     public async Task<IActionResult> DownloadWhisperModel([FromServices] QuimeraReader.Infrastructure.Services.AudioAlignmentQueue queue)
     {
         string modelUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin";
-        string targetPath = "ggml-base.bin";
+
+        var settingsDict = await _dbContext.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
+        settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
+        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+        
+        System.IO.Directory.CreateDirectory(libraryRoot);
+        string targetPath = Path.Combine(libraryRoot, "ggml-base.bin");
 
         bool wasAlreadyDownloaded = System.IO.File.Exists(targetPath);
 
@@ -76,7 +82,7 @@ public class SettingsController : ControllerBase
             {
                 using var httpClient = new System.Net.Http.HttpClient();
                 using var stream = await httpClient.GetStreamAsync(modelUrl);
-                using var fileStream = new FileStream(targetPath, FileMode.CreateNew);
+                using var fileStream = new System.IO.FileStream(targetPath, System.IO.FileMode.CreateNew);
                 await stream.CopyToAsync(fileStream);
             }
             catch (System.Exception ex)
@@ -84,6 +90,16 @@ public class SettingsController : ControllerBase
                 _logger.LogError(ex, "Error al descargar el modelo Whisper");
                 return StatusCode(500, new { Message = "Error al descargar el modelo: " + ex.Message });
             }
+        }
+
+        var modelPathSetting = await _dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "WhisperModelPath");
+        if (modelPathSetting == null)
+        {
+            _dbContext.SystemSettings.Add(new QuimeraReader.Domain.Entities.SystemSetting { Key = "WhisperModelPath", Value = targetPath });
+        }
+        else
+        {
+            modelPathSetting.Value = targetPath;
         }
 
         // Auto-requeue any ERROR books
@@ -95,7 +111,7 @@ public class SettingsController : ControllerBase
         }
         await _dbContext.SaveChangesAsync();
 
-        return Ok(new { Message = "Modelo descargado con Ã©xito y trabajos reanudados." });
+        return Ok(new { Message = "Modelo descargado con éxito y trabajos reanudados." });
     }
 
     [HttpGet("whisper/status")]
@@ -107,7 +123,7 @@ public class SettingsController : ControllerBase
 [HttpPost("restart")]
     public IActionResult RestartServer([FromServices] Microsoft.Extensions.Hosting.IHostApplicationLifetime appLifetime)
     {
-        _logger.LogWarning("Se recibiÃ³ comando de REINICIO desde los ajustes. Deteniendo la aplicaciÃ³n...");
+        _logger.LogWarning("Se recibió comando de REINICIO desde los ajustes. Deteniendo la aplicación...");
         
         // Ejecutamos en un hilo separado para permitir que la respuesta HTTP termine y llegue al cliente
         _ = Task.Run(async () =>
@@ -121,7 +137,7 @@ public class SettingsController : ControllerBase
     [HttpPost("update-container")]
     public IActionResult UpdateContainer([FromServices] Microsoft.Extensions.Hosting.IHostApplicationLifetime appLifetime)
     {
-        _logger.LogWarning("Se recibiÃ³ comando de ACTUALIZACIÃ“N de contenedor desde los ajustes.");
+        _logger.LogWarning("Se recibió comando de ACTUALIZACIÓN de contenedor desde los ajustes.");
         
         // Ejecutamos en un hilo separado
         _ = Task.Run(async () =>
@@ -134,18 +150,18 @@ public class SettingsController : ControllerBase
                 var response = await httpClient.PostAsync("http://watchtower:8080/v1/update", null);
                 if (response.IsSuccessStatusCode)
                 {
-                    _logger.LogInformation("ActualizaciÃ³n solicitada con Ã©xito a Watchtower HTTP API.");
+                    _logger.LogInformation("Actualización solicitada con éxito a Watchtower HTTP API.");
                     watchtowerTriggered = true;
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogInformation("No se detectÃ³ servicio Watchtower HTTP API ({Message}), intentando script local...", ex.Message);
+                _logger.LogInformation("No se detectó servicio Watchtower HTTP API ({Message}), intentando script local...", ex.Message);
             }
 
             try 
             {
-                // Si existe un script de actualizaciÃ³n (ej. un webhook local o script de watchtower), intentamos ejecutarlo
+                // Si existe un script de actualización (ej. un webhook local o script de watchtower), intentamos ejecutarlo
                 if (System.IO.File.Exists("/app/update_container.sh"))
                 {
                     var process = new System.Diagnostics.Process()
@@ -164,7 +180,7 @@ public class SettingsController : ControllerBase
             }
             catch (System.Exception ex)
             {
-                _logger.LogError(ex, "Error al ejecutar script de actualizaciÃ³n");
+                _logger.LogError(ex, "Error al ejecutar script de actualización");
             }
 
             if (!watchtowerTriggered)
@@ -174,6 +190,7 @@ public class SettingsController : ControllerBase
             }
         });
 
-        return Ok(new { Message = "Iniciando proceso de actualizaciÃ³n y reinicio..." });
+        return Ok(new { Message = "Iniciando proceso de actualización y reinicio..." });
     }
 }
+
