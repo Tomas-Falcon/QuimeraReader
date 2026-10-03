@@ -532,10 +532,6 @@ public partial class BooksController : ControllerBase
             {
                 _dbContext.Books.Add(book);
             }
-            else
-            {
-                _dbContext.Books.Update(book);
-            }
             
             await _dbContext.SaveChangesAsync();
 
@@ -1131,6 +1127,7 @@ public class ScanRequest
 { 
     public string FolderPath { get; set; } = string.Empty; 
 }
+
 
 
 
