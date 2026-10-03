@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -30,12 +30,12 @@ public class EpubScannerService
         _logger = logger;
     }
 
-    public async Task<Book> ScanEpubAsync(string sourceFilePath, string preferredProviderName, string? originalFileName = null)
+    public async Task<Book> ScanEpubAsync(string sourceFilePath, string preferredProviderName, string? originalFileName = null, bool forceMove = false)
     {
         EpubBook epubBook = await EpubReader.ReadBookAsync(sourceFilePath);
         string bookTitle = string.IsNullOrWhiteSpace(epubBook.Title) && !string.IsNullOrWhiteSpace(originalFileName) 
             ? Path.GetFileNameWithoutExtension(originalFileName) 
-            : (epubBook.Title ?? "Sin TÃ­tulo");
+            : (epubBook.Title ?? "Sin Título");
             
         var book = await _dbContext.Books
             .Include(b => b.Authors)
@@ -43,7 +43,7 @@ public class EpubScannerService
             .FirstOrDefaultAsync(b => b.Title == bookTitle) 
             ?? new Book { Title = bookTitle };
             
-        // Si el libro ya existe, limpiamos los autores para volver a procesarlos (o podrÃ­amos saltarlo)
+        // Si el libro ya existe, limpiamos los autores para volver a procesarlos (o podríamos saltarlo)
         if (book.Id > 0)
         {
             book.Authors.Clear();
@@ -73,7 +73,7 @@ public class EpubScannerService
             {
                 var val = id.Identifier ?? "";
                 
-                // Si el esquema dice explÃ­citamente ISBN
+                // Si el esquema dice explícitamente ISBN
                 if (id.Scheme != null && id.Scheme.Equals("ISBN", StringComparison.OrdinalIgnoreCase))
                 {
                     extractedIsbns.Add(val);
@@ -87,7 +87,7 @@ public class EpubScannerService
                     continue;
                 }
 
-                // Intentar deducir si es un ISBN13 o ISBN10 por formato numÃ©rico
+                // Intentar deducir si es un ISBN13 o ISBN10 por formato numérico
                 var numericOnly = new string(val.Where(c => char.IsDigit(c) || c == 'X' || c == 'x').ToArray());
                 if (numericOnly.Length == 13 && (numericOnly.StartsWith("978") || numericOnly.StartsWith("979")))
                 {
@@ -101,7 +101,7 @@ public class EpubScannerService
                 }
             }
 
-            // Limpiar prefijos y obtener valores Ãºnicos
+            // Limpiar prefijos y obtener valores únicos
             var uniqueIsbns = extractedIsbns
                 .Select(i => i.Replace("urn:isbn:", "", StringComparison.OrdinalIgnoreCase).Trim())
                 .Where(i => !string.IsNullOrWhiteSpace(i))
@@ -123,17 +123,17 @@ public class EpubScannerService
             {
                 // Limpiar etiquetas HTML si las tiene
                 book.Description = System.Text.RegularExpressions.Regex.Replace(epubDescription, "<.*?>", " ").Trim();
-                _logger.LogInformation("Sinopsis extraÃ­da directamente del EPUB para '{Title}'", book.Title);
+                _logger.LogInformation("Sinopsis extraída directamente del EPUB para '{Title}'", book.Title);
             }
         }
 
-        // Extraer categorÃ­as/subjects directamente del EPUB (dc:subject)
+        // Extraer categorías/subjects directamente del EPUB (dc:subject)
         if (epubBook.Schema?.Package?.Metadata?.Subjects != null)
         {
             foreach (var subjectRaw in epubBook.Schema.Package.Metadata.Subjects)
             {
                 if (string.IsNullOrWhiteSpace(subjectRaw?.Subject)) continue;
-                // Algunos EPUBs ponen "Novela, FantÃ¡stico" en un solo subject, separado por comas
+                // Algunos EPUBs ponen "Novela, Fantástico" en un solo subject, separado por comas
                 var parts = subjectRaw.Subject.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 foreach (var catName in parts)
                 {
@@ -155,7 +155,7 @@ public class EpubScannerService
             }
             if (book.Categories.Any())
             {
-                _logger.LogInformation("CategorÃ­as extraÃ­das del EPUB para '{Title}': {Categories}", 
+                _logger.LogInformation("Categorías extraídas del EPUB para '{Title}': {Categories}", 
                     book.Title, string.Join(", ", book.Categories.Select(c => c.Category?.Name)));
             }
         }
@@ -189,7 +189,7 @@ public class EpubScannerService
         
         if (metadata == null)
         {
-            _logger.LogWarning("NingÃºn proveedor devolviÃ³ metadatos para '{Title}'", book.Title);
+            _logger.LogWarning("Ningún proveedor devolvió metadatos para '{Title}'", book.Title);
         }
 
         byte[]? apiCoverBytes = null;
@@ -272,7 +272,7 @@ public class EpubScannerService
             }
         }
 
-        // --- ORGANIZACION FÃSICA ---
+        // --- ORGANIZACION FÍSICA ---
         settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
         if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
 
@@ -282,7 +282,7 @@ public class EpubScannerService
 
         string safeAuthor = GetSafeFilename(mainAuthor);
         
-        // Si el tÃ­tulo sigue estando vacÃ­o, usamos el originalFileName o un nombre por defecto
+        // Si el título sigue estando vacío, usamos el originalFileName o un nombre por defecto
         if (string.IsNullOrWhiteSpace(book.Title))
         {
             book.Title = originalFileName != null ? Path.GetFileNameWithoutExtension(originalFileName) : "Unknown Book";
@@ -301,6 +301,7 @@ public class EpubScannerService
         // Mover o crear Symlink basado en IngestionMode
         string newEpubPath = Path.Combine(bookSubDir, $"{safeTitle}.epub");
         settingsDict.TryGetValue("IngestionMode", out var ingestionMode);
+        if (forceMove) ingestionMode = "MoveAndOrganize";
         
         book.SourceFilePath = sourceFilePath;
 
@@ -318,7 +319,7 @@ public class EpubScannerService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Error creando Symlink para {File}. En modo torrent NO se copiarÃ¡ el archivo para ahorrar espacio. Se guardarÃ¡ la ruta original.", sourceFilePath);
+                _logger.LogWarning(ex, "Error creando Symlink para {File}. En modo torrent NO se copiará el archivo para ahorrar espacio. Se guardará la ruta original.", sourceFilePath);
                 // Si falla el symlink en Docker/Windows, no copiamos (evitamos duplicar 140k libros).
                 // Guardamos la ruta original del torrent.
                 book.EpubFilePath = sourceFilePath;
@@ -357,7 +358,7 @@ public class EpubScannerService
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Error creando Symlink Audio. No se copiarÃ¡ el archivo. Se mantendrÃ¡ la ruta original: {File}", possibleAudioPath);
+                        _logger.LogWarning(ex, "Error creando Symlink Audio. No se copiará el archivo. Se mantendrá la ruta original: {File}", possibleAudioPath);
                         newAudioPath = possibleAudioPath; // usar la ruta original del torrent
                     }
                     hasAudio = true;
@@ -375,18 +376,18 @@ public class EpubScannerService
             }
         }
 
-        // --- MANEJO DE COLA DE SINCRONIZACIÃ“N (Just-In-Time) ---
+        // --- MANEJO DE COLA DE SINCRONIZACIÓN (Just-In-Time) ---
         if (hasAudio)
         {
             if (book.LastReadAt != null)
             {
-                // El libro ya estaba activo, encolar automÃ¡ticamente
+                // El libro ya estaba activo, encolar automáticamente
                 book.ProcessingStatus = "PENDING_SYNC";
                 await _queue.EnqueueAsync(book.Id);
             }
             else
             {
-                // El libro no estÃ¡ activo, esperar al Trigger 1 (Lectura)
+                // El libro no está activo, esperar al Trigger 1 (Lectura)
                 book.ProcessingStatus = "CREATED";
             }
         }
@@ -395,7 +396,7 @@ public class EpubScannerService
             book.ProcessingStatus = "NONE"; // No hay audio
         }
 
-        // Guardar CarÃ¡tula (priorizando la de la API si se obtuvo)
+        // Guardar Carátula (priorizando la de la API si se obtuvo)
         byte[]? finalCoverBytes = apiCoverBytes ?? epubBook.CoverImage;
         if (finalCoverBytes != null)
         {
@@ -471,7 +472,7 @@ public class EpubScannerService
         
         if (metadata == null)
         {
-            _logger.LogWarning("NingÃºn proveedor devolviÃ³ metadatos adicionales para '{Title}'", book.Title);
+            _logger.LogWarning("Ningún proveedor devolvió metadatos adicionales para '{Title}'", book.Title);
         }
 
         if (metadata != null)
@@ -557,7 +558,7 @@ public class EpubScannerService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Error descargando carÃ¡tula de {CoverUri}", metadata.CoverImageUri);
+                    _logger.LogWarning(ex, "Error descargando carátula de {CoverUri}", metadata.CoverImageUri);
                 }
             }
         }
@@ -602,6 +603,8 @@ public class EpubScannerService
         return string.Join("_", filename.Split(Path.GetInvalidFileNameChars()));
     }
 }
+
+
 
 
 

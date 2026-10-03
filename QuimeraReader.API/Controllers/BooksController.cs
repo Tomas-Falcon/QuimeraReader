@@ -526,7 +526,7 @@ public partial class BooksController : ControllerBase
 
             var scannerService = HttpContext.RequestServices.GetRequiredService<QuimeraReader.Infrastructure.Services.EpubScannerService>();
             
-            var book = await scannerService.ScanEpubAsync(tempPath, "GoogleBooks", file.FileName);
+            var book = await scannerService.ScanEpubAsync(tempPath, "GoogleBooks", file.FileName, forceMove: true);
             
             if (book.Id == 0)
             {
@@ -1131,6 +1131,7 @@ public class ScanRequest
 { 
     public string FolderPath { get; set; } = string.Empty; 
 }
+
 
 
 
