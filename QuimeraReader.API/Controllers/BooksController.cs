@@ -1025,9 +1025,25 @@ public partial class BooksController : ControllerBase
         if (audio == null || book == null) return NotFound();
         
         int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
-        book.AudioTracks.Add(new QuimeraReader.Domain.Entities.BookAudioTrack { FilePath = audio.PhysicalPath, TrackNumber = nextTrack });
+        
+        string? outDir = Path.GetDirectoryName(book.EpubFilePath);
+        string newAudioPath = audio.PhysicalPath;
+        if (!string.IsNullOrEmpty(outDir))
+        {
+            newAudioPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(book.EpubFilePath) + $"_track{nextTrack}" + Path.GetExtension(audio.OriginalFileName));
+            if (System.IO.File.Exists(audio.PhysicalPath))
+            {
+                System.IO.File.Move(audio.PhysicalPath, newAudioPath, true);
+            }
+        }
+        
+        book.AudioTracks.Add(new QuimeraReader.Domain.Entities.BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
+        book.ProcessingStatus = "PENDING_SYNC";
         _dbContext.UnmatchedAudioTracks.Remove(audio);
         await _dbContext.SaveChangesAsync();
+        
+        await _queue.EnqueueAsync(book.Id);
+        
         return Ok();
     }
 
@@ -1068,9 +1084,27 @@ public partial class BooksController : ControllerBase
                         if (book != null)
                         {
                             int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
-                            book.AudioTracks.Add(new QuimeraReader.Domain.Entities.BookAudioTrack { FilePath = audio.PhysicalPath, TrackNumber = nextTrack });
+                            
+                            string? outDir = Path.GetDirectoryName(book.EpubFilePath);
+                            string newAudioPath = audio.PhysicalPath;
+                            if (!string.IsNullOrEmpty(outDir))
+                            {
+                                newAudioPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(book.EpubFilePath) + $"_track{nextTrack}" + Path.GetExtension(audio.OriginalFileName));
+                                if (System.IO.File.Exists(audio.PhysicalPath))
+                                {
+                                    System.IO.File.Move(audio.PhysicalPath, newAudioPath, true);
+                                }
+                            }
+                            
+                            book.AudioTracks.Add(new QuimeraReader.Domain.Entities.BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
+                            book.ProcessingStatus = "PENDING_SYNC";
                             db.UnmatchedAudioTracks.Remove(audio);
                             await db.SaveChangesAsync();
+
+                            var queue = scope.ServiceProvider.GetService<QuimeraReader.API.BackgroundServices.AudioAlignmentQueue>();
+                            if (queue != null) {
+                                await queue.EnqueueAsync(book.Id);
+                            }
                         }
                     }
                 }
