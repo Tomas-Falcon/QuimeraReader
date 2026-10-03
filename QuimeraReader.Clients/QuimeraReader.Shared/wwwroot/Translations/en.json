@@ -101,5 +101,6 @@
     "BookSelection_SearchPlaceholder":  "Type a title...",
     "BookSelection_NotFound":  "No books found.",
     "Button_Select":  "Select",
-    "BookSelection_SearchLabel":  "Search book"
+    "BookSelection_SearchLabel": "Search book",`r`n    "Common_Back": "Back"
 }
+
