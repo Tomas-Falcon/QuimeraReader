@@ -499,7 +499,7 @@ public partial class BooksController : ControllerBase
                     var matchedBook = await _dbContext.Books.Include(b => b.AudioTracks).FirstOrDefaultAsync(b => b.Id == matchedBookId.Value);
                     if (matchedBook != null)
                     {
-                        string? outDir = Path.GetDirectoryName(matchedBook.EpubFilePath);
+                        string outDir = await GetBookOutputDirAsync(matchedBook, _dbContext);
                         if (!string.IsNullOrEmpty(outDir))
                         {
                             string newAudioPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(matchedBook.EpubFilePath) + "_audio" + Path.GetExtension(file.FileName));
@@ -1026,7 +1026,7 @@ public partial class BooksController : ControllerBase
         
         int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
         
-        string? outDir = Path.GetDirectoryName(book.EpubFilePath);
+        string outDir = await GetBookOutputDirAsync(book, _dbContext);
         string newAudioPath = audio.PhysicalPath;
         if (!string.IsNullOrEmpty(outDir))
         {
@@ -1085,7 +1085,7 @@ public partial class BooksController : ControllerBase
                         {
                             int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
                             
-                            string? outDir = Path.GetDirectoryName(book.EpubFilePath);
+                            string outDir = await GetBookOutputDirAsync(book, _dbContext);
                             string newAudioPath = audio.PhysicalPath;
                             if (!string.IsNullOrEmpty(outDir))
                             {
@@ -1101,7 +1101,7 @@ public partial class BooksController : ControllerBase
                             db.UnmatchedAudioTracks.Remove(audio);
                             await db.SaveChangesAsync();
 
-                            var queue = scope.ServiceProvider.GetService<QuimeraReader.API.BackgroundServices.AudioAlignmentQueue>();
+                            var queue = scope.ServiceProvider.GetService<QuimeraReader.Infrastructure.Services.AudioAlignmentQueue>();
                             if (queue != null) {
                                 await queue.EnqueueAsync(book.Id);
                             }
@@ -1114,11 +1114,26 @@ public partial class BooksController : ControllerBase
         });
         return Ok("El proceso ha iniciado en segundo plano. Esto tardará unos minutos.");
     }
+
+    private async Task<string> GetBookOutputDirAsync(QuimeraReader.Domain.Entities.Book book, QuimeraReader.Infrastructure.AppDbContext db)
+    {
+        if (!string.IsNullOrEmpty(book.CoverImagePath)) return System.IO.Path.GetDirectoryName(book.CoverImagePath)!;
+        if (book.AudioTracks != null && book.AudioTracks.Any()) return System.IO.Path.GetDirectoryName(book.AudioTracks.First().FilePath)!;
+        string safeAuthor = string.Join("_", (book.Authors?.FirstOrDefault()?.Author?.Name ?? "Unknown Author").Split(System.IO.Path.GetInvalidFileNameChars()));
+        string safeTitle = string.Join("_", book.Title.Split(System.IO.Path.GetInvalidFileNameChars()));
+        var settingsDict = await db.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
+        settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
+        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "Library");
+        return System.IO.Path.Combine(libraryRoot, safeAuthor, safeTitle);
+    }
 }
 public class ScanRequest 
 { 
     public string FolderPath { get; set; } = string.Empty; 
 }
+
+
+
 
 
 
