@@ -13,11 +13,17 @@ public partial class UnmatchedAudios : ComponentBase
     private bool _isAutoMatching = false;
     private bool? _filterMatched = null;
 
-    private List<dynamic> _filterOptions = new List<dynamic>
+        public class FilterOption
     {
-        new { Text = "Todos los Audios", Value = (bool?)null },
-        new { Text = "Asignados", Value = (bool?)true },
-        new { Text = "Huérfanos", Value = (bool?)false }
+        public string Text { get; set; }
+        public bool? Value { get; set; }
+    }
+
+    private List<FilterOption> _filterOptions = new List<FilterOption>
+    {
+        new FilterOption { Text = "Todos los Audios", Value = null },
+        new FilterOption { Text = "Asignados", Value = true },
+        new FilterOption { Text = "Huérfanos", Value = false }
     };
 
     private List<ManagedAudioDto> _audios = new();
@@ -152,4 +158,5 @@ public partial class UnmatchedAudios : ComponentBase
         }
     }
 }
+
 
