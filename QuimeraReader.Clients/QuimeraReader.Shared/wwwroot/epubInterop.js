@@ -81,7 +81,7 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         if (!location || !location.start || !location.start.cfi) return;
         var percentage = -1;
         try {
-            if (book.locations && book.locations.length > 0) {
+            if (book.locations && book.locations.total > 0) {
                 var p = book.locations.percentageFromCfi(location.start.cfi);
                 if (typeof p === 'number' && !isNaN(p) && isFinite(p)) {
                     percentage = p;
@@ -94,7 +94,7 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         if (dotNetRef) {
             var currentPage = 0; var totalPages = 0;
             try {
-                if (book.locations && book.locations.length > 0) {
+                if (book.locations && book.locations.total > 0) {
                     currentPage = book.locations.locationFromCfi(location.start.cfi) || 0;
                     totalPages = book.locations.total || 0;
                 }
@@ -194,7 +194,7 @@ export function destroyEpub() {
 export function nextEpubPage() { if (window.epubNext) window.epubNext(); }
 export function prevEpubPage() { if (window.epubPrev) window.epubPrev(); }
 export function goToPercentage(pct) {
-    if (window.epubBook && window.epubBook.locations && window.epubBook.locations.length > 0) {
+    if (window.epubBook && window.epubBook.locations && window.epubBook.locations.total > 0) {
         var cfi = window.epubBook.locations.cfiFromPercentage(pct / 100.0);
         if (cfi && window.epubRendition) {
             window.epubRendition.display(cfi);
