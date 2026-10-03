@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -34,7 +34,7 @@ public class AudioMatchingService
         var explicitMatch = allBooks.FirstOrDefault(b => b.Title.Length > 5 && fileName.Contains(b.Title.ToLower()));
         if (explicitMatch != null)
         {
-            _logger.LogInformation("Candidato inicial por título: {File} -> {BookTitle}. Validando por contenido...", fileName, explicitMatch.Title);
+            _logger.LogInformation("Candidato inicial por tÃ­tulo: {File} -> {BookTitle}. Validando por contenido...", fileName, explicitMatch.Title);
             preCandidateId = explicitMatch.Id;
         }
         else
@@ -51,7 +51,7 @@ public class AudioMatchingService
             }
         }
 
-        _logger.LogInformation("Iniciando extracción Whisper para validación de contenido de {File}...", fileName);
+        _logger.LogInformation("Iniciando extracciÃ³n Whisper para validaciÃ³n de contenido de {File}...", fileName);
         return await MatchByContentAsync(audioFilePath, preCandidateId, cancellationToken);
     }
 
@@ -93,88 +93,72 @@ public class AudioMatchingService
                 if (cancellationToken.IsCancellationRequested) break;
             }
 
-            if (string.IsNullOrWhiteSpace(extractedText)) return null;
+                        if (string.IsNullOrWhiteSpace(extractedText)) return null;
             string normalizedAudioText = extractedText.ToLowerInvariant();
 
-            var allTitles = await _dbContext.Books.Select(b => new { b.Id, b.Title }).ToListAsync(cancellationToken);
-            var contentMatch = allTitles
-                .Select(b => new 
-                { 
-                    Id = b.Id, 
-                    Title = b.Title,
-                    Hits = (normalizedAudioText.Contains(b.Title.ToLower()) && b.Title.Length > 4) ? 10 : 0
-                })
-                .Where(x => x.Hits >= 10)
-                .OrderByDescending(x => x.Hits)
-                .FirstOrDefault();
-
-            if (contentMatch != null)
-            {
-                _logger.LogInformation("Audio emparejado por CONTENIDO (Título en audio): {File} -> {BookTitle}", Path.GetFileName(audioFilePath), contentMatch.Title);
-                return contentMatch.Id;
-            }
-            
-            // 2. Construir un SUBSET de candidatos para evitar extraer el EPUB de toda la biblioteca
-            var candidateIds = new HashSet<int>();
-            
-            if (preCandidateId.HasValue) candidateIds.Add(preCandidateId.Value);
-
+            // 1. Streaming Candidate Selection (Phase 1)
             string rawFileName = Path.GetFileNameWithoutExtension(audioFilePath).ToLowerInvariant();
-            var fileWords = rawFileName.Split(new[] { ' ', '-', '_' }, StringSplitOptions.RemoveEmptyEntries)
-                                       .Where(w => w.Length > 4)
+            string spacedFileName = rawFileName.Replace("_", " ").Replace("-", " ");
+            string cleanFileName = new string(spacedFileName.Where(c => char.IsLetterOrDigit(c) || char.IsWhiteSpace(c)).ToArray());
+            var fileWords = cleanFileName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                                       .Where(w => w.Length > 2)
                                        .ToList();
 
-            // Subset A: Coincidencia parcial del nombre del archivo (ej. "Harry Potter")
-            if (fileWords.Any())
+            var candidateScores = new Dictionary<int, double>();
+            if (preCandidateId.HasValue) candidateScores[preCandidateId.Value] = 9999.0;
+
+            var booksStream = _dbContext.Books.AsNoTracking().Select(b => new { b.Id, b.Title, b.EpubFilePath }).AsAsyncEnumerable();
+
+            await foreach (var b in booksStream.WithCancellation(cancellationToken))
             {
-                var partialTitleMatches = await _dbContext.Books
-                    .Where(b => !b.AudioTracks.Any())
-                    .Where(b => fileWords.Any(w => b.Title.ToLower().Contains(w)))
-                    .Select(b => b.Id)
-                    .ToListAsync(cancellationToken);
+                if (string.IsNullOrEmpty(b.EpubFilePath)) continue;
                 
-                foreach(var id in partialTitleMatches) candidateIds.Add(id);
+                // Immediate Exact Match shortcut
+                if (b.Title.Length > 4 && normalizedAudioText.Contains(b.Title.ToLowerInvariant()))
+                {
+                    _logger.LogInformation("Audio emparejado por CONTENIDO EXACTO (Título hablado): {File} -> {BookTitle}", Path.GetFileName(audioFilePath), b.Title);
+                    return b.Id;
+                }
+
+                // Calculate Fuzzy Score
+                string cleanTitle = new string(b.Title.ToLowerInvariant().Replace("_", " ").Replace("-", " ").Where(c => char.IsLetterOrDigit(c) || char.IsWhiteSpace(c)).ToArray());
+                double score = 0;
+                foreach (var w in fileWords)
+                {
+                    if (cleanTitle.Contains(w)) score += 50;
+                }
+                score += CalculateSimilarity(cleanFileName, cleanTitle);
+                
+                if (score > 30) // Arbitrary minimum to avoid sorting 140k
+                {
+                    candidateScores[b.Id] = candidateScores.TryGetValue(b.Id, out var existing) ? Math.Max(existing, score) : score;
+                }
             }
 
-            var whisperWords = normalizedAudioText.Split(new[] { ' ', '.', ',', ':', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
-                                           .Where(w => w.Length > 5)
-                                           .Distinct()
-                                           .ToList();
+            var topCandidateIds = candidateScores.OrderByDescending(kvp => kvp.Value).Take(20).Select(kvp => kvp.Key).ToList();
 
-            // Subset B: Coincidencia FTS desde el texto de Whisper (Título o Autor mencionado en el audio)
-            var topWhisperWords = whisperWords.Take(15).ToList();
-            if (topWhisperWords.Any())
-            {
-                string matchQuery = string.Join(" OR ", topWhisperWords.Select(w => $"\"{w}*\""));
-                var ftsMatches = await _dbContext.Books
-                    .FromSqlRaw($"SELECT b.* FROM Books b INNER JOIN BooksFTS fts ON b.Id = fts.rowid WHERE BooksFTS MATCH {{0}} LIMIT 20", matchQuery)
-                    .Select(b => b.Id)
-                    .ToListAsync(cancellationToken);
-                    
-                foreach(var id in ftsMatches) candidateIds.Add(id);
-            }
-
-            // Subset C: Fallback a los huérfanos más recientes si fallaron los métodos rápidos
-            if (candidateIds.Count == 0)
+            // If empty, fallback to recent
+            if (!topCandidateIds.Any())
             {
                 var fallbackIds = await _dbContext.Books
                     .Where(b => !b.AudioTracks.Any() && !string.IsNullOrEmpty(b.EpubFilePath))
                     .OrderByDescending(b => b.Id)
-                    .Take(100) // Límite de seguridad para evitar cuelgues (O(n))
+                    .Take(20)
                     .Select(b => b.Id)
                     .ToListAsync(cancellationToken);
-                
-                foreach(var id in fallbackIds) candidateIds.Add(id);
+                topCandidateIds.AddRange(fallbackIds);
             }
 
-            // 3. Procesamiento profundo de EPUB SOLO sobre el subset de candidatos
+            // 2. Trigram Intersection (Phase 2)
+            var whisperTrigrams = GenerateTrigrams(normalizedAudioText);
+            
             var candidateBooks = await _dbContext.Books
-                .Where(b => candidateIds.Contains(b.Id) && !string.IsNullOrEmpty(b.EpubFilePath))
+                .Where(b => topCandidateIds.Contains(b.Id))
                 .Select(b => new { b.Id, b.Title, b.EpubFilePath })
                 .ToListAsync(cancellationToken);
 
             int bestMatchId = 0;
-            int maxHits = 0;
+            int maxTrigrams = 0;
 
             foreach (var candidate in candidateBooks)
             {
@@ -188,26 +172,28 @@ public class AudioMatchingService
                     {
                         sb.AppendLine(textContentFile.Content);
                     }
-                    string epubText = System.Text.RegularExpressions.Regex.Replace(sb.ToString(), "<.*?>", string.Empty).ToLowerInvariant();
+                    string epubRawText = System.Text.RegularExpressions.Regex.Replace(sb.ToString(), "<.*?>", string.Empty).ToLowerInvariant();
                     
-                    int matchCount = whisperWords.Count(w => epubText.Contains(w));
+                    var epubTrigrams = GenerateTrigrams(epubRawText);
                     
-                    if (matchCount > maxHits)
+                    int matchCount = whisperTrigrams.Intersect(epubTrigrams).Count();
+                    
+                    if (matchCount > maxTrigrams)
                     {
-                        maxHits = matchCount;
+                        maxTrigrams = matchCount;
                         bestMatchId = candidate.Id;
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Error leyendo EPUB para emparejamiento: {Path}", candidate.EpubFilePath);
+                    _logger.LogWarning(ex, "Error leyendo EPUB para emparejamiento por Trigramas: {Path}", candidate.EpubFilePath);
                 }
             }
 
-            if (maxHits > 10 && bestMatchId > 0)
+            if (maxTrigrams >= 10 && bestMatchId > 0)
             {
                 var matchedTitle = candidateBooks.First(b => b.Id == bestMatchId).Title;
-                _logger.LogInformation("Audio emparejado por TEXTO DEL EPUB ({Hits} palabras): {File} -> {BookTitle}", maxHits, Path.GetFileName(audioFilePath), matchedTitle);
+                _logger.LogInformation("Audio emparejado por TRIGRAMAS ({Hits} secuencias idénticas): {File} -> {BookTitle}", maxTrigrams, Path.GetFileName(audioFilePath), matchedTitle);
                 return bestMatchId;
             }
             
@@ -222,6 +208,24 @@ public class AudioMatchingService
         {
             if (File.Exists(tempWavFile)) try { File.Delete(tempWavFile); } catch { }
         }
+    }
+
+    private HashSet<string> GenerateTrigrams(string text)
+    {
+        var trigrams = new HashSet<string>();
+        if (string.IsNullOrWhiteSpace(text)) return trigrams;
+        
+        var cleanText = new string(text.Where(c => char.IsLetterOrDigit(c) || char.IsWhiteSpace(c)).ToArray()).ToLowerInvariant();
+        var words = cleanText.Split(new[] { ' ', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        
+        if (words.Length < 3) return trigrams;
+        
+        for (int i = 0; i < words.Length - 2; i++)
+        {
+            trigrams.Add($"{words[i]} {words[i+1]} {words[i+2]}");
+        }
+        
+        return trigrams;
     }
 
     private double CalculateSimilarity(string source, string target)
@@ -243,3 +247,4 @@ public class AudioMatchingService
         return (1.0 - ((double)d[n, m] / Math.Max(source.Length, target.Length))) * 100.0;
     }
 }
+
