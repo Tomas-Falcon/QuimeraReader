@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Infrastructure;
 using QuimeraReader.Infrastructure.Services;
 using Microsoft.Extensions.Hosting;
@@ -14,6 +14,8 @@ namespace QuimeraReader.API.BackgroundServices;
 public class AudioAlignmentBackgroundService : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
+    // Umbral de cobertura de trigramas (transcripción completa vs EPUB) para aceptar el emparejamiento.
+    private const double MinCoverage = 0.30;
     private readonly AudioAlignmentQueue _queue;
     private readonly ILogger<AudioAlignmentBackgroundService> _logger;
 
@@ -125,6 +127,30 @@ public class AudioAlignmentBackgroundService : BackgroundService
             await dbContext.SaveChangesAsync(stoppingToken);
             return;
         }
+
+        // Validación definitiva: ¿la transcripción completa coincide con este libro?
+        if (alignmentResult.Coverage < MinCoverage)
+        {
+            _logger.LogWarning(
+                "Audio '{Audio}' RECHAZADO para el libro '{Title}' (ID: {Id}): cobertura de trigramas {Coverage:P1} < {Min:P0}. Se devuelve a huérfanos.",
+                audioTrack!.FileName, bookToSync.Title, bookToSync.Id, alignmentResult.Coverage, MinCoverage);
+
+            long size = File.Exists(audioFilePath) ? new FileInfo(audioFilePath).Length : 0;
+            dbContext.UnmatchedAudioTracks.Add(new QuimeraReader.Domain.Entities.UnmatchedAudioTrack
+            {
+                OriginalFileName = string.IsNullOrEmpty(audioTrack.FileName) ? Path.GetFileName(audioFilePath) : audioTrack.FileName,
+                PhysicalPath = audioFilePath,
+                FileSizeBytes = size,
+                UploadedAt = DateTime.UtcNow
+            });
+            dbContext.BookAudioTracks.Remove(audioTrack);
+            if (bookToSync.SyncMap != null) dbContext.Remove(bookToSync.SyncMap);
+            bookToSync.ProcessingStatus = "NONE";
+            await dbContext.SaveChangesAsync(stoppingToken);
+            return;
+        }
+
+        _logger.LogInformation("Cobertura de trigramas audio/EPUB para '{Title}': {Coverage:P1}", bookToSync.Title, alignmentResult.Coverage);
 
         // Guardar resultado
         if (bookToSync.SyncMap == null)

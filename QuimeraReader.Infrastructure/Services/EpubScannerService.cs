@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -273,7 +273,7 @@ public class EpubScannerService
             }
         }
 
-        // --- ORGANIZACION FÃSICA ---
+        // --- ORGANIZACION FÍSICA ---
         settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
         if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
 
@@ -377,7 +377,7 @@ public class EpubScannerService
             }
         }
 
-        // --- MANEJO DE COLA DE SINCRONIZACIÃ“N (Just-In-Time) ---
+        // --- MANEJO DE COLA DE SINCRONIZACIÓN (Just-In-Time) ---
         if (hasAudio)
         {
             if (book.LastReadAt != null)
