@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -85,8 +85,8 @@ namespace QuimeraReader.Web.Services
             {
                 try
                 {
-                    var payload = new { EpubCfi = book.CurrentEpubCfi, Percentage = book.PercentageCompleted, AudioPosition = book.CurrentAudioPosition };
-                    await _httpClient.PutAsJsonAsync($"api/Books/{book.Id}/position", payload);
+                    var payload = new { CurrentEpubCfi = book.CurrentEpubCfi, PercentageCompleted = book.PercentageCompleted, CurrentAudioPosition = book.CurrentAudioPosition, CurrentAudioTrackNumber = book.CurrentAudioTrackNumber };
+                    await _httpClient.PostAsJsonAsync($"api/Books/{book.Id}/positions", payload);
                 }
                 catch { }
             }
@@ -145,9 +145,22 @@ namespace QuimeraReader.Web.Services
         private async Task<string> DownloadFileToDbAsync(int bookId, string fileType, string? serverPath, string? baseUrl)
         {
             if (string.IsNullOrEmpty(serverPath)) return "";
-            if (serverPath.StartsWith("blob:")) return serverPath;
+            if (serverPath.StartsWith("blob:") || serverPath.StartsWith("data:")) return serverPath;
             
             var fullUrl = serverPath.StartsWith("http") ? serverPath : $"{baseUrl}/{serverPath}";
+
+            if (fileType == "cover")
+            {
+                try {
+                    var bytes = await _httpClient.GetByteArrayAsync(fullUrl);
+                    var b64 = Convert.ToBase64String(bytes);
+                    var ext = System.IO.Path.GetExtension(serverPath).TrimStart('.').ToLower();
+                    if (ext == "jpg") ext = "jpeg";
+                    if (string.IsNullOrEmpty(ext)) ext = "jpeg";
+                    return $"data:image/{ext};base64,{b64}";
+                } catch { return ""; }
+            }
+
             return await _jsRuntime.InvokeAsync<string>("window.quimeraIndexedDb.downloadFileToDb", bookId, fileType, fullUrl);
         }
 

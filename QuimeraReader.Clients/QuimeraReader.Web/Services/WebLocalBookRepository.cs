@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -67,7 +67,7 @@ namespace QuimeraReader.Web.Services
         {
             var syncAction = new AnnotationQueueItem { 
                 Id = Guid.NewGuid().ToString(),
-                 
+                BookId = bookId,
                 CfiRange = cfiRange, 
                 SelectedText = selectedText, 
                 ColorHex = colorHex, 
@@ -121,6 +121,11 @@ namespace QuimeraReader.Web.Services
         public async Task SyncAnnotationsAsync(int bookId, List<AnnotationDto> annotations)
         {
             await _jsRuntime.InvokeVoidAsync("window.localStorage.setItem", $"annotations_{bookId}", JsonSerializer.Serialize(annotations));
+        }
+
+        public async Task<string?> GetBookFileUrlAsync(int bookId, string fileType)
+        {
+            return await _jsRuntime.InvokeAsync<string>("window.quimeraIndexedDb.getFileUrl", bookId, fileType);
         }
     }
 }

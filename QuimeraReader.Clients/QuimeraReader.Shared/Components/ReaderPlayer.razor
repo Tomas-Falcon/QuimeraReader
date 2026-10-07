@@ -1,4 +1,4 @@
-﻿@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @using Microsoft.JSInterop
 @using System.Text.Json
@@ -139,7 +139,7 @@
             @if (Book.HasAudio)
             {
                 <div class="player-controls" style="background: var(--bg-card); padding: 10px;">
-                    <audio @ref="_audioElement" src="@(BookService.BaseAddress + @Book.AudioUrl)" controls class="native-audio w-100" />
+                    <audio @ref="_audioElement" src="@_audioSourceUrl" controls class="native-audio w-100" />
                 </div>
             }
         </div>
@@ -221,10 +221,25 @@
     }
     private bool _isPlaying = false;
     private List<SyncSegment> _segments = new();
+    private string _audioSourceUrl = "";
 
     protected override async Task OnInitializedAsync()
     {
         Book = await BookService.GetBookAsync(BookId);
+        
+        if (Book != null)
+        {
+            var localRepo = ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
+            var audioFileUrl = localRepo != null ? await localRepo.GetBookFileUrlAsync(BookId, "audio") : null;
+            if (!string.IsNullOrEmpty(audioFileUrl) && (audioFileUrl.StartsWith("blob:") || System.IO.File.Exists(audioFileUrl) || audioFileUrl.StartsWith("data:")))
+            {
+                _audioSourceUrl = audioFileUrl;
+            }
+            else
+            {
+                _audioSourceUrl = $"{BookService.BaseAddress.TrimEnd('/')}/{Book.AudioUrl}";
+            }
+        }
         
         if (Book != null && Book.IsAligned)
         {
@@ -274,8 +289,32 @@
                 if (_dotNetRef == null) _dotNetRef = DotNetObjectReference.Create(this);
                 _epubJsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/QuimeraReader.Shared/epubInterop.js");
                 // Construct the absolute URL to the EPUB file via API
-                if (!string.IsNullOrEmpty(Book.LocalEpubPath) && System.IO.File.Exists(Book.LocalEpubPath))
+                var localRepo = ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
+                var epubFileUrl = localRepo != null ? await localRepo.GetBookFileUrlAsync(BookId, "epub") : null;
+                
+                if (!string.IsNullOrEmpty(epubFileUrl) && (epubFileUrl.StartsWith("blob:") || System.IO.File.Exists(epubFileUrl)))
                 {
+                    if (epubFileUrl.StartsWith("blob:")) 
+                    {
+                        await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubFileUrl, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache);
+                    }
+                    else
+                    {
+                        try 
+                        {
+                            var fileStream = System.IO.File.OpenRead(epubFileUrl);
+                            using var streamRef = new DotNetStreamReference(stream: fileStream);
+                            await _epubJsModule.InvokeVoidAsync("initializeEpubFromStream", "epub-viewer", streamRef, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Console.WriteLine($"Error reading local EPUB: {ex.Message}");
+                        }
+                    }
+                }
+                else if (!string.IsNullOrEmpty(Book.LocalEpubPath) && System.IO.File.Exists(Book.LocalEpubPath))
+                {
+                    // Fallback
                     try 
                     {
                         var fileStream = System.IO.File.OpenRead(Book.LocalEpubPath);
