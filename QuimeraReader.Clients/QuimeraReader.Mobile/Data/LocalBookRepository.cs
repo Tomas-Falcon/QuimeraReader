@@ -254,4 +254,18 @@ public class LocalBookRepository : ILocalBookRepository
             await _dbContext.SaveChangesAsync();
         }
     }
+
+    public async Task<string?> GetBookFileUrlAsync(int bookId, string fileType)
+    {
+        var book = await GetBookByIdAsync(bookId);
+        if (book == null) return null;
+
+        return fileType.ToLower() switch
+        {
+            "epub" => book.LocalEpubPath,
+            "cover" => book.LocalCoverPath,
+            "audio" => book.LocalAudioPath,
+            _ => null
+        };
+    }
 }

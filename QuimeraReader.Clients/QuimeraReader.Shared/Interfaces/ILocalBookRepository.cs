@@ -18,4 +18,5 @@ public interface ILocalBookRepository
     Task EnsureCreatedAsync();
     Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId);
     Task SyncAnnotationsAsync(int bookId, List<AnnotationDto> annotations);
+    Task<string?> GetBookFileUrlAsync(int bookId, string fileType);
 }

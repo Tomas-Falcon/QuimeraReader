@@ -81,7 +81,7 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         if (!location || !location.start || !location.start.cfi) return;
         var percentage = -1;
         try {
-            if (book.locations && book.locations.length > 0) {
+            if (book.locations && book.locations.total > 0) {
                 var p = book.locations.percentageFromCfi(location.start.cfi);
                 if (typeof p === 'number' && !isNaN(p) && isFinite(p)) {
                     percentage = p;
@@ -94,7 +94,7 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         if (dotNetRef) {
             var currentPage = 0; var totalPages = 0;
             try {
-                if (book.locations && book.locations.length > 0) {
+                if (book.locations && book.locations.total > 0) {
                     currentPage = book.locations.locationFromCfi(location.start.cfi) || 0;
                     totalPages = book.locations.total || 0;
                 }
@@ -194,12 +194,14 @@ export function destroyEpub() {
 export function nextEpubPage() { if (window.epubNext) window.epubNext(); }
 export function prevEpubPage() { if (window.epubPrev) window.epubPrev(); }
 export function goToPercentage(pct) {
-    if (window.epubBook && window.epubBook.locations && window.epubBook.locations.length > 0) {
+    if (window.epubBook && window.epubBook.locations && window.epubBook.locations.total > 0) {
         var cfi = window.epubBook.locations.cfiFromPercentage(pct / 100.0);
         if (cfi && window.epubRendition) {
             window.epubRendition.display(cfi);
+            return true;
         }
     }
+    return false;
 }
 
 export function applyAnnotation(cfiRange, color, hasNote) {
@@ -305,3 +307,51 @@ export function highlightKaraokePhrase(text) {
 
 
 
+
+export function setAudioBookmark(cfiRange) {
+    if (window.epubRendition) {
+        if (window.currentAudioBookmarkCfi) {
+            try {
+                window.epubRendition.annotations.remove(window.currentAudioBookmarkCfi, "underline");
+            } catch(e) {}
+        }
+        if (cfiRange) {
+            window.currentAudioBookmarkCfi = cfiRange;
+            try {
+                window.epubRendition.annotations.underline(cfiRange, {}, () => {}, "", {
+                    "stroke": "#ff9800",
+                    "stroke-width": "4px",
+                    "stroke-opacity": "1.0",
+                    "stroke-dasharray": "4,4"
+                });
+            } catch(e) {}
+        }
+    }
+}
+
+export function convertKaraokeToHardMark() {
+    if (!window.epubRendition) return;
+    if (window.lastKaraokeCfi) {
+        setAudioBookmark(window.lastKaraokeCfi);
+    }
+    var contents = window.epubRendition.getContents();
+    if (!contents || contents.length === 0) return;
+    var prev = contents[0].document.querySelectorAll('.karaoke-highlight');
+    prev.forEach(el => {
+        el.style.backgroundColor = 'transparent';
+        el.classList.remove('karaoke-highlight');
+    });
+}
+
+export function clearAudioBookmark() {
+    if (window.epubRendition && window.currentAudioBookmarkCfi) {
+        try {
+            window.epubRendition.annotations.remove(window.currentAudioBookmarkCfi, "underline");
+        } catch(e) {}
+        window.currentAudioBookmarkCfi = null;
+    }
+}
+
+export function setNavigationLock(isLocked) {
+    window.navigationLocked = isLocked;
+}

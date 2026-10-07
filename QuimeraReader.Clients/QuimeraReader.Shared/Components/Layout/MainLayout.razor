@@ -1,4 +1,4 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @inject QuimeraReader.Shared.Interfaces.INetworkStateService NetworkStateService
 @implements IDisposable
 
@@ -54,7 +54,7 @@ else
                         </div>
                     }
 
-                    <RadzenDropDown TValue="string" Value="@_currentLang" Data="@_languages" ValueProperty="Code" TextProperty="Name" Change="OnLanguageChanged" Style="width: 110px;" />
+                    <RadzenDropDown TValue="string" Value="@_currentLang" Data="@_languages" ValueProperty="Code" TextProperty="Name" Change="OnLanguageChanged" Style="width: 125px;" />
                     
                     <RadzenButton Icon="cloud_download" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Size="ButtonSize.Small" Click="FetchMissingMetadata" IsBusy="@_isFetchingMetadata" title="Metadatos" />
 

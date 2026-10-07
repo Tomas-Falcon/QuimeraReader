@@ -33,13 +33,52 @@
                 <div class="text-center" style="flex: 1;">
                     <h5 class="mb-0 text-truncate" style="max-width: 300px; margin: 0 auto;">@Book.Title</h5>
                 </div>
-                <div style="width: 70px;"></div> <!-- Spacer -->
+                <div style="width: 100px;" class="text-end d-flex justify-content-end gap-2">
+                                        <button class="btn btn-sm @(_isNavigationLocked ? "btn-danger" : "btn-outline-light")" @onclick="ToggleNavigationLock" title="Bloquear navegaciÛn t·ctil para seleccionar texto">
+                        <i class="bi @(_isNavigationLocked ? "bi-lock-fill" : "bi-unlock")"></i>
+                    </button>
+                    @if (Book.HasEpub && Book.HasAudio)
+                    {
+                        <button class="btn btn-sm btn-outline-light" @onclick="ToggleAudiobookMode" title="Alternar modo de lectura/audio">
+                            <i class="bi @(_showAudiobookMode ? "bi-book" : "bi-headphones")"></i>
+                        </button>
+                    }
+                    @if (Book.HasAudio && Book.AudioTracks != null && Book.AudioTracks.Count > 1)
+                    {
+                        <button class="btn btn-sm @(_showPlaylist ? "btn-primary" : "btn-outline-light")" @onclick="TogglePlaylist" title="@TranslationService["ReaderPlayer_Playlist"]">
+                            <i class="bi bi-music-note-list"></i>
+                        </button>
+                    }
+                </div>
             </div>
+
+            @if (_showPlaylist && Book.AudioTracks != null)
+            {
+                <RadzenCard class="position-absolute" Style="top: 60px; right: 20px; width: 350px; max-height: calc(100vh - 140px); overflow-y: auto; z-index: 100; padding: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+                    <div class="p-3 d-flex justify-content-between align-items-center" style="background: var(--rz-primary); border-bottom: 1px solid var(--rz-border-color);">
+                        <h6 class="mb-0 text-white" style="margin: 0;">@TranslationService["ReaderPlayer_Playlist"]</h6>
+                        <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" Size="ButtonSize.ExtraSmall" Click="TogglePlaylist" />
+                    </div>
+                    <RadzenDataList Data="@Book.AudioTracks.OrderBy(t => t.TrackNumber)" TItem="AudioTrackDto" Style="max-height: 100%;">
+                        <Template Context="track">
+                            <div class="d-flex align-items-center justify-content-between p-2" style="cursor: pointer; background: @(track.TrackNumber == _currentTrackNumber ? "var(--rz-secondary-lighter)" : "transparent");" @onclick="() => ChangeTrackAsync(track.TrackNumber)">
+                                <span class="text-truncate" style="flex: 1; font-weight: @(track.TrackNumber == _currentTrackNumber ? "bold" : "normal");">
+                                    <RadzenIcon Icon="@(track.TrackNumber == _currentTrackNumber ? "play_circle" : "audiotrack")" class="me-2" />
+                                    @(string.IsNullOrWhiteSpace(track.FileName) ? $"{TranslationService["ReaderPlayer_Track"]} {track.TrackNumber}" : track.FileName)
+                                </span>
+                                @if (track.TrackNumber == _currentTrackNumber)
+                                {
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="@TranslationService["ReaderPlayer_Current"]" />
+                                }
+                            </div>
+                        </Template>
+                    </RadzenDataList>
+                </RadzenCard>
+            }
 
             <!-- Text Area / EPUB Reader -->
             <div class="text-container position-relative" id="text-container" style="flex: 1; display: flex; flex-direction: column;">
-                @if (Book.HasEpub)
-                {
+                <div style="display: @(Book.HasEpub && !_showAudiobookMode ? "flex" : "none"); flex: 1; flex-direction: column; overflow: hidden;">
                     <div id="epub-viewer" style="flex: 1; width: 100%; min-height: 0; overflow: hidden;">
                         <!-- Epub.js will render the book here -->
                     </div>
@@ -52,10 +91,11 @@
                         </div>
                         <input type="range" class="form-range custom-progress-bar" min="0" max="100" step="0.1" value="@(Book.PercentageCompleted ?? 0)" @onchange="OnProgressSliderChanged" />
                     </div>
-                }
-                else if (_segments != null && _segments.Any())
+                </div>
+
+                @if (Book.HasAudio && _segments != null && _segments.Any())
                 {
-                    <div class="sync-text p-4" style="flex: 1; overflow-y: auto;">
+                    <div class="sync-text p-4" style="display: @(!Book.HasEpub || _showAudiobookMode ? "block" : "none"); flex: 1; overflow-y: auto;">
                         @for (int i = 0; i < _segments.Count; i++)
                         {
                             var segment = _segments[i];
@@ -67,7 +107,7 @@
                         }
                     </div>
                 }
-                else
+                else if (!Book.HasEpub)
                 {
                     <div class="no-sync-map text-center pt-5" style="flex: 1;">
                         <img src="@(BookService.BaseAddress + @Book.CoverUrl)" class="fallback-cover mb-4" style="max-width: 200px; border-radius: 8px;" />
@@ -110,7 +150,10 @@
                 }
                 else if (Book.HasAudio && _segments != null && _segments.Any())
                 {
-                    <RadzenButton Text="Reproducir" Icon="play_circle" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small" Click="PlayFromSelectionAsync" />
+                    <div class="d-flex gap-2">
+                        <RadzenButton Text="Fijar Audio" Icon="push_pin" ButtonStyle="ButtonStyle.Warning" Variant="Variant.Outlined" Size="ButtonSize.Small" Click="@(() => SetAudioBookmarkAsync(false))" />
+                        <RadzenButton Text="Reproducir" Icon="play_circle" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small" Click="PlayFromSelectionAsync" />
+                    </div>
                 }
                 else {
                     <div></div>
@@ -126,7 +169,7 @@
             @if (Book.HasAudio)
             {
                 <div class="player-controls" style="background: var(--bg-card); padding: 10px;">
-                    <audio @ref="_audioElement" src="@(BookService.BaseAddress + @Book.AudioUrl)" controls class="native-audio w-100" />
+                    <audio @ref="_audioElement" src="@GetCurrentTrackUrl()" controls class="native-audio w-100" />
                 </div>
             }
         </div>
@@ -160,6 +203,24 @@
     }
     
     private bool _isLoading = true;
+    private bool _showAudiobookMode = false;
+    private bool _isNavigationLocked = false;
+    
+    private async Task ToggleNavigationLock()
+    {
+        _isNavigationLocked = !_isNavigationLocked;
+        if (_epubJsModule != null)
+        {
+            await _epubJsModule.InvokeVoidAsync("setNavigationLock", _isNavigationLocked);
+        }
+        StateHasChanged();
+    }
+    
+    private void ToggleAudiobookMode()
+    {
+        _showAudiobookMode = !_showAudiobookMode;
+        StateHasChanged();
+    }
     private ElementReference _audioElement;
     private IJSObjectReference? _jsModule;
     private DotNetObjectReference<ReaderPlayer>? _dotNetRef;
@@ -190,10 +251,25 @@
     }
     private bool _isPlaying = false;
     private List<SyncSegment> _segments = new();
+    private string _audioSourceUrl = "";
 
     protected override async Task OnInitializedAsync()
     {
         Book = await BookService.GetBookAsync(BookId);
+        
+        if (Book != null)
+        {
+            var localRepo = ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
+            var audioFileUrl = localRepo != null ? await localRepo.GetBookFileUrlAsync(BookId, "audio") : null;
+            if (!string.IsNullOrEmpty(audioFileUrl) && (audioFileUrl.StartsWith("blob:") || System.IO.File.Exists(audioFileUrl) || audioFileUrl.StartsWith("data:")))
+            {
+                _audioSourceUrl = audioFileUrl;
+            }
+            else
+            {
+                _audioSourceUrl = $"{BookService.BaseAddress.TrimEnd('/')}/{Book.AudioUrl}";
+            }
+        }
         
         if (Book != null && Book.IsAligned)
         {
@@ -243,8 +319,32 @@
                 if (_dotNetRef == null) _dotNetRef = DotNetObjectReference.Create(this);
                 _epubJsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/QuimeraReader.Shared/epubInterop.js");
                 // Construct the absolute URL to the EPUB file via API
-                if (!string.IsNullOrEmpty(Book.LocalEpubPath) && System.IO.File.Exists(Book.LocalEpubPath))
+                var localRepo = ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
+                var epubFileUrl = localRepo != null ? await localRepo.GetBookFileUrlAsync(BookId, "epub") : null;
+                
+                if (!string.IsNullOrEmpty(epubFileUrl) && (epubFileUrl.StartsWith("blob:") || System.IO.File.Exists(epubFileUrl)))
                 {
+                    if (epubFileUrl.StartsWith("blob:")) 
+                    {
+                        await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubFileUrl, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache);
+                    }
+                    else
+                    {
+                        try 
+                        {
+                            var fileStream = System.IO.File.OpenRead(epubFileUrl);
+                            using var streamRef = new DotNetStreamReference(stream: fileStream);
+                            await _epubJsModule.InvokeVoidAsync("initializeEpubFromStream", "epub-viewer", streamRef, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Console.WriteLine($"Error reading local EPUB: {ex.Message}");
+                        }
+                    }
+                }
+                else if (!string.IsNullOrEmpty(Book.LocalEpubPath) && System.IO.File.Exists(Book.LocalEpubPath))
+                {
+                    // Fallback
                     try 
                     {
                         var fileStream = System.IO.File.OpenRead(Book.LocalEpubPath);
@@ -368,7 +468,7 @@
         StateHasChanged();
     }
 
-    private async Task PlayFromSelectionAsync()
+    private async Task SetAudioBookmarkAsync(bool autoPlay = false)
     {
         _showAnnotationDialog = false;
         if (!string.IsNullOrEmpty(_selectedText) && _segments != null && _segments.Any())
@@ -381,15 +481,38 @@
 
             if (match != null)
             {
-                var startOffset = Math.Max(0, match.Start - 1.5);
-                await SeekToSegmentAsync(startOffset);
-                ToastService.ShowSuccess("Reproduciendo desde la selecci√≥n.");
+                var startOffset = Math.Max(0, match.Start - 5.0);
+                
+                if (_epubJsModule != null && !string.IsNullOrEmpty(_selectedCfi))
+                {
+                    await _epubJsModule.InvokeVoidAsync("setAudioBookmark", _selectedCfi);
+                }
+                
+                if (autoPlay)
+                {
+                    await SeekToSegmentAsync(startOffset);
+                    ToastService.ShowSuccess("Reproduciendo desde la marca.");
+                }
+                else
+                {
+                    _currentTime = startOffset;
+                    if (_jsModule != null)
+                    {
+                        await _jsModule.InvokeVoidAsync("seekAudio", _audioElement, startOffset);
+                    }
+                    ToastService.ShowSuccess("Marca de audiolibro establecida.");
+                }
             }
             else
             {
                 ToastService.ShowError("No se encontr√≥ el audio para este fragmento.");
             }
         }
+    }
+
+    private async Task PlayFromSelectionAsync()
+    {
+        await SetAudioBookmarkAsync(true);
     }
 
     private async Task DeleteAnnotationAsync()
@@ -524,9 +647,17 @@
     }
 
     [JSInvokable]
-    public void OnPlayStateChanged(bool isPlaying)
+    public async Task OnPlayStateChanged(bool isPlaying)
     {
         _isPlaying = isPlaying;
+        if (!_isPlaying)
+        {
+            if (_epubJsModule != null) await _epubJsModule.InvokeVoidAsync("convertKaraokeToHardMark");
+        }
+        else
+        {
+            if (_epubJsModule != null) await _epubJsModule.InvokeVoidAsync("clearAudioBookmark");
+        }
         StateHasChanged();
     }
 
@@ -580,17 +711,19 @@
         [JsonPropertyName("text")]
         public string Text { get; set; } = string.Empty;
     }
+    private async Task SkipBackward()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("skipAudio", _audioElement, -15);
+        }
+    }
+
+    private async Task SkipForward()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("skipAudio", _audioElement, 30);
+        }
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

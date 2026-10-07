@@ -13,8 +13,8 @@
             {
                 <RadzenPanelMenuItem Text="@TranslationService["Nav_OfflineLibrary"]" Icon="cloud_download" Path="offline-library" />
             }
+            <RadzenPanelMenuItem Text="@TranslationService["Nav_ManageAudios"]" Path="unmatched-audios" Icon="audio_file" />
             <RadzenPanelMenuItem Text="@TranslationService["Nav_Settings"]" Icon="settings" Path="settings" />
-            <RadzenPanelMenuItem Text="Audios Huerfanos" Path="unmatched-audios" Icon="audio_file" />
         </RadzenPanelMenu>
     </div>
 
@@ -28,7 +28,7 @@
 
     protected override void OnInitialized()
     {
-        var informationalVersion = System.Reflection.Assembly.GetExecutingAssembly()
+        var informationalVersion = (System.Reflection.Assembly.GetEntryAssembly() ?? typeof(NavMenu).Assembly)
             .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
             .Cast<System.Reflection.AssemblyInformationalVersionAttribute>()
             .FirstOrDefault()?.InformationalVersion;

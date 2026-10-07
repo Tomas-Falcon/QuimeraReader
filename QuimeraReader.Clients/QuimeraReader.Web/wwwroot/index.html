@@ -17,6 +17,8 @@
     <!-- epub.js for EPUB rendering -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+    <link rel="manifest" href="manifest.json" />
+    <script src="indexedDbInterop.js"></script>
 </head>
 <body>
     <div id="app">
@@ -91,5 +93,10 @@
     <!-- Script de Radzen agregado acá -->
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register("service-worker.js");
+        }
+    </script>
 </body>
 </html>

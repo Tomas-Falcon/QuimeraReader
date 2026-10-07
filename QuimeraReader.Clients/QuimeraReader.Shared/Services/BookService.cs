@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using QuimeraReader.Shared.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -396,6 +396,7 @@ public class BookService : IBookService
         response.EnsureSuccessStatusCode();
     }
 }
+
 
 
 

@@ -87,6 +87,15 @@ public class DeepLibraryScannerService
                             book.AudioTracks.Add(new BookAudioTrack { FilePath = audioPath, TrackNumber = nextTrack });
                         }
                     }
+                    else
+                    {
+                        book.AudioTracks.Add(new BookAudioTrack { FilePath = audioPath, TrackNumber = nextTrack });
+                    }
+
+                    if (book.ProcessingStatus != "SYNCED" && book.ProcessingStatus != "PROCESSING")
+                    {
+                        book.ProcessingStatus = "PENDING_SYNC";
+                    }
                 }
             }
         }

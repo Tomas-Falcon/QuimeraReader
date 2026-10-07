@@ -14,54 +14,24 @@ namespace QuimeraReader.API.Controllers;
 [Route("api/[controller]")]
 public partial class BooksController : ControllerBase
 {
-        [HttpDelete]
+            [HttpDelete]
     public async Task<IActionResult> DeleteBooks([FromQuery] int[] ids)
     {
-        if (ids == null || ids.Length == 0) return BadRequest();
-        var books = await _dbContext.Books.Include(b => b.AudioTracks).Where(b => ids.Contains(b.Id)).ToListAsync();
-        if (books.Any()) {
-            await DeleteBooksInternalAsync(books);
-        }
+        await _mediator.Send(new QuimeraReader.Application.Books.Commands.DeleteBooks.DeleteBooksCommand { Ids = ids });
         return Ok();
     }
 
-    [HttpDelete("authors")]
+        [HttpDelete("authors")]
     public async Task<IActionResult> DeleteAuthors([FromQuery] int[] ids)
     {
-        if (ids == null || ids.Length == 0) return BadRequest();
-
-        var authors = await _dbContext.Authors.Where(a => ids.Contains(a.Id)).ToListAsync();
-        if (!authors.Any()) return Ok();
-
-        var books = await _dbContext.Books
-            .Include(b => b.AudioTracks)
-            .Where(b => b.Authors.Any(a => ids.Contains(a.AuthorId)))
-            .ToListAsync();
-
-        if (books.Any()) {
-            await DeleteBooksInternalAsync(books);
-        }
-
-        // Si quedaron autores vacios (por ej, subidos a mano) los borramos
-        var remainingAuthors = await _dbContext.Authors.Where(a => ids.Contains(a.Id)).ToListAsync();
-        if (remainingAuthors.Any())
-        {
-            _dbContext.Authors.RemoveRange(remainingAuthors);
-            await _dbContext.SaveChangesAsync();
-        }
+        await _mediator.Send(new QuimeraReader.Application.Books.Commands.DeleteAuthors.DeleteAuthorsCommand { Ids = ids });
         return Ok();
     }
 
-    [HttpDelete("categories")]
+        [HttpDelete("categories")]
     public async Task<IActionResult> DeleteCategories([FromQuery] int[] ids)
     {
-        if (ids == null || ids.Length == 0) return BadRequest();
-
-        var categories = await _dbContext.Categories.Where(c => ids.Contains(c.Id)).ToListAsync();
-        if (!categories.Any()) return Ok();
-
-        _dbContext.Categories.RemoveRange(categories);
-        await _dbContext.SaveChangesAsync();
+        await _mediator.Send(new QuimeraReader.Application.Books.Commands.DeleteCategories.DeleteCategoriesCommand { Ids = ids });
         return Ok();
     }
     private readonly AppDbContext _dbContext;
@@ -71,6 +41,7 @@ public partial class BooksController : ControllerBase
     private readonly LibraryScanState _scanState;
     private readonly ILogger<BooksController> _logger;
     private readonly IEnumerable<QuimeraReader.Domain.Interfaces.IMetadataProvider> _metadataProviders;
+    private readonly MediatR.IMediator _mediator;
 
     public BooksController(
         IEnumerable<QuimeraReader.Domain.Interfaces.IMetadataProvider> metadataProviders,
@@ -79,7 +50,7 @@ public partial class BooksController : ControllerBase
         AudioAlignmentService alignmentService, 
         AudioAlignmentQueue queue, 
         LibraryScanState scanState,
-        ILogger<BooksController> logger)
+        ILogger<BooksController> logger, MediatR.IMediator mediator)
     {
         _dbContext = dbContext;
         _scannerService = scannerService;
@@ -87,6 +58,7 @@ public partial class BooksController : ControllerBase
         _queue = queue;
         _scanState = scanState;
         _logger = logger;
+        _mediator = mediator;
         _metadataProviders = metadataProviders;
     }
 
@@ -355,7 +327,7 @@ public partial class BooksController : ControllerBase
             }
             finally
             {
-                // Limpieza de huÃƒÂ©rfanos generados durante la actualizaciÃ³n de metadatos
+                // Limpieza de huérfanos generados durante la actualización de metadatos
                 try
                 {
                     using var scope = scopeFactory.CreateScope();
@@ -378,7 +350,7 @@ public partial class BooksController : ControllerBase
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error en la limpieza de huÃƒÂ©rfanos post-escaneo");
+                    _logger.LogError(ex, "Error en la limpieza de huérfanos post-escaneo");
                 }
 
                 try
@@ -389,7 +361,7 @@ public partial class BooksController : ControllerBase
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error en la sincronizaciÃ³n con Hardcover");
+                    _logger.LogError(ex, "Error en la sincronización con Hardcover");
                 }
 
                 scanState.IsScanning = false;
@@ -436,15 +408,15 @@ public partial class BooksController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error crÃƒÂ­tico durante MergeDuplicates");
-            return StatusCode(500, new { Message = "Error interno durante la fusiÃ³n", Details = ex.Message, Inner = ex.InnerException?.Message });
+            _logger.LogError(ex, "Error crítico durante MergeDuplicates");
+            return StatusCode(500, new { Message = "Error interno durante la fusión", Details = ex.Message, Inner = ex.InnerException?.Message });
         }
     }
 
     [HttpPost("{bookId}/categories")]
     public async Task<IActionResult> AddCustomCategory(int bookId, [FromBody] string categoryName)
     {
-        if (string.IsNullOrWhiteSpace(categoryName)) return BadRequest("El nombre de la categorÃƒÂ­a no puede estar vacÃƒÂ­o.");
+        if (string.IsNullOrWhiteSpace(categoryName)) return BadRequest("El nombre de la categoría no puede estar vacío.");
 
         var book = await _dbContext.Books.Include(b => b.Categories).ThenInclude(bc => bc.Category).FirstOrDefaultAsync(b => b.Id == bookId);
         if (book == null) return NotFound();
@@ -463,7 +435,7 @@ public partial class BooksController : ControllerBase
             await _dbContext.SaveChangesAsync();
         }
 
-        return Ok(new { Message = "CategorÃƒÂ­a aÃƒÂ±adida exitosamente." });
+        return Ok(new { Message = "Categoría añadida exitosamente." });
     }
 
     [HttpPost("upload")]
@@ -472,7 +444,7 @@ public partial class BooksController : ControllerBase
     public async Task<IActionResult> UploadEpub(IFormFile file)
     {
         if (file == null || file.Length == 0)
-            return BadRequest("No se proporcionÃ³ ningÃºn archivo.");
+            return BadRequest("No se proporcionó ningún archivo.");
 
         string[] audioExtensions = { ".mp3", ".m4b", ".m4a", ".wav", ".ogg" };
         bool isAudio = audioExtensions.Contains(Path.GetExtension(file.FileName).ToLowerInvariant());
@@ -499,7 +471,7 @@ public partial class BooksController : ControllerBase
                     var matchedBook = await _dbContext.Books.Include(b => b.AudioTracks).FirstOrDefaultAsync(b => b.Id == matchedBookId.Value);
                     if (matchedBook != null)
                     {
-                        string? outDir = Path.GetDirectoryName(matchedBook.EpubFilePath);
+                        string outDir = await GetBookOutputDirAsync(matchedBook, _dbContext);
                         if (!string.IsNullOrEmpty(outDir))
                         {
                             string newAudioPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(matchedBook.EpubFilePath) + "_audio" + Path.GetExtension(file.FileName));
@@ -511,26 +483,26 @@ public partial class BooksController : ControllerBase
                         }
                     }
                 }
-                string orphansDir = Path.Combine(Directory.GetCurrentDirectory(), "Library", "Orphans");
+                var settingsDict = await _dbContext.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
+                settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
+                if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+
+                string orphansDir = Path.Combine(libraryRoot, "Orphans");
                 Directory.CreateDirectory(orphansDir);
                 string orphanPath = Path.Combine(orphansDir, file.FileName);
                 System.IO.File.Move(tempPath, orphanPath, true);
                 _dbContext.UnmatchedAudioTracks.Add(new UnmatchedAudioTrack { OriginalFileName = file.FileName, PhysicalPath = orphanPath, FileSizeBytes = file.Length, UploadedAt = DateTime.UtcNow });
                 await _dbContext.SaveChangesAsync();
-                return Ok(new { Message = "El audio fue guardado como huÃ©rfano porque no se encontrÃ³ coincidencia." });
+                return Ok(new { Message = "El audio fue guardado como huérfano porque no se encontró coincidencia." });
             }
 
             var scannerService = HttpContext.RequestServices.GetRequiredService<QuimeraReader.Infrastructure.Services.EpubScannerService>();
             
-            var book = await scannerService.ScanEpubAsync(tempPath, "GoogleBooks", file.FileName);
+            var book = await scannerService.ScanEpubAsync(tempPath, "GoogleBooks", file.FileName, forceMove: true);
             
             if (book.Id == 0)
             {
                 _dbContext.Books.Add(book);
-            }
-            else
-            {
-                _dbContext.Books.Update(book);
             }
             
             await _dbContext.SaveChangesAsync();
@@ -569,7 +541,7 @@ public partial class BooksController : ControllerBase
     [RequestFormLimits(MultipartBodyLengthLimit = 1073741824)]
     public async Task<IActionResult> UploadAudio(int id, IFormFile file)
     {
-        if (file == null || file.Length == 0) return BadRequest("No se proporcionÃ³ ningÃºn archivo de audio.");
+        if (file == null || file.Length == 0) return BadRequest("No se proporcionó ningún archivo de audio.");
         
         string[] audioExtensions = { ".mp3", ".m4b", ".m4a", ".wav", ".ogg" };
         string ext = Path.GetExtension(file.FileName).ToLowerInvariant();
@@ -581,7 +553,7 @@ public partial class BooksController : ControllerBase
         string bookDir;
         if (!string.IsNullOrEmpty(book.EpubFilePath)) bookDir = Path.GetDirectoryName(book.EpubFilePath)!;
         else if (!string.IsNullOrEmpty(book.CoverImagePath)) bookDir = Path.GetDirectoryName(book.CoverImagePath)!;
-        else return BadRequest("El libro no tiene una ruta fÃ­sica establecida.");
+        else return BadRequest("El libro no tiene una ruta física establecida.");
 
         int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
         string safeTitle = string.Join("_", book.Title.Split(Path.GetInvalidFileNameChars()));
@@ -596,11 +568,11 @@ public partial class BooksController : ControllerBase
 
             book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack, FileName = file.FileName });
             await _dbContext.SaveChangesAsync();
-            return Ok(new { Message = "Audio aÃ±adido correctamente." });
+            return Ok(new { Message = "Audio añadido correctamente." });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error aÃ±adiendo audio al libro {BookId}", id);
+            _logger.LogError(ex, "Error añadiendo audio al libro {BookId}", id);
             return StatusCode(500, "Error interno del servidor.");
         }
     }
@@ -680,7 +652,7 @@ public partial class BooksController : ControllerBase
         }
 
         await _dbContext.SaveChangesAsync();
-        return Ok(new { Message = $"Se agregaron {queuedCount} libros a la cola de sincronizaciÃ³n." });
+        return Ok(new { Message = $"Se agregaron {queuedCount} libros a la cola de sincronización." });
     }
 
     [HttpGet("{id}/syncmap")]
@@ -710,7 +682,7 @@ public partial class BooksController : ControllerBase
         
         if (!book.AudioTracks.Any())
         {
-            await DeleteBooksInternalAsync(new List<Book> { book });
+            await _mediator.Send(new QuimeraReader.Application.Books.Commands.DeleteBooks.DeleteBooksCommand { Ids = new[] { book.Id } });
         }
         else 
         {
@@ -736,7 +708,7 @@ public partial class BooksController : ControllerBase
         
         if (string.IsNullOrEmpty(book.EpubFilePath))
         {
-            await DeleteBooksInternalAsync(new List<Book> { book });
+            await _mediator.Send(new QuimeraReader.Application.Books.Commands.DeleteBooks.DeleteBooksCommand { Ids = new[] { book.Id } });
         }
         else
         {
@@ -759,7 +731,7 @@ public partial class BooksController : ControllerBase
         _dbContext.Books.Remove(book);
         await _dbContext.SaveChangesAsync();
 
-        // Limpieza de huÃ©rfanos
+        // Limpieza de huérfanos
         foreach(var authorId in authorIds)
         {
             bool authorHasMoreBooks = await _dbContext.Books.AnyAsync(b => b.Authors.Any(a => a.AuthorId == authorId));
@@ -789,13 +761,13 @@ public partial class BooksController : ControllerBase
                 // Borrar carpeta del libro y todo su contenido (cover.jpg, metadata.opf, etc.)
                 Directory.Delete(bookDir, true);
 
-                // Comprobar si la carpeta padre (Autor o Saga) quedÃƒÂ³ vacÃƒÂ­a
+                // Comprobar si la carpeta padre (Autor o Saga) quedó vacía
                 var parentDir = Directory.GetParent(bookDir)?.FullName;
                 if (parentDir != null && Directory.Exists(parentDir) && !Directory.EnumerateFileSystemEntries(parentDir).Any())
                 {
                     Directory.Delete(parentDir);
 
-                    // Comprobar si la carpeta abuelo (Autor si estÃƒÂ¡bamos dentro de una Saga) quedÃƒÂ³ vacÃƒÂ­a
+                    // Comprobar si la carpeta abuelo (Autor si estábamos dentro de una Saga) quedó vacía
                     var grandParentDir = Directory.GetParent(parentDir)?.FullName;
                     if (grandParentDir != null && Directory.Exists(grandParentDir) && !Directory.EnumerateFileSystemEntries(grandParentDir).Any())
                     {
@@ -840,41 +812,16 @@ public partial class BooksController : ControllerBase
         return Ok();
     }
 
-    [HttpPut("{bookId}/metadata")]
+        [HttpPut("{bookId}/metadata")]
     public async Task<IActionResult> UpdateMetadata(int bookId, [FromBody] UpdateMetadataRequest request)
     {
-        var book = await _dbContext.Books.Include(b => b.Categories).ThenInclude(bc => bc.Category).FirstOrDefaultAsync(b => b.Id == bookId);
-        if (book == null) return NotFound();
-
-                if (book.ReadingStatus != request.ReadingStatus && 
-           (request.ReadingStatus == "Reading" || request.ReadingStatus == "NextToRead" || request.ReadingStatus == "Read"))
-        {
-            book.LastReadAt = DateTime.UtcNow;
-        }
-        
-        book.Title = request.Title;
-        book.ReadingStatus = request.ReadingStatus;
-        
-        // Remove old categories not in new list
-        var toRemove = book.Categories.Where(c => !request.Categories.Contains(c.Category.Name)).ToList();
-        foreach (var r in toRemove) book.Categories.Remove(r);
-
-        // Add new categories
-        var existingNames = book.Categories.Select(c => c.Category.Name).ToList();
-        var toAdd = request.Categories.Where(c => !existingNames.Contains(c)).ToList();
-        foreach (var newCatName in toAdd)
-        {
-            var cat = await _dbContext.Categories.FirstOrDefaultAsync(c => c.Name == newCatName);
-            if (cat == null) 
-            {
-                cat = new Category { Name = newCatName };
-                _dbContext.Categories.Add(cat);
-                await _dbContext.SaveChangesAsync(); // save to get ID
-            }
-            book.Categories.Add(new BookCategory { BookId = book.Id, CategoryId = cat.Id });
-        }
-
-        await _dbContext.SaveChangesAsync();
+        await _mediator.Send(new QuimeraReader.Application.Books.Commands.UpdateMetadata.UpdateMetadataCommand 
+        { 
+            BookId = bookId, 
+            Title = request.Title, 
+            ReadingStatus = request.ReadingStatus, 
+            Categories = request.Categories 
+        });
         return Ok();
     }
 
@@ -996,6 +943,38 @@ public partial class BooksController : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("all-audios")]
+    public async Task<ActionResult<IEnumerable<QuimeraReader.Application.Books.DTOs.ManagedAudioDto>>> GetAllAudios()
+    {
+        var unmatched = await _dbContext.UnmatchedAudioTracks.Select(u => new QuimeraReader.Application.Books.DTOs.ManagedAudioDto
+        {
+            Id = u.Id,
+            IsMatched = false,
+            FileName = u.OriginalFileName,
+            BookTitle = ""
+        }).ToListAsync();
+
+        var matchedEntities = await _dbContext.BookAudioTracks.Include(t => t.Book).Select(m => new 
+        {
+            m.Id,
+            m.FileName,
+            m.FilePath,
+            m.BookId,
+            BookTitle = m.Book != null ? m.Book.Title : ""
+        }).ToListAsync();
+
+        var matched = matchedEntities.Select(m => new QuimeraReader.Application.Books.DTOs.ManagedAudioDto
+        {
+            Id = m.Id,
+            IsMatched = true,
+            FileName = string.IsNullOrEmpty(m.FileName) ? System.IO.Path.GetFileName(m.FilePath) : m.FileName,
+            BookId = m.BookId,
+            BookTitle = m.BookTitle
+        }).ToList();
+
+        return Ok(unmatched.Concat(matched).OrderBy(x => x.IsMatched).ThenBy(x => x.FileName));
+    }
+
     [HttpGet("unmatched-audios")]
     public async Task<ActionResult<IEnumerable<QuimeraReader.Domain.Entities.UnmatchedAudioTrack>>> GetUnmatchedAudios()
     {
@@ -1021,9 +1000,25 @@ public partial class BooksController : ControllerBase
         if (audio == null || book == null) return NotFound();
         
         int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
-        book.AudioTracks.Add(new QuimeraReader.Domain.Entities.BookAudioTrack { FilePath = audio.PhysicalPath, TrackNumber = nextTrack });
+        
+        string outDir = await GetBookOutputDirAsync(book, _dbContext);
+        string newAudioPath = audio.PhysicalPath;
+        if (!string.IsNullOrEmpty(outDir))
+        {
+            newAudioPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(book.EpubFilePath) + $"_track{nextTrack}" + Path.GetExtension(audio.OriginalFileName));
+            if (System.IO.File.Exists(audio.PhysicalPath))
+            {
+                System.IO.File.Move(audio.PhysicalPath, newAudioPath, true);
+            }
+        }
+        
+        book.AudioTracks.Add(new QuimeraReader.Domain.Entities.BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
+        book.ProcessingStatus = "PENDING_SYNC";
         _dbContext.UnmatchedAudioTracks.Remove(audio);
         await _dbContext.SaveChangesAsync();
+        
+        await _queue.EnqueueAsync(book.Id);
+        
         return Ok();
     }
 
@@ -1032,37 +1027,92 @@ public partial class BooksController : ControllerBase
     {
         var audio = await _dbContext.UnmatchedAudioTracks.FindAsync(id);
         if (audio == null || !System.IO.File.Exists(audio.PhysicalPath)) return NotFound();
-        return PhysicalFile(audio.PhysicalPath, "audio/mpeg", enableRangeProcessing: true);
+        
+        string ext = System.IO.Path.GetExtension(audio.PhysicalPath).ToLower();
+        string mimeType = ext switch {
+            ".mp3" => "audio/mpeg",
+            ".m4a" => "audio/mp4",
+            ".m4b" => "audio/mp4",
+            ".ogg" => "audio/ogg",
+            ".wav" => "audio/wav",
+            _ => "application/octet-stream"
+        };
+        return PhysicalFile(audio.PhysicalPath, mimeType, enableRangeProcessing: true);
     }
 
     [HttpPost("unmatched-audios/auto-match")]
-    public async Task<IActionResult> AutoMatchUnmatchedAudios([FromServices] QuimeraReader.Infrastructure.Services.AudioMatchingService audioMatchingService)
+    public IActionResult AutoMatchUnmatchedAudios([FromServices] Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory)
     {
-        var unmatched = await _dbContext.UnmatchedAudioTracks.ToListAsync();
-        int successCount = 0;
-        foreach (var audio in unmatched)
-        {
-            var matchId = await audioMatchingService.TryMatchAudioToBookAsync(audio.PhysicalPath);
-            if (matchId.HasValue)
-            {
-                var book = await _dbContext.Books.Include(b => b.AudioTracks).FirstOrDefaultAsync(b => b.Id == matchId.Value);
-                if (book != null)
+        _ = Task.Run(async () => {
+            try {
+                using var scope = scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<QuimeraReader.Infrastructure.AppDbContext>();
+                var audioMatchingService = scope.ServiceProvider.GetRequiredService<QuimeraReader.Infrastructure.Services.AudioMatchingService>();
+                
+                var unmatched = await db.UnmatchedAudioTracks.ToListAsync();
+                foreach (var audio in unmatched)
                 {
-                    int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
-                    book.AudioTracks.Add(new QuimeraReader.Domain.Entities.BookAudioTrack { FilePath = audio.PhysicalPath, TrackNumber = nextTrack });
-                    _dbContext.UnmatchedAudioTracks.Remove(audio);
-                    await _dbContext.SaveChangesAsync();
-                    successCount++;
+                    var matchId = await audioMatchingService.TryMatchAudioToBookAsync(audio.PhysicalPath);
+                    if (matchId.HasValue)
+                    {
+                        var book = await db.Books.Include(b => b.AudioTracks).FirstOrDefaultAsync(b => b.Id == matchId.Value);
+                        if (book != null)
+                        {
+                            int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
+                            
+                            string outDir = await GetBookOutputDirAsync(book, _dbContext);
+                            string newAudioPath = audio.PhysicalPath;
+                            if (!string.IsNullOrEmpty(outDir))
+                            {
+                                newAudioPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(book.EpubFilePath) + $"_track{nextTrack}" + Path.GetExtension(audio.OriginalFileName));
+                                if (System.IO.File.Exists(audio.PhysicalPath))
+                                {
+                                    System.IO.File.Move(audio.PhysicalPath, newAudioPath, true);
+                                }
+                            }
+                            
+                            book.AudioTracks.Add(new QuimeraReader.Domain.Entities.BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
+                            book.ProcessingStatus = "PENDING_SYNC";
+                            db.UnmatchedAudioTracks.Remove(audio);
+                            await db.SaveChangesAsync();
+
+                            var queue = scope.ServiceProvider.GetService<QuimeraReader.Infrastructure.Services.AudioAlignmentQueue>();
+                            if (queue != null) {
+                                await queue.EnqueueAsync(book.Id);
+                            }
+                        }
+                    }
                 }
+            } catch (Exception ex) {
+                System.Console.WriteLine($"Error en auto-match: {ex.Message}");
             }
-        }
-        return Ok(successCount.ToString());
+        });
+        return Ok("El proceso ha iniciado en segundo plano. Esto tardará unos minutos.");
+    }
+
+    private async Task<string> GetBookOutputDirAsync(QuimeraReader.Domain.Entities.Book book, QuimeraReader.Infrastructure.AppDbContext db)
+    {
+        if (!string.IsNullOrEmpty(book.CoverImagePath)) return System.IO.Path.GetDirectoryName(book.CoverImagePath)!;
+        if (book.AudioTracks != null && book.AudioTracks.Any()) return System.IO.Path.GetDirectoryName(book.AudioTracks.First().FilePath)!;
+        string safeAuthor = string.Join("_", (book.Authors?.FirstOrDefault()?.Author?.Name ?? "Unknown Author").Split(System.IO.Path.GetInvalidFileNameChars()));
+        string safeTitle = string.Join("_", book.Title.Split(System.IO.Path.GetInvalidFileNameChars()));
+        var settingsDict = await db.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
+        settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
+        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "Library");
+        return System.IO.Path.Combine(libraryRoot, safeAuthor, safeTitle);
     }
 }
 public class ScanRequest 
 { 
     public string FolderPath { get; set; } = string.Empty; 
 }
+
+
+
+
+
+
+
 
 
 

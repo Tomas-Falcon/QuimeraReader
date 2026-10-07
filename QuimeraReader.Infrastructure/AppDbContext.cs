@@ -22,6 +22,7 @@ public class AppDbContext : DbContext, IAppDbContext
     }
 
     public DbSet<BookAudioTrack> BookAudioTracks { get; set; }
+    public DbSet<BookAudioChapter> BookAudioChapters { get; set; }
     public DbSet<UnmatchedAudioTrack> UnmatchedAudioTracks { get; set; } = null!;
         public DbSet<BookAnnotation> BookAnnotations { get; set; } = null!;
 
@@ -71,3 +72,5 @@ public class AppDbContext : DbContext, IAppDbContext
             .HasKey(s => s.Key);
     }
 }
+
+

@@ -1,4 +1,4 @@
-using System.Threading.Channels;
+﻿using System.Threading.Channels;
 
 namespace QuimeraReader.Infrastructure.Services;
 
@@ -26,3 +26,4 @@ public class AudioAlignmentQueue
         return _queue.Reader.ReadAllAsync(cancellationToken);
     }
 }
+

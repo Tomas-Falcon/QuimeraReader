@@ -66,7 +66,13 @@ public class SettingsController : ControllerBase
     public async Task<IActionResult> DownloadWhisperModel([FromServices] QuimeraReader.Infrastructure.Services.AudioAlignmentQueue queue)
     {
         string modelUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin";
-        string targetPath = "ggml-base.bin";
+
+        var settingsDict = await _dbContext.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
+        settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
+        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+        
+        System.IO.Directory.CreateDirectory(libraryRoot);
+        string targetPath = Path.Combine(libraryRoot, "ggml-base.bin");
 
         bool wasAlreadyDownloaded = System.IO.File.Exists(targetPath);
 
@@ -76,7 +82,7 @@ public class SettingsController : ControllerBase
             {
                 using var httpClient = new System.Net.Http.HttpClient();
                 using var stream = await httpClient.GetStreamAsync(modelUrl);
-                using var fileStream = new FileStream(targetPath, FileMode.CreateNew);
+                using var fileStream = new System.IO.FileStream(targetPath, System.IO.FileMode.CreateNew);
                 await stream.CopyToAsync(fileStream);
             }
             catch (System.Exception ex)
@@ -84,6 +90,16 @@ public class SettingsController : ControllerBase
                 _logger.LogError(ex, "Error al descargar el modelo Whisper");
                 return StatusCode(500, new { Message = "Error al descargar el modelo: " + ex.Message });
             }
+        }
+
+        var modelPathSetting = await _dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "WhisperModelPath");
+        if (modelPathSetting == null)
+        {
+            _dbContext.SystemSettings.Add(new QuimeraReader.Domain.Entities.SystemSetting { Key = "WhisperModelPath", Value = targetPath });
+        }
+        else
+        {
+            modelPathSetting.Value = targetPath;
         }
 
         // Auto-requeue any ERROR books
@@ -99,9 +115,20 @@ public class SettingsController : ControllerBase
     }
 
     [HttpGet("whisper/status")]
-    public IActionResult GetWhisperStatus()
+    public async Task<IActionResult> GetWhisperStatus()
     {
-        bool isDownloaded = System.IO.File.Exists("ggml-base.bin");
+        var settings = await _dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "WhisperModelPath");
+        bool isDownloaded = false;
+        
+        if (settings != null && !string.IsNullOrEmpty(settings.Value))
+        {
+            isDownloaded = System.IO.File.Exists(settings.Value);
+        }
+        else
+        {
+            isDownloaded = System.IO.File.Exists("ggml-base.bin");
+        }
+        
         return Ok(new { IsDownloaded = isDownloaded });
     }
 [HttpPost("restart")]
@@ -177,3 +204,5 @@ public class SettingsController : ControllerBase
         return Ok(new { Message = "Iniciando proceso de actualización y reinicio..." });
     }
 }
+
+

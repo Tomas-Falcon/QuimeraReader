@@ -1,4 +1,4 @@
-@using QuimeraReader.Shared.Models
+﻿@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @using Radzen
 @using Radzen.Blazor
@@ -28,14 +28,16 @@
             else
             {
                 <RadzenButton Text="Seleccionar" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Icon="check_box" />
-                @if (_isUploading)
-                {
-                    <span class="text-muted small"><RadzenIcon Icon="refresh" class="rz-spin" /> Subiendo...</span>
-                }
-                <label class="rz-button rz-button-md rz-variant-filled rz-primary rz-shade-default m-0 d-flex align-items-center gap-2" style="cursor: pointer;">
-                    <RadzenIcon Icon="cloud_upload" /> Subir EPUB
-                    <InputFile OnChange="HandleFileUpload" accept=".epub,.mp3,.m4b,.m4a,.wav" class="d-none" multiple />
-                </label>
+                <div class="d-flex align-items-center gap-2">
+                    @if (_isUploading)
+                    {
+                        <span class="text-muted small me-2"><RadzenIcon Icon="refresh" class="rz-spin" /> Subiendo...</span>
+                    }
+                    <label class="rz-button rz-button-md rz-variant-filled rz-primary rz-shade-default m-0 d-flex align-items-center gap-2" style="cursor: pointer;">
+                        <RadzenIcon Icon="cloud_upload" /> Subir EPUB
+                        <InputFile @key='"fileUploadInput"' OnChange="HandleFileUpload" accept=".epub,.mp3,.m4b,.m4a,.wav" class="d-none" multiple />
+                    </label>
+                </div>
                                 <RadzenDropDown Multiple="true" Placeholder="Categorías" Data="@_availableCategories" TextProperty="Name" ValueProperty="Id" @bind-Value="_selectedCategories"  Style="min-width: 200px; max-width: 100%;" AllowClear="true" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
                 <RadzenDropDown TValue="string" Data="@_sortOptions" @bind-Value="_selectedSort" Style="width: auto;" />
             }
@@ -322,6 +324,12 @@
             int successCount = 0;
             foreach (var file in files)
             {
+                if (_cts.Token.IsCancellationRequested)
+                {
+                    ToastService.ShowInfo("Subida cancelada por cambio de página.");
+                    break;
+                }
+                
                 try
                 {
                     await BookService.UploadEpubAsync(file.OpenReadStream(maxAllowedSize: 1073741824), file.Name);
@@ -544,4 +552,5 @@
         _objRef?.Dispose();
     }
 }
+
 

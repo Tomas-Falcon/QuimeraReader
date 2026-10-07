@@ -1,4 +1,4 @@
-﻿@page "/unmatched-audios"
+@page "/unmatched-audios"
 
 @using QuimeraReader.Shared.Services
 @using QuimeraReader.Shared.Models
@@ -9,10 +9,11 @@
 
 <RadzenCard class="m-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3>Audios Huérfanos</h3>
-                <div>
-            <RadzenButton Icon="auto_fix_high" Text="Auto-vincular" ButtonStyle="ButtonStyle.Secondary" class="me-2" Click="AutoMatchAudios" IsBusy="@_isAutoMatching" />
-            <RadzenButton Icon="refresh" Text="Recargar" Click="LoadAudios" IsBusy="@_isLoading" />
+        <h3>@TranslationService["AudioManagement_Title"]</h3>
+        <div>
+            <RadzenDropDown TValue="bool?" Data="@_filterOptions" ValueProperty="Value" TextProperty="Text" @bind-Value="_filterMatched" Change="@OnFilterChanged" class="me-3" Style="width: 200px;" />
+            <RadzenButton Icon="auto_fix_high" Text="@TranslationService["AudioManagement_AutoMatch"]" ButtonStyle="ButtonStyle.Secondary" class="me-2" Click="AutoMatchAudios" IsBusy="@_isAutoMatching" />
+            <RadzenButton Icon="refresh" Text="@TranslationService["AudioManagement_Reload"]" Click="LoadAudios" IsBusy="@_isLoading" />
         </div>
     </div>
 
@@ -20,38 +21,54 @@
     {
         <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
     }
-    else if (!_audios.Any())
+    else if (!_filteredAudios.Any())
     {
         <RadzenAlert AlertStyle="AlertStyle.Success" ShowIcon="true" Variant="Variant.Flat">
-            No hay audios huérfanos en la base de datos. ¡Todo está en orden!
+            @TranslationService["AudioManagement_NoAudios"]
         </RadzenAlert>
     }
     else
     {
-        <RadzenDataGrid Data="@_audios" TItem="UnmatchedAudioTrack" AllowPaging="true" PageSize="10" AllowSorting="true">
-            <Columns>
-                <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Property="Id" Title="ID" Width="70px" />
-                <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Property="OriginalFileName" Title="Archivo Original" />
-                <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Property="FileSizeBytes" Title="Tamaño">
-                    <Template Context="audio">
-                        @(Math.Round((double)audio.FileSizeBytes / 1024 / 1024, 2)) MB
-                    </Template>
-                </RadzenDataGridColumn>
-                                <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Title="Escuchar" Width="260px">
-                    <Template Context="audio">
-                        <audio controls src="@(Http.BaseAddress)api/books/unmatched-audios/@(audio.Id)/stream" style="height: 30px; width: 230px;"></audio>
-                    </Template>
-                </RadzenDataGridColumn>
-                <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Property="UploadedAt" Title="Fecha Subida" FormatString="{0:dd/MM/yyyy HH:mm}" />
-                <RadzenDataGridColumn TItem="UnmatchedAudioTrack" Title="Acciones" Width="200px" TextAlign="TextAlign.Center">
-                    <Template Context="audio">
-                        <RadzenButton Icon="link" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" class="me-1" Click="@(() => OpenMatchDialog(audio))" title="Asociar a libro" />
-                        <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Click="@(() => DeleteAudio(audio))" title="Eliminar definitivamente" />
-                    </Template>
-                </RadzenDataGridColumn>
-            </Columns>
-        </RadzenDataGrid>
+        <div style="overflow-x: auto; width: 100%;">
+            <RadzenDataGrid Data="@_filteredAudios" TItem="ManagedAudioDto" AllowPaging="true" PageSize="10" AllowSorting="true" Style="min-width: 800px;">
+                <Columns>
+                    <RadzenDataGridColumn TItem="ManagedAudioDto" Property="Id" Title="@TranslationService["AudioManagement_ColumnId"]" Width="70px" />
+                    <RadzenDataGridColumn TItem="ManagedAudioDto" Property="FileName" Title="@TranslationService["AudioManagement_ColumnFile"]" />
+                    <RadzenDataGridColumn TItem="ManagedAudioDto" Property="IsMatched" Title="@TranslationService["AudioManagement_ColumnStatus"]" Width="120px">
+                        <Template Context="audio">
+                            @if (audio.IsMatched)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="@TranslationService["AudioManagement_StatusMatched"]" />
+                            }
+                            else
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="@TranslationService["AudioManagement_StatusUnmatched"]" />
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="ManagedAudioDto" Property="BookTitle" Title="@TranslationService["AudioManagement_ColumnBook"]" />
+                    <RadzenDataGridColumn TItem="ManagedAudioDto" Title="@TranslationService["AudioManagement_ColumnActions"]" Width="200px" TextAlign="TextAlign.Center">
+                        <Template Context="audio">
+                            @if (!audio.IsMatched)
+                            {
+                                <RadzenButton Icon="link" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" class="me-1" Click="@(() => OpenMatchDialog(audio))" title="@TranslationService["AudioManagement_ActionMatch"]" />
+                                <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Click="@(() => DeleteAudio(audio))" title="@TranslationService["AudioManagement_ActionDelete"]" />
+                            }
+                                                        else
+                            {
+                                <RadzenButton Icon="auto_stories" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small" class="me-1" title="@TranslationService["AudioManagement_ActionViewBook"]" Click="@(() => NavigateToBook(audio.BookId))" />
+                                <RadzenButton Icon="swap_horiz" ButtonStyle="ButtonStyle.Warning" Size="ButtonSize.Small" class="me-1" title="Reasignar" Click="@(() => OpenReassignDialog(audio))" />
+                                <RadzenButton Icon="link_off" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" title="Desvincular" Click="@(() => UnmatchAudio(audio))" />
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </div>
     }
 </RadzenCard>
+
+
+
 
 

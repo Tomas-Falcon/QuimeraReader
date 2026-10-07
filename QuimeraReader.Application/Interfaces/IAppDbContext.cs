@@ -12,6 +12,7 @@ public interface IAppDbContext
     DbSet<BookAuthor> BookAuthors { get; }
     DbSet<SyncMap> SyncMaps { get; }
     DbSet<BookAudioTrack> BookAudioTracks { get; }
+    DbSet<BookAudioChapter> BookAudioChapters { get; }
     DbSet<UnmatchedAudioTrack> UnmatchedAudioTracks { get; }
     DbSet<SystemSetting> SystemSettings { get; }
 
@@ -22,3 +23,4 @@ public interface IAppDbContext
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
+

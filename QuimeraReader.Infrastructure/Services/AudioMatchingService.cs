@@ -11,7 +11,7 @@ using Whisper.net;
 
 namespace QuimeraReader.Infrastructure.Services;
 
-public class AudioMatchingService
+public class AudioMatchingService : QuimeraReader.Application.Interfaces.IAudioMatchingService
 {
     private readonly AppDbContext _dbContext;
     private readonly ILogger<AudioMatchingService> _logger;
@@ -24,34 +24,38 @@ public class AudioMatchingService
 
     public async Task<int?> TryMatchAudioToBookAsync(string audioFilePath, CancellationToken cancellationToken = default)
     {
-        string fileName = Path.GetFileNameWithoutExtension(audioFilePath).ToLowerInvariant();
+        string rawFileName = Path.GetFileNameWithoutExtension(audioFilePath).ToLowerInvariant();
+        string fileName = rawFileName.Replace("_", " ").Replace("-", " ");
         
         var allBooks = await _dbContext.Books.Select(b => new { b.Id, b.Title }).ToListAsync(cancellationToken);
         
+        int? preCandidateId = null;
+
         var explicitMatch = allBooks.FirstOrDefault(b => b.Title.Length > 5 && fileName.Contains(b.Title.ToLower()));
         if (explicitMatch != null)
         {
-            _logger.LogInformation("Audio emparejado por contención de título: {File} -> {BookTitle}", fileName, explicitMatch.Title);
-            return explicitMatch.Id;
+            _logger.LogInformation("Candidato inicial por título: {File} -> {BookTitle}. Validando por contenido...", fileName, explicitMatch.Title);
+            preCandidateId = explicitMatch.Id;
         }
-
-        var bestMatch = allBooks
-            .Select(b => new { Book = b, Score = CalculateSimilarity(fileName, b.Title.ToLower()) })
-            .OrderByDescending(x => x.Score)
-            .FirstOrDefault();
-
-        if (bestMatch != null && bestMatch.Score > 85.0)
+        else
         {
-            _logger.LogInformation("Audio emparejado por similitud de nombre ({Score}%): {File} -> {BookTitle}", 
-                Math.Round(bestMatch.Score, 2), fileName, bestMatch.Book.Title);
-            return bestMatch.Book.Id;
+            var bestMatch = allBooks
+                .Select(b => new { Book = b, Score = CalculateSimilarity(fileName, b.Title.ToLower()) })
+                .OrderByDescending(x => x.Score)
+                .FirstOrDefault();
+
+            if (bestMatch != null && bestMatch.Score > 85.0)
+            {
+                _logger.LogInformation("Candidato inicial por similitud ({Score}%): {File} -> {BookTitle}. Validando por contenido...", Math.Round(bestMatch.Score, 2), fileName, bestMatch.Book.Title);
+                preCandidateId = bestMatch.Book.Id;
+            }
         }
 
-        _logger.LogInformation("Iniciando emparejamiento por contenido (Whisper Parcial) para {File}...", fileName);
-        return await MatchByContentAsync(audioFilePath, cancellationToken);
+        _logger.LogInformation("Iniciando extracción Whisper para validación de contenido de {File}...", fileName);
+        return await MatchByContentAsync(audioFilePath, preCandidateId, cancellationToken);
     }
 
-    private async Task<int?> MatchByContentAsync(string audioFilePath, CancellationToken cancellationToken)
+    private async Task<int?> MatchByContentAsync(string audioFilePath, int? preCandidateId, CancellationToken cancellationToken)
     {
         var modelPathSetting = await _dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "WhisperModelPath", cancellationToken);
         string modelPath = modelPathSetting?.Value ?? "ggml-base.bin";
@@ -89,45 +93,121 @@ public class AudioMatchingService
                 if (cancellationToken.IsCancellationRequested) break;
             }
 
-            if (string.IsNullOrWhiteSpace(extractedText)) return null;
+                        if (string.IsNullOrWhiteSpace(extractedText)) return null;
             string normalizedAudioText = extractedText.ToLowerInvariant();
 
-            var allTitles = await _dbContext.Books.Select(b => new { b.Id, b.Title }).ToListAsync(cancellationToken);
-            var contentMatch = allTitles
-                .Select(b => new 
-                { 
-                    Id = b.Id, 
-                    Title = b.Title,
-                    Hits = (normalizedAudioText.Contains(b.Title.ToLower()) && b.Title.Length > 4) ? 10 : 0
-                })
-                .Where(x => x.Hits >= 10)
-                .OrderByDescending(x => x.Hits)
-                .FirstOrDefault();
+            // 1. Streaming Candidate Selection (Phase 1)
+            string rawFileName = Path.GetFileNameWithoutExtension(audioFilePath).ToLowerInvariant();
+            string spacedFileName = rawFileName.Replace("_", " ").Replace("-", " ");
+            string cleanFileName = new string(spacedFileName.Where(c => char.IsLetterOrDigit(c) || char.IsWhiteSpace(c)).ToArray());
+            var fileWords = cleanFileName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                                       .Where(w => w.Length > 2)
+                                       .ToList();
 
-            if (contentMatch != null)
+            var candidateScores = new Dictionary<int, double>();
+            if (preCandidateId.HasValue) candidateScores[preCandidateId.Value] = 1000.0;
+
+            var booksStream = _dbContext.Books.AsNoTracking().Select(b => new { b.Id, b.Title, b.EpubFilePath }).AsAsyncEnumerable();
+
+            await foreach (var b in booksStream.WithCancellation(cancellationToken))
             {
-                _logger.LogInformation("Audio emparejado por CONTENIDO (Título en audio): {File} -> {BookTitle}", Path.GetFileName(audioFilePath), contentMatch.Title);
-                return contentMatch.Id;
+                if (string.IsNullOrEmpty(b.EpubFilePath)) continue;
+                
+                // Título hablado: solo suma puntos al candidato (NO asigna). Un título de una
+                // palabra común (ej. "Sangre") aparece en casi cualquier transcripción.
+                double spokenTitleBonus = 0;
+                if (b.Title.Length > 4)
+                {
+                    var titleWordCount = b.Title.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+                    if (normalizedAudioText.Contains(b.Title.ToLowerInvariant()))
+                        spokenTitleBonus = titleWordCount >= 2 ? 100 : 10;
+                }
+
+                // Calculate Fuzzy Score
+                string cleanTitle = new string(b.Title.ToLowerInvariant().Replace("_", " ").Replace("-", " ").Where(c => char.IsLetterOrDigit(c) || char.IsWhiteSpace(c)).ToArray());
+                double score = 0;
+                foreach (var w in fileWords)
+                {
+                    if (cleanTitle.Contains(w)) score += 50;
+                }
+                score += CalculateSimilarity(cleanFileName, cleanTitle) + spokenTitleBonus;
+                
+                if (score > 30) // Arbitrary minimum to avoid sorting 140k
+                {
+                    candidateScores[b.Id] = candidateScores.TryGetValue(b.Id, out var existing) ? Math.Max(existing, score) : score;
+                }
+            }
+
+            var topCandidateIds = candidateScores.OrderByDescending(kvp => kvp.Value).Take(20).Select(kvp => kvp.Key).ToList();
+
+            // If empty, fallback to recent
+            if (!topCandidateIds.Any())
+            {
+                var fallbackIds = await _dbContext.Books
+                    .Where(b => !b.AudioTracks.Any() && !string.IsNullOrEmpty(b.EpubFilePath))
+                    .OrderByDescending(b => b.Id)
+                    .Take(20)
+                    .Select(b => b.Id)
+                    .ToListAsync(cancellationToken);
+                topCandidateIds.AddRange(fallbackIds);
+            }
+
+            // 2. Trigram Intersection (Phase 2)
+            var whisperTrigrams = GenerateTrigrams(normalizedAudioText);
+            
+            var candidateBooks = await _dbContext.Books
+                .Where(b => topCandidateIds.Contains(b.Id))
+                .Select(b => new { b.Id, b.Title, b.EpubFilePath })
+                .ToListAsync(cancellationToken);
+
+            int bestMatchId = 0;
+            int maxTrigrams = 0;
+
+            foreach (var candidate in candidateBooks)
+            {
+                if (string.IsNullOrEmpty(candidate.EpubFilePath) || !File.Exists(candidate.EpubFilePath)) continue;
+
+                try
+                {
+                    var book = VersOne.Epub.EpubReader.ReadBook(candidate.EpubFilePath);
+                    var sb = new System.Text.StringBuilder();
+                    foreach (var textContentFile in book.ReadingOrder.Skip(2).Take(5))
+                    {
+                        sb.AppendLine(textContentFile.Content);
+                    }
+                    string epubRawText = System.Text.RegularExpressions.Regex.Replace(sb.ToString(), "<.*?>", string.Empty).ToLowerInvariant();
+                    
+                    var epubTrigrams = GenerateTrigrams(epubRawText);
+                    
+                    int matchCount = whisperTrigrams.Intersect(epubTrigrams).Count();
+                    
+                    if (matchCount > maxTrigrams)
+                    {
+                        maxTrigrams = matchCount;
+                        bestMatchId = candidate.Id;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error leyendo EPUB para emparejamiento por Trigramas: {Path}", candidate.EpubFilePath);
+                }
+            }
+
+            double coverage = whisperTrigrams.Any() ? (double)maxTrigrams / whisperTrigrams.Count : 0;
+            if (coverage >= 0.05 && bestMatchId > 0)
+            {
+                var matchedTitle = candidateBooks.First(b => b.Id == bestMatchId).Title;
+                _logger.LogInformation("Audio emparejado por TRIGRAMAS ({Hits} secuencias id�nticas, {Coverage:P2} cobertura): {File} -> {BookTitle}", maxTrigrams, coverage, Path.GetFileName(audioFilePath), matchedTitle);
+                return bestMatchId;
             }
             
-            // Si el título no está explícitamente, busquemos palabras clave largas en BooksFTS
-            var words = normalizedAudioText.Split(new[] { ' ', '.', ',', ':', ';' }, StringSplitOptions.RemoveEmptyEntries)
-                                           .Where(w => w.Length > 5)
-                                           .Distinct()
-                                           .Take(8)
-                                           .ToList();
-                                           
-            if (words.Any())
+            if (bestMatchId == 0 && preCandidateId.HasValue)
             {
-                string matchQuery = string.Join(" OR ", words.Select(w => $"\"{w}*\""));
-                var ftsMatch = await _dbContext.Books
-                    .FromSqlRaw($"SELECT b.* FROM Books b INNER JOIN BooksFTS fts ON b.Id = fts.rowid WHERE BooksFTS MATCH {{0}} LIMIT 1", matchQuery)
-                    .FirstOrDefaultAsync(cancellationToken);
-                    
-                if (ftsMatch != null)
+                var matchedTitle = candidateBooks.FirstOrDefault(b => b.Id == preCandidateId.Value)?.Title;
+                if (matchedTitle != null)
                 {
-                    _logger.LogInformation("Audio emparejado por FTS Múltiple: {File} -> {BookTitle}", Path.GetFileName(audioFilePath), ftsMatch.Title);
-                    return ftsMatch.Id;
+                    _logger.LogInformation("Audio emparejado por Metadata ID3 (Fallback): {File} -> {BookTitle}", Path.GetFileName(audioFilePath), matchedTitle);
+                    return preCandidateId.Value;
                 }
             }
             
@@ -144,22 +224,13 @@ public class AudioMatchingService
         }
     }
 
+    private HashSet<string> GenerateTrigrams(string text)
+        => QuimeraReader.Domain.Common.TextSimilarityUtils.GenerateTrigrams(text);
+
     private double CalculateSimilarity(string source, string target)
-    {
-        if (source == null || target == null || source.Length == 0 || target.Length == 0) return 0.0;
-        if (source == target) return 100.0;
-        int n = source.Length, m = target.Length;
-        int[,] d = new int[n + 1, m + 1];
-        for (int i = 0; i <= n; d[i, 0] = i++) { }
-        for (int j = 0; j <= m; d[0, j] = j++) { }
-        for (int i = 1; i <= n; i++)
-        {
-            for (int j = 1; j <= m; j++)
-            {
-                int cost = (target[j - 1] == source[i - 1]) ? 0 : 1;
-                d[i, j] = Math.Min(Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1), d[i - 1, j - 1] + cost);
-            }
-        }
-        return (1.0 - ((double)d[n, m] / Math.Max(source.Length, target.Length))) * 100.0;
-    }
+        => QuimeraReader.Domain.Common.TextSimilarityUtils.CalculateSimilarity(source, target);
 }
+
+
+
+
