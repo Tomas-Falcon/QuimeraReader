@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components;
 using QuimeraReader.Shared.Models;
 using QuimeraReader.Shared.Services;
 
@@ -10,10 +10,13 @@ public partial class SettingsPanel : ComponentBase
     [Inject] public IScanService ScanService { get; set; } = default!;
     [Inject] public ISettingsService SettingsService { get; set; } = default!;
     [Inject] public ToastService ToastService { get; set; } = default!;
+    [Inject] public IServerConfigService ServerConfig { get; set; } = default!;
+    [Inject] public NavigationManager NavManager { get; set; } = default!;
 
     private bool _isLoading = true;
     private bool _isSaving = false;
     private string _message = string.Empty;
+    private string _clientServerUrl = string.Empty;
     private bool _isSuccess = false;
     private bool _isScanning = false;
     private ScanStatus? _scanStatus;
@@ -54,6 +57,11 @@ public partial class SettingsPanel : ComponentBase
     {
         try
         {
+            if (ServerConfig?.ServerUrl != null)
+            {
+                _clientServerUrl = ServerConfig.ServerUrl;
+            }
+
             var settings = await SettingsService.GetSettingsAsync();
             if (settings.TryGetValue("IncomingScanFolder", out var incoming)) _libraryRootPath = incoming;
             if (settings.TryGetValue("LibraryRootPath", out var outgoing)) _outgoingLibraryPath = outgoing;
@@ -129,6 +137,16 @@ public partial class SettingsPanel : ComponentBase
         {
             _isSaving = false;
             StateHasChanged();
+        }
+    }
+
+    private void SaveClientConfig()
+    {
+        if (!string.IsNullOrWhiteSpace(_clientServerUrl))
+        {
+            ServerConfig.SaveServerUrl(_clientServerUrl);
+            ShowMessage("Conexión del cliente guardada. Recargando...", true);
+            NavManager.NavigateTo(NavManager.Uri, forceLoad: true);
         }
     }
 

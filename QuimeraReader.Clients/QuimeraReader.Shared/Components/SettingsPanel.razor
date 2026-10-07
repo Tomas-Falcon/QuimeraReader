@@ -1,4 +1,4 @@
-﻿@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Models
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @inject QuimeraReader.Shared.Interfaces.INetworkStateService NetworkStateService
 @using QuimeraReader.Shared.Services
@@ -24,6 +24,24 @@
     {
         <RadzenTabs>
             <Tabs>
+                @if (ServerConfig.GetType().Name.Contains("Mobile"))
+                {
+                    <RadzenTabsItem Text="Cliente (App)" Icon="devices">
+                        <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
+                            <h4 class="text-primary"><RadzenIcon Icon="dns" /> Conexión al Servidor</h4>
+                            <p class="text-white-50 small mb-4">Cambia la dirección del servidor al que se conecta esta aplicación.</p>
+                
+                            <div class="mb-4">
+                                <RadzenLabel Text="URL del Servidor" class="fw-bold mb-2 d-block" />
+                                <RadzenTextBox @bind-Value="_clientServerUrl" class="w-100 bg-secondary text-light border-0" />
+                                <div class="form-text text-white-50 mt-1">Ejemplo: http://192.168.1.10:5000/</div>
+                            </div>
+                            
+                            <RadzenButton Text="Aplicar Conexión" Icon="save" Click="SaveClientConfig" ButtonStyle="Radzen.ButtonStyle.Primary" />
+                        </RadzenCard>
+                    </RadzenTabsItem>
+                }
+                
                 <RadzenTabsItem Text="@TranslationService["Settings_General"]" Icon="settings">
                     <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
                         <h4 class="text-primary"><RadzenIcon Icon="folder" /> @TranslationService["Settings_ServerFolders"]</h4>
