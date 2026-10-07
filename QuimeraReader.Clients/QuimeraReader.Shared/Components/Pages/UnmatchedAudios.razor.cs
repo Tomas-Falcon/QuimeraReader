@@ -158,6 +158,53 @@ public partial class UnmatchedAudios : ComponentBase
             }
         }
     }
+    private async Task OpenReassignDialog(ManagedAudioDto audio)
+    {
+        var bookIdRes = await DialogService.OpenAsync<BookSelectionModal>("Seleccionar Nuevo Libro", null, new Radzen.DialogOptions() { Width = "500px", Height = "600px" });
+        if (bookIdRes is int targetBookId)
+        {
+            try
+            {
+                var response = await Http.PostAsync($"api/books/audio-tracks/{audio.Id}/reassign/{targetBookId}", null);
+                if (response.IsSuccessStatusCode)
+                {
+                    ToastService.ShowSuccess("Audio reasignado correctamente.");
+                    await LoadAudios();
+                }
+                else
+                {
+                    ToastService.ShowError("No se pudo reasignar el audio.");
+                }
+            }
+            catch (Exception ex)
+            {
+                ToastService.ShowError($"Error: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task UnmatchAudio(ManagedAudioDto audio)
+    {
+        var confirm = await DialogService.Confirm($"¿Desvincular '{audio.FileName}' de su libro actual?", "Desvincular Audio", new ConfirmOptions { OkButtonText = "Sí", CancelButtonText = "No" });
+        if (confirm == true)
+        {
+            try
+            {
+                var response = await Http.PostAsync($"api/books/audio-tracks/{audio.Id}/unmatch", null);
+                if (response.IsSuccessStatusCode)
+                {
+                    ToastService.ShowSuccess("Audio desvinculado. Ahora es huérfano.");
+                    await LoadAudios();
+                }
+                else
+                {
+                    ToastService.ShowError("No se pudo desvincular el audio.");
+                }
+            }
+            catch (Exception ex)
+            {
+                ToastService.ShowError($"Error: {ex.Message}");
+            }
+        }
+    }
 }
-
-

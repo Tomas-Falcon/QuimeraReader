@@ -54,9 +54,11 @@
                                 <RadzenButton Icon="link" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" class="me-1" Click="@(() => OpenMatchDialog(audio))" title="@TranslationService["AudioManagement_ActionMatch"]" />
                                 <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Click="@(() => DeleteAudio(audio))" title="@TranslationService["AudioManagement_ActionDelete"]" />
                             }
-                            else
+                                                        else
                             {
-                                <RadzenButton Icon="auto_stories" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small" title="@TranslationService["AudioManagement_ActionViewBook"]" Click="@(() => NavigateToBook(audio.BookId))" />
+                                <RadzenButton Icon="auto_stories" ButtonStyle="ButtonStyle.Info" Size="ButtonSize.Small" class="me-1" title="@TranslationService["AudioManagement_ActionViewBook"]" Click="@(() => NavigateToBook(audio.BookId))" />
+                                <RadzenButton Icon="swap_horiz" ButtonStyle="ButtonStyle.Warning" Size="ButtonSize.Small" class="me-1" title="Reasignar" Click="@(() => OpenReassignDialog(audio))" />
+                                <RadzenButton Icon="link_off" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" title="Desvincular" Click="@(() => UnmatchAudio(audio))" />
                             }
                         </Template>
                     </RadzenDataGridColumn>
@@ -65,6 +67,8 @@
         </div>
     }
 </RadzenCard>
+
+
 
 
 
