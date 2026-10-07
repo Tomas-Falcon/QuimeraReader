@@ -88,7 +88,7 @@ services:
     volumes:
       - /path/to/your/downloads:/media
       - /path/to/your/library:/library
-      - /path/to/your/config:/config
+      - ./config:/config
       # Docker socket to enable restarts and manual updates from the web UI
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
@@ -101,7 +101,7 @@ services:
       - DOCKER_API_VERSION=1.44
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 300 --http-api-update --http-api-periodic-polls --http-api-token quimera quimerareader
+    command: --interval 300 --http-api-update --http-api-periodic-polls --http-api-token your_secure_token quimerareader
     restart: unless-stopped
 ```
 
