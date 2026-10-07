@@ -85,7 +85,7 @@ else
                     <div class="badges mb-4 d-flex gap-2 flex-wrap align-items-center">
                         @if (_book.AverageRating.HasValue && _book.AverageRating.Value > 0)
                         {
-                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" class="text-dark fs-6" title="@Translation["BookDetails_AverageRating"]">
+                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" class="text-dark fs-6" title='@Translation["BookDetails_AverageRating"]'>
                                 <i class="bi bi-star-fill"></i> @_book.AverageRating.Value.ToString("0.0")
                             </RadzenBadge>
                         }
