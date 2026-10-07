@@ -28,7 +28,7 @@
 
     protected override void OnInitialized()
     {
-        var informationalVersion = System.Reflection.Assembly.GetExecutingAssembly()
+        var informationalVersion = (System.Reflection.Assembly.GetEntryAssembly() ?? typeof(NavMenu).Assembly)
             .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
             .Cast<System.Reflection.AssemblyInformationalVersionAttribute>()
             .FirstOrDefault()?.InformationalVersion;
