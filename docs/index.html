@@ -18,11 +18,29 @@
     
     <style>
         :root {
+            --bg-color: #ffffff;
+            --text-color: #0f172a;
+            --accent-color: #2563eb;
+            --accent-hover: #1d4ed8;
+            --card-bg: #f8fafc;
+            --border-color: #e2e8f0;
+            --code-bg: #f1f5f9;
+            --code-text: #0f172a;
+            --header-bg: #ffffff;
+            --header-border: #e2e8f0;
+        }
+
+        [data-theme="dark"] {
             --bg-color: #0f172a;
             --text-color: #f1f5f9;
             --accent-color: #3b82f6;
             --accent-hover: #2563eb;
             --card-bg: #1e293b;
+            --border-color: #334155;
+            --code-bg: #000000;
+            --code-text: #10b981;
+            --header-bg: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            --header-border: #334155;
         }
 
         * {
@@ -36,28 +54,52 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             line-height: 1.6;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        nav {
+            display: flex;
+            justify-content: flex-end;
+            padding: 1rem 2rem;
+            gap: 1rem;
+            background-color: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .controls select, .controls button {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.875rem;
         }
 
         header {
             text-align: center;
             padding: 4rem 2rem;
-            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-            border-bottom: 1px solid #334155;
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--header-border);
         }
 
         h1 {
             font-size: 3rem;
             margin-bottom: 1rem;
-            background: linear-gradient(90deg, #60a5fa, #a78bfa);
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         .subtitle {
             font-size: 1.25rem;
-            color: #94a3b8;
+            color: #64748b;
             max-width: 600px;
             margin: 0 auto 2rem auto;
+        }
+        
+        [data-theme="dark"] .subtitle {
+            color: #94a3b8;
         }
 
         .cta-buttons {
@@ -87,11 +129,11 @@
         .btn-secondary {
             background-color: var(--card-bg);
             color: var(--text-color);
-            border: 1px solid #334155;
+            border: 1px solid var(--border-color);
         }
 
         .btn-secondary:hover {
-            background-color: #334155;
+            background-color: var(--border-color);
         }
 
         main {
@@ -111,81 +153,173 @@
             background-color: var(--card-bg);
             padding: 2rem;
             border-radius: 1rem;
-            border: 1px solid #334155;
+            border: 1px solid var(--border-color);
         }
 
         .feature-card h3 {
             font-size: 1.25rem;
             margin-bottom: 1rem;
-            color: #60a5fa;
+            color: var(--accent-color);
         }
 
         .docker-command {
-            background-color: #000;
+            background-color: var(--code-bg);
             padding: 1.5rem;
             border-radius: 0.5rem;
             font-family: monospace;
             overflow-x: auto;
-            color: #10b981;
+            color: var(--code-text);
             margin: 2rem 0;
-            border: 1px solid #334155;
+            border: 1px solid var(--border-color);
+            white-space: pre;
         }
 
         footer {
             text-align: center;
             padding: 2rem;
             color: #64748b;
-            border-top: 1px solid #334155;
+            border-top: 1px solid var(--border-color);
             margin-top: 2rem;
         }
     </style>
 </head>
-<body>
+<body data-theme="dark">
+
+    <nav class="controls">
+        <select id="lang-toggle" onchange="changeLanguage()">
+            <option value="en">English</option>
+            <option value="es">Español</option>
+        </select>
+        <button id="theme-toggle" onclick="toggleTheme()" data-i18n="theme-toggle-btn">Toggle Theme</button>
+    </nav>
 
     <header>
         <h1>QuimeraReader</h1>
-        <p class="subtitle">A comprehensive, self-hosted platform designed for managing massive ebook (EPUB) and audiobook libraries with AI-powered synchronization.</p>
+        <p class="subtitle" data-i18n="subtitle">A comprehensive, self-hosted platform designed for managing massive ebook (EPUB) and audiobook libraries with AI-powered synchronization.</p>
         <div class="cta-buttons">
-            <a href="https://github.com/Tomas-Falcon/QuimeraReader" class="btn btn-primary">View on GitHub</a>
-            <a href="#install" class="btn btn-secondary">Installation</a>
+            <a href="https://github.com/Tomas-Falcon/QuimeraReader" class="btn btn-primary" data-i18n="github-btn">View on GitHub</a>
+            <a href="#install" class="btn btn-secondary" data-i18n="install-btn">Installation</a>
         </div>
     </header>
 
     <main>
         <div class="features">
             <div class="feature-card">
-                <h3>🎙️ AI Read-Along Sync</h3>
-                <p>Utilizes local Whisper.net AI to generate synchronization maps, actively highlighting the EPUB text as the audiobook plays. A seamless, immersive experience.</p>
+                <h3 data-i18n="feat1-title">AI Read-Along Sync</h3>
+                <p data-i18n="feat1-desc">Utilizes local Whisper.net AI to generate synchronization maps, actively highlighting the EPUB text as the audiobook plays. A seamless, immersive experience.</p>
             </div>
             <div class="feature-card">
-                <h3>⚡ Clean Architecture</h3>
-                <p>Built entirely on a 100% C# .NET 10 ecosystem following strict Clean Architecture and CQRS principles. High performance, modular, and maintainable.</p>
+                <h3 data-i18n="feat2-title">Clean Architecture</h3>
+                <p data-i18n="feat2-desc">Built entirely on a 100% C# .NET 10 ecosystem following strict Clean Architecture and CQRS principles. High performance, modular, and maintainable.</p>
             </div>
             <div class="feature-card">
-                <h3>📚 Automated Library Management</h3>
-                <p>Background scanners automatically detect, process, and scrape metadata for dropped EPUBs and Audiobooks from Hardcover, Google Books, and OpenLibrary.</p>
+                <h3 data-i18n="feat3-title">Automated Library Management</h3>
+                <p data-i18n="feat3-desc">Background scanners automatically detect, process, and scrape metadata for dropped EPUBs and Audiobooks from Hardcover, Google Books, and OpenLibrary.</p>
             </div>
         </div>
 
-        <h2 id="install" style="margin-bottom: 1rem;">Docker Deployment (Recommended)</h2>
-        <p>QuimeraReader is distributed as a multi-stage Docker container via GitHub Container Registry. Mount your media, library, and config volumes to get started.</p>
+        <h2 id="install" style="margin-bottom: 1rem;" data-i18n="install-title">Docker Deployment (Recommended)</h2>
+        <p data-i18n="install-desc">QuimeraReader is distributed as a multi-stage Docker container. Use the following <code>docker-compose.yml</code> configuration to mount your volumes and enable automatic updates.</p>
         
-        <div class="docker-command">
-            docker run -d \<br>
-            &nbsp;&nbsp;--name=quimerareader \<br>
-            &nbsp;&nbsp;-p 5000:5000 \<br>
-            &nbsp;&nbsp;-v /path/to/downloads:/media \<br>
-            &nbsp;&nbsp;-v /path/to/library:/library \<br>
-            &nbsp;&nbsp;-v /path/to/config:/config \<br>
-            &nbsp;&nbsp;ghcr.io/tomas-falcon/quimerareader:latest
-        </div>
+        <div class="docker-command">services:
+  quimerareader:
+    image: ghcr.io/tomas-falcon/quimerareader:latest
+    container_name: quimerareader
+    ports:
+      - "5000:5000"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+      - QUIMERA_DB_PATH=/config/quimerareader.db
+    volumes:
+      - "/path/to/downloads:/media"
+      - "/path/to/library:/library"
+      - "./config:/config"
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    environment:
+      - DOCKER_API_VERSION=1.44
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 300 --http-api-update --http-api-periodic-polls --http-api-token your_token_here quimerareader
+    restart: unless-stopped</div>
         
-        <p>For the complete <code>docker-compose.yml</code> and advanced configuration, please check the <a href="https://github.com/Tomas-Falcon/QuimeraReader" style="color: #60a5fa;">GitHub Repository</a>.</p>
+        <p><span data-i18n="footer-docs">For advanced configuration, please check the</span> <a href="https://github.com/Tomas-Falcon/QuimeraReader" style="color: var(--accent-color);">GitHub Repository</a>.</p>
     </main>
 
     <footer>
         <p>Built by Tomas Falcon. Open Source under the MIT License.</p>
     </footer>
 
+    <script>
+        const translations = {
+            en: {
+                "subtitle": "A comprehensive, self-hosted platform designed for managing massive ebook (EPUB) and audiobook libraries with AI-powered synchronization.",
+                "github-btn": "View on GitHub",
+                "install-btn": "Installation",
+                "feat1-title": "AI Read-Along Sync",
+                "feat1-desc": "Utilizes local Whisper.net AI to generate synchronization maps, actively highlighting the EPUB text as the audiobook plays. A seamless, immersive experience.",
+                "feat2-title": "Clean Architecture",
+                "feat2-desc": "Built entirely on a 100% C# .NET 10 ecosystem following strict Clean Architecture and CQRS principles. High performance, modular, and maintainable.",
+                "feat3-title": "Automated Library Management",
+                "feat3-desc": "Background scanners automatically detect, process, and scrape metadata for dropped EPUBs and Audiobooks from Hardcover, Google Books, and OpenLibrary.",
+                "install-title": "Docker Deployment (Recommended)",
+                "install-desc": "QuimeraReader is distributed as a multi-stage Docker container. Use the following docker-compose.yml configuration to mount your volumes and enable automatic updates.",
+                "footer-docs": "For advanced configuration, please check the",
+                "theme-toggle-btn": "Toggle Theme"
+            },
+            es: {
+                "subtitle": "Una plataforma homelab completa y self-hosted diseñada para gestionar librerías masivas de ebooks (EPUB) y audiolibros con sincronización impulsada por IA.",
+                "github-btn": "Ver en GitHub",
+                "install-btn": "Instalación",
+                "feat1-title": "Sincronización IA (Read-Along)",
+                "feat1-desc": "Utiliza IA local (Whisper.net) para generar mapas de sincronización, resaltando activamente el texto del EPUB mientras se reproduce el audiolibro.",
+                "feat2-title": "Clean Architecture",
+                "feat2-desc": "Construido íntegramente en C# .NET 10 siguiendo principios estrictos de Clean Architecture y CQRS. Alto rendimiento, modular y mantenible.",
+                "feat3-title": "Gestión de Biblioteca Automatizada",
+                "feat3-desc": "Escáneres en segundo plano detectan, procesan y extraen metadatos automáticamente de EPUBs y audiolibros desde Hardcover, Google Books y OpenLibrary.",
+                "install-title": "Despliegue con Docker (Recomendado)",
+                "install-desc": "QuimeraReader se distribuye como un contenedor Docker multi-stage. Utiliza la siguiente configuración docker-compose.yml para montar tus volúmenes y habilitar actualizaciones automáticas.",
+                "footer-docs": "Para configuraciones avanzadas, por favor revisa el",
+                "theme-toggle-btn": "Cambiar Tema"
+            }
+        };
+
+        function toggleTheme() {
+            const body = document.body;
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+
+        function changeLanguage() {
+            const lang = document.getElementById('lang-toggle').value;
+            const elements = document.querySelectorAll('[data-i18n]');
+            
+            elements.forEach(element => {
+                const key = element.getAttribute('data-i18n');
+                if (translations[lang][key]) {
+                    element.textContent = translations[lang][key];
+                }
+            });
+            localStorage.setItem('lang', lang);
+        }
+
+        // Initialize state
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.body.setAttribute('data-theme', savedTheme);
+            
+            const savedLang = localStorage.getItem('lang') || 'en';
+            document.getElementById('lang-toggle').value = savedLang;
+            changeLanguage();
+        });
+    </script>
 </body>
 </html>
