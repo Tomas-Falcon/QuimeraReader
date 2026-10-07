@@ -758,6 +758,28 @@ public partial class BooksController : ControllerBase
 
         int nextTrack = targetBook.AudioTracks.Any() ? targetBook.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
         track.TrackNumber = nextTrack;
+        
+        // Mover el archivo físicamente al directorio del nuevo libro
+        string outDir = await GetBookOutputDirAsync(targetBook, _dbContext);
+        if (!string.IsNullOrEmpty(outDir))
+        {
+            // Usar el nombre original si lo tenemos, si no, el del archivo actual
+            string originalFileName = track.FileName ?? System.IO.Path.GetFileName(track.FilePath);
+            string baseName = !string.IsNullOrEmpty(targetBook.EpubFilePath) 
+                ? System.IO.Path.GetFileNameWithoutExtension(targetBook.EpubFilePath) 
+                : string.Join("_", targetBook.Title.Split(System.IO.Path.GetInvalidFileNameChars()));
+                
+            string newAudioPath = System.IO.Path.Combine(outDir, baseName + $"_track{nextTrack}" + System.IO.Path.GetExtension(originalFileName));
+            
+            if (System.IO.File.Exists(track.FilePath))
+            {
+                // Crear el directorio si no existe
+                if (!System.IO.Directory.Exists(outDir)) System.IO.Directory.CreateDirectory(outDir);
+                System.IO.File.Move(track.FilePath, newAudioPath, true);
+                track.FilePath = newAudioPath;
+            }
+        }
+
         targetBook.AudioTracks.Add(track);
         targetBook.ProcessingStatus = "PENDING_SYNC";
 
