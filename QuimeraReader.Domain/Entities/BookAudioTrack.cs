@@ -1,4 +1,4 @@
-﻿namespace QuimeraReader.Domain.Entities;
+namespace QuimeraReader.Domain.Entities;
 
 public class BookAudioTrack
 {
@@ -11,4 +11,6 @@ public class BookAudioTrack
     public int TrackNumber { get; set; }
     
     public double? DurationSeconds { get; set; }
+    
+    public ICollection<BookAudioChapter> Chapters { get; set; } = new List<BookAudioChapter>();
 }

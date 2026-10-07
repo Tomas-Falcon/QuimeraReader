@@ -47,7 +47,7 @@
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
         <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
       <JavaMaximumHeapSize>4G</JavaMaximumHeapSize>
-    <JavaSdkDirectory>C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot</JavaSdkDirectory>
+      <JavaSdkDirectory Condition="Exists('C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot')">C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot</JavaSdkDirectory>
     <AndroidEnableMultiDex>true</AndroidEnableMultiDex>
   </PropertyGroup>
 

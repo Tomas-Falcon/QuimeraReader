@@ -105,7 +105,7 @@ public class AudioMatchingService : QuimeraReader.Application.Interfaces.IAudioM
                                        .ToList();
 
             var candidateScores = new Dictionary<int, double>();
-            if (preCandidateId.HasValue) candidateScores[preCandidateId.Value] = 9999.0;
+            if (preCandidateId.HasValue) candidateScores[preCandidateId.Value] = 1000.0;
 
             var booksStream = _dbContext.Books.AsNoTracking().Select(b => new { b.Id, b.Title, b.EpubFilePath }).AsAsyncEnumerable();
 

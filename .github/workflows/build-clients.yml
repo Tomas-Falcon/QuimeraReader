@@ -1,0 +1,158 @@
+name: Build & Release Clients (Android & Windows)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Plataforma a compilar'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - android
+          - windows
+      create_release:
+        description: '¿Crear GitHub Release descargable?'
+        required: true
+        default: true
+        type: boolean
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: Build Android APK
+    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'android'
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'microsoft'
+          java-version: '17'
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI Android Workload
+        run: dotnet workload install maui-android
+
+      - name: Build & Publish Android APK
+        run: |
+          dotnet publish QuimeraReader.Clients/QuimeraReader.Mobile/QuimeraReader.Mobile.csproj `
+            -f net10.0-android `
+            -c Release `
+            -p:PublishTrimmed=false `
+            -p:RunAOTCompilation=false `
+            -p:AndroidKeyStore=false `
+            -o ./publish/android
+
+      - name: Locate and Rename APK
+        shell: pwsh
+        run: |
+          $apk = Get-ChildItem -Path ./publish/android -Filter *.apk -Recurse | Select-Object -First 1
+          if ($apk) {
+            Copy-Item -Path $apk.FullName -Destination ./publish/QuimeraReader-Android.apk -Force
+            Write-Host "APK preparado: ./publish/QuimeraReader-Android.apk"
+          } else {
+            Write-Error "No se encontró ningún archivo APK generado."
+          }
+
+      - name: Upload Android Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuimeraReader-Android-APK
+          path: ./publish/QuimeraReader-Android.apk
+
+  build-windows:
+    name: Build Windows EXE
+    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'windows'
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI Windows Workload
+        run: dotnet workload install maui-windows
+
+      - name: Build & Publish Windows App
+        run: |
+          dotnet publish QuimeraReader.Clients/QuimeraReader.Mobile/QuimeraReader.Mobile.csproj `
+            -f net10.0-windows10.0.19041.0 `
+            -c Release `
+            -p:WindowsPackageType=None `
+            -p:RuntimeIdentifier=win-x64 `
+            -o ./publish/windows
+
+      - name: Package Windows ZIP
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ./dist
+          Compress-Archive -Path ./publish/windows/* -DestinationPath ./dist/QuimeraReader-Windows-x64.zip -Force
+          Write-Host "Paquete Windows comprimido en ./dist/QuimeraReader-Windows-x64.zip"
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuimeraReader-Windows-x64
+          path: ./dist/QuimeraReader-Windows-x64.zip
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [build-android, build-windows]
+    if: always() && (github.event_name == 'push' || inputs.create_release == true) && (needs.build-android.result == 'success' || needs.build-windows.result == 'success')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./release-assets
+          merge-multiple: true
+
+      - name: Determine Tag Name
+        id: tag_name
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "TAG=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          else
+            echo "TAG=client-build-$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_name.outputs.TAG }}
+          name: Release ${{ steps.tag_name.outputs.TAG }}
+          draft: false
+          prerelease: false
+          files: |
+            ./release-assets/*.apk
+            ./release-assets/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
