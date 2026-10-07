@@ -171,7 +171,7 @@ public class AudioMatchingService : QuimeraReader.Application.Interfaces.IAudioM
                 {
                     var book = VersOne.Epub.EpubReader.ReadBook(candidate.EpubFilePath);
                     var sb = new System.Text.StringBuilder();
-                    foreach (var textContentFile in book.ReadingOrder.Take(4))
+                    foreach (var textContentFile in book.ReadingOrder.Skip(2).Take(5))
                     {
                         sb.AppendLine(textContentFile.Content);
                     }
@@ -193,11 +193,22 @@ public class AudioMatchingService : QuimeraReader.Application.Interfaces.IAudioM
                 }
             }
 
-            if (maxTrigrams >= 10 && bestMatchId > 0)
+            double coverage = whisperTrigrams.Any() ? (double)maxTrigrams / whisperTrigrams.Count : 0;
+            if (coverage >= 0.05 && bestMatchId > 0)
             {
                 var matchedTitle = candidateBooks.First(b => b.Id == bestMatchId).Title;
-                _logger.LogInformation("Audio emparejado por TRIGRAMAS ({Hits} secuencias idÃ©nticas): {File} -> {BookTitle}", maxTrigrams, Path.GetFileName(audioFilePath), matchedTitle);
+                _logger.LogInformation("Audio emparejado por TRIGRAMAS ({Hits} secuencias idénticas, {Coverage:P2} cobertura): {File} -> {BookTitle}", maxTrigrams, coverage, Path.GetFileName(audioFilePath), matchedTitle);
                 return bestMatchId;
+            }
+            
+            if (bestMatchId == 0 && preCandidateId.HasValue)
+            {
+                var matchedTitle = candidateBooks.FirstOrDefault(b => b.Id == preCandidateId.Value)?.Title;
+                if (matchedTitle != null)
+                {
+                    _logger.LogInformation("Audio emparejado por Metadata ID3 (Fallback): {File} -> {BookTitle}", Path.GetFileName(audioFilePath), matchedTitle);
+                    return preCandidateId.Value;
+                }
             }
             
             return null;
@@ -219,5 +230,7 @@ public class AudioMatchingService : QuimeraReader.Application.Interfaces.IAudioM
     private double CalculateSimilarity(string source, string target)
         => QuimeraReader.Domain.Common.TextSimilarityUtils.CalculateSimilarity(source, target);
 }
+
+
 
 

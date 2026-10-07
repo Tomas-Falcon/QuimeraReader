@@ -50,35 +50,39 @@ jobs:
       - name: Install MAUI Android Workload
         run: dotnet workload install maui-android
 
-      - name: Build & Publish Android APK
+      - name: Build Android APK
         run: |
-          dotnet publish QuimeraReader.Clients/QuimeraReader.Mobile/QuimeraReader.Mobile.csproj `
+          dotnet build QuimeraReader.Clients/QuimeraReader.Mobile/QuimeraReader.Mobile.csproj `
             -f net10.0-android `
+            -p:TargetPlatformOverride=net10.0-android `
             -c Release `
             -p:PublishTrimmed=false `
             -p:RunAOTCompilation=false `
-            -p:AndroidKeyStore=false `
-            -o ./publish/android
+            -nodeReuse:false
 
-      - name: Locate and Rename APK
+      - name: Locate and Prepare APK
         shell: pwsh
         run: |
-          $apk = Get-ChildItem -Path ./publish/android -Filter *.apk -Recurse | Select-Object -First 1
+          New-Item -ItemType Directory -Force -Path ./dist
+          $apk = Get-ChildItem -Path QuimeraReader.Clients/QuimeraReader.Mobile/bin/Release/net10.0-android -Filter *-Signed.apk -Recurse | Select-Object -First 1
+          if (-not $apk) {
+            $apk = Get-ChildItem -Path QuimeraReader.Clients/QuimeraReader.Mobile/bin/Release/net10.0-android -Filter *.apk -Recurse | Select-Object -First 1
+          }
           if ($apk) {
-            Copy-Item -Path $apk.FullName -Destination ./publish/QuimeraReader-Android.apk -Force
-            Write-Host "APK preparado: ./publish/QuimeraReader-Android.apk"
+            Copy-Item -Path $apk.FullName -Destination ./dist/QuimeraReader-Android.apk -Force
+            Write-Host "APK encontrado y copiado a: ./dist/QuimeraReader-Android.apk"
           } else {
-            Write-Error "No se encontró ningún archivo APK generado."
+            Write-Error "No se encontró ningún archivo APK en bin/Release/net10.0-android."
           }
 
       - name: Upload Android Artifact
         uses: actions/upload-artifact@v4
         with:
           name: QuimeraReader-Android-APK
-          path: ./publish/QuimeraReader-Android.apk
+          path: ./dist/QuimeraReader-Android.apk
 
   build-windows:
-    name: Build Windows EXE
+    name: Build Windows App
     if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'windows'
     runs-on: windows-latest
 
@@ -100,9 +104,11 @@ jobs:
         run: |
           dotnet publish QuimeraReader.Clients/QuimeraReader.Mobile/QuimeraReader.Mobile.csproj `
             -f net10.0-windows10.0.19041.0 `
+            -p:TargetPlatformOverride=net10.0-windows10.0.19041.0 `
             -c Release `
             -p:WindowsPackageType=None `
             -p:RuntimeIdentifier=win-x64 `
+            -nodeReuse:false -m:1 `
             -o ./publish/windows
 
       - name: Package Windows ZIP

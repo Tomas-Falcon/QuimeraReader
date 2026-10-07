@@ -55,10 +55,15 @@ public class UploadBookCommandHandler : IRequestHandler<UploadBookCommand, Uploa
                     if (!string.IsNullOrEmpty(outDir))
                     {
                         Directory.CreateDirectory(outDir);
-                        string newAudioPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(matchedBook.EpubFilePath ?? matchedBook.Title) + "_audio" + Path.GetExtension(request.FileName));
+                        string safeFileName = string.Join("_", request.FileName.Split(Path.GetInvalidFileNameChars()));
+                        string newAudioPath = Path.Combine(outDir, safeFileName);
+                        if (File.Exists(newAudioPath)) {
+                            newAudioPath = Path.Combine(outDir, Guid.NewGuid().ToString().Substring(0, 8) + "_" + safeFileName);
+                        }
                         File.Move(tempPath, newAudioPath, true);
-                        matchedBook.AudioTracks.Clear();
-                        matchedBook.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = 1 });
+                        
+                        int newTrackNum = matchedBook.AudioTracks.Any() ? matchedBook.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
+                        matchedBook.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, FileName = request.FileName, TrackNumber = newTrackNum });
                         await _dbContext.SaveChangesAsync(cancellationToken);
                         return new UploadBookResultDto { Message = "Audio emparejado con libro existente: " + matchedBook.Title, HasAudio = true };
                     }
@@ -98,3 +103,4 @@ public class UploadBookCommandHandler : IRequestHandler<UploadBookCommand, Uploa
         };
     }
 }
+
