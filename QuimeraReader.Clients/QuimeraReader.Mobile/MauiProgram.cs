@@ -47,7 +47,8 @@ public static class MauiProgram
         builder.Services.AddScoped(sp => 
         {
             var config = sp.GetRequiredService<QuimeraReader.Shared.Services.IServerConfigService>();
-            var url = config.ServerUrl ?? "http://localhost:5000/";
+            var defaultUrl = DeviceInfo.Platform == DevicePlatform.Android ? "http://10.0.2.2:5000/" : "http://localhost:5000/";
+            var url = config.ServerUrl ?? defaultUrl;
             return new HttpClient { BaseAddress = new Uri(url) };
         });
 
@@ -65,5 +66,6 @@ public static class MauiProgram
 		return builder.Build();
 	}
 }
+
 
 
