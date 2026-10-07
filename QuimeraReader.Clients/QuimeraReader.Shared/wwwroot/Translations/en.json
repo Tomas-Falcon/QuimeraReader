@@ -40,6 +40,12 @@
   "Reader_Read": "read",
   "Reader_PureAudiobookMode": "Pure Audiobook Mode",
   "Reader_NoTranscriptsFound": "No transcripts or text found for this title.",
+  "ReaderPlayer_Playlist": "Track List",
+  "ReaderPlayer_Track": "Track",
+  "ReaderPlayer_Current": "Current",
+  "ReaderPlayer_Close": "Close",
+  "ReaderPlayer_SkipBackward": "Skip Back 15s",
+  "ReaderPlayer_SkipForward": "Skip Forward 30s",
   "Settings_ServerConfig": "Server Configuration",
   "Settings_LoadingPreferences": "Loading preferences...",
   "Settings_General": "General",
@@ -172,3 +178,4 @@
   "AudioManagement_ErrorAutoMatch": "Error starting automatic process.",
   "AudioManagement_ErrorLoad": "Error loading audios: {0}"
 }
+

@@ -1,4 +1,4 @@
-﻿export function initializePlayer(audioElement, dotNetReference) {
+export function initializePlayer(audioElement, dotNetReference) {
     if (!audioElement) return;
 
     audioElement.addEventListener('timeupdate', () => {
@@ -34,5 +34,10 @@ export function scrollToActiveSegment() {
     const activeEl = document.querySelector('.active-segment');
     if (activeEl) {
         activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+export function skipAudio(audioElement, offsetSeconds) {
+    if (audioElement) {
+        audioElement.currentTime = Math.max(0, audioElement.currentTime + offsetSeconds);
     }
 }

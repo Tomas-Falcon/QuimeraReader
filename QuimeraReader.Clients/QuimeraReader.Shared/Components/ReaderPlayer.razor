@@ -34,7 +34,7 @@
                     <h5 class="mb-0 text-truncate" style="max-width: 300px; margin: 0 auto;">@Book.Title</h5>
                 </div>
                 <div style="width: 100px;" class="text-end d-flex justify-content-end gap-2">
-                    <button class="btn btn-sm @(_isNavigationLocked ? "btn-danger" : "btn-outline-light")" @onclick="ToggleNavigationLock" title="Bloquear navegaciÃ³n tÃ¡ctil para seleccionar texto">
+                                        <button class="btn btn-sm @(_isNavigationLocked ? "btn-danger" : "btn-outline-light")" @onclick="ToggleNavigationLock" title="Bloquear navegación táctil para seleccionar texto">
                         <i class="bi @(_isNavigationLocked ? "bi-lock-fill" : "bi-unlock")"></i>
                     </button>
                     @if (Book.HasEpub && Book.HasAudio)
@@ -43,8 +43,38 @@
                             <i class="bi @(_showAudiobookMode ? "bi-book" : "bi-headphones")"></i>
                         </button>
                     }
+                    @if (Book.HasAudio && Book.AudioTracks != null && Book.AudioTracks.Count > 1)
+                    {
+                        <button class="btn btn-sm @(_showPlaylist ? "btn-primary" : "btn-outline-light")" @onclick="TogglePlaylist" title="@TranslationService["ReaderPlayer_Playlist"]">
+                            <i class="bi bi-music-note-list"></i>
+                        </button>
+                    }
                 </div>
             </div>
+
+            @if (_showPlaylist && Book.AudioTracks != null)
+            {
+                <RadzenCard class="position-absolute" Style="top: 60px; right: 20px; width: 350px; max-height: calc(100vh - 140px); overflow-y: auto; z-index: 100; padding: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+                    <div class="p-3 d-flex justify-content-between align-items-center" style="background: var(--rz-primary); border-bottom: 1px solid var(--rz-border-color);">
+                        <h6 class="mb-0 text-white" style="margin: 0;">@TranslationService["ReaderPlayer_Playlist"]</h6>
+                        <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" Size="ButtonSize.ExtraSmall" Click="TogglePlaylist" />
+                    </div>
+                    <RadzenDataList Data="@Book.AudioTracks.OrderBy(t => t.TrackNumber)" TItem="AudioTrackDto" Style="max-height: 100%;">
+                        <Template Context="track">
+                            <div class="d-flex align-items-center justify-content-between p-2" style="cursor: pointer; background: @(track.TrackNumber == _currentTrackNumber ? "var(--rz-secondary-lighter)" : "transparent");" @onclick="() => ChangeTrackAsync(track.TrackNumber)">
+                                <span class="text-truncate" style="flex: 1; font-weight: @(track.TrackNumber == _currentTrackNumber ? "bold" : "normal");">
+                                    <RadzenIcon Icon="@(track.TrackNumber == _currentTrackNumber ? "play_circle" : "audiotrack")" class="me-2" />
+                                    @(string.IsNullOrWhiteSpace(track.FileName) ? $"{TranslationService["ReaderPlayer_Track"]} {track.TrackNumber}" : track.FileName)
+                                </span>
+                                @if (track.TrackNumber == _currentTrackNumber)
+                                {
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="@TranslationService["ReaderPlayer_Current"]" />
+                                }
+                            </div>
+                        </Template>
+                    </RadzenDataList>
+                </RadzenCard>
+            }
 
             <!-- Text Area / EPUB Reader -->
             <div class="text-container position-relative" id="text-container" style="flex: 1; display: flex; flex-direction: column;">
@@ -139,7 +169,7 @@
             @if (Book.HasAudio)
             {
                 <div class="player-controls" style="background: var(--bg-card); padding: 10px;">
-                    <audio @ref="_audioElement" src="@_audioSourceUrl" controls class="native-audio w-100" />
+                    <audio @ref="_audioElement" src="@GetCurrentTrackUrl()" controls class="native-audio w-100" />
                 </div>
             }
         </div>
@@ -681,18 +711,19 @@
         [JsonPropertyName("text")]
         public string Text { get; set; } = string.Empty;
     }
+    private async Task SkipBackward()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("skipAudio", _audioElement, -15);
+        }
+    }
+
+    private async Task SkipForward()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("skipAudio", _audioElement, 30);
+        }
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
