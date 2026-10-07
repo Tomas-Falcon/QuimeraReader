@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Json;
+using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using QuimeraReader.Shared.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -73,8 +73,7 @@ public class BookService : IBookService
                 var data = filtered.Skip(skip ?? ((page - 1) * pageSize)).Take(take ?? pageSize).ToArray();
                 return new PaginatedResult<Book> { Page = page, PageSize = pageSize, Total = filtered.Count(), Data = data };
             }
-
-            _logger.LogInformation("[BookService] Obteniendo lista de libros. Page: {Page}, Search: {Search}", page, search);
+            _logger.LogDebug("[BookService] Obteniendo lista de libros. Page: {Page}, Search: {Search}", page, search);
             var url = $"api/Books?page={page}&pageSize={pageSize}";
             if (skip.HasValue) url += $"&skip={skip.Value}";
             if (take.HasValue) url += $"&take={take.Value}";

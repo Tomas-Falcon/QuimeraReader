@@ -717,6 +717,56 @@ public partial class BooksController : ControllerBase
         return Ok();
     }
 
+    [HttpPost("audio-tracks/{id}/unmatch")]
+    public async Task<IActionResult> UnmatchAudioTrack(int id)
+    {
+        var track = await _dbContext.BookAudioTracks.Include(t => t.Book).FirstOrDefaultAsync(t => t.Id == id);
+        if (track == null) return NotFound();
+
+        var unmatched = new QuimeraReader.Domain.Entities.UnmatchedAudioTrack
+        {
+            OriginalFileName = track.FileName ?? System.IO.Path.GetFileName(track.FilePath),
+            PhysicalPath = track.FilePath,
+            UploadedAt = DateTime.UtcNow,
+            FileSizeBytes = new System.IO.FileInfo(track.FilePath).Exists ? new System.IO.FileInfo(track.FilePath).Length : 0
+        };
+
+        _dbContext.UnmatchedAudioTracks.Add(unmatched);
+        
+        if (track.Book != null)
+        {
+            track.Book.AudioTracks.Remove(track);
+        }
+        _dbContext.BookAudioTracks.Remove(track);
+        
+        await _dbContext.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpPost("audio-tracks/{id}/reassign/{bookId}")]
+    public async Task<IActionResult> ReassignAudioTrack(int id, int bookId)
+    {
+        var track = await _dbContext.BookAudioTracks.Include(t => t.Book).FirstOrDefaultAsync(t => t.Id == id);
+        var targetBook = await _dbContext.Books.Include(b => b.AudioTracks).FirstOrDefaultAsync(b => b.Id == bookId);
+        
+        if (track == null || targetBook == null) return NotFound();
+
+        if (track.Book != null)
+        {
+            track.Book.AudioTracks.Remove(track);
+        }
+
+        int nextTrack = targetBook.AudioTracks.Any() ? targetBook.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
+        track.TrackNumber = nextTrack;
+        targetBook.AudioTracks.Add(track);
+        targetBook.ProcessingStatus = "PENDING_SYNC";
+
+        await _dbContext.SaveChangesAsync();
+        await _queue.EnqueueAsync(targetBook.Id);
+
+        return Ok();
+    }
+
     private async Task DeleteBookEntityAndFoldersAsync(Book book)
     {
         // Guardamos la ruta de la carpeta para borrarla luego
