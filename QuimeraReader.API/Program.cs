@@ -1,4 +1,5 @@
-ï»¿using Microsoft.AspNetCore.Builder;
+using Polly;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +14,7 @@ using QuimeraReader.API.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configurar logging: JSON para producciÃ³n (Docker), texto simple para desarrollo
+// Configurar logging: JSON para producción (Docker), texto simple para desarrollo
 if (builder.Environment.IsProduction())
 {
     builder.Logging.AddJsonConsole(options =>
@@ -26,7 +27,7 @@ var dbPath = Environment.GetEnvironmentVariable("QUIMERA_DB_PATH") ?? "quimerare
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"));
 
-// Enlazar la interfaz de AplicaciÃ³n con la implementaciÃ³n de Infraestructura
+// Enlazar la interfaz de Aplicación con la implementación de Infraestructura
 builder.Services.AddScoped<QuimeraReader.Application.Interfaces.IAppDbContext>(provider => 
     provider.GetRequiredService<AppDbContext>());
 
@@ -34,9 +35,12 @@ builder.Services.AddScoped<QuimeraReader.Application.Interfaces.IAppDbContext>(p
 builder.Services.AddHttpClient();
 
 // Inyectar Metadata Providers
-builder.Services.AddScoped<IMetadataProvider, GoogleBooksMetadataProvider>();
-builder.Services.AddScoped<IMetadataProvider, OpenLibraryMetadataProvider>();
-builder.Services.AddScoped<IMetadataProvider, HardcoverMetadataProvider>();
+builder.Services.AddHttpClient<IMetadataProvider, GoogleBooksMetadataProvider>()
+    .AddTransientHttpErrorPolicy(p => p.WaitAndRetryAsync(3, _ => TimeSpan.FromMilliseconds(600)));
+builder.Services.AddHttpClient<IMetadataProvider, OpenLibraryMetadataProvider>()
+    .AddTransientHttpErrorPolicy(p => p.WaitAndRetryAsync(3, _ => TimeSpan.FromMilliseconds(600)));
+builder.Services.AddHttpClient<IMetadataProvider, HardcoverMetadataProvider>()
+    .AddTransientHttpErrorPolicy(p => p.WaitAndRetryAsync(3, _ => TimeSpan.FromMilliseconds(600)));
 builder.Services.AddScoped<IMetadataProvider, GoodreadsScraperProvider>();
 builder.Services.AddScoped<IMetadataProvider, StoryGraphScraperProvider>();
 
@@ -101,7 +105,10 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseAuthorization();
 app.MapControllers();
+app.MapHealthChecks("/api/health");
 
 app.MapFallbackToFile("index.html"); // SPA Fallback para enrutamiento Blazor
 
 app.Run();
+
+

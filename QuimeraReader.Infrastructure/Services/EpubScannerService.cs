@@ -12,7 +12,7 @@ using QuimeraReader.Domain.Interfaces;
 
 namespace QuimeraReader.Infrastructure.Services;
 
-public class EpubScannerService
+public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScannerService
 {
     private readonly IEnumerable<IMetadataProvider> _providers;
     private readonly HttpClient _httpClient;

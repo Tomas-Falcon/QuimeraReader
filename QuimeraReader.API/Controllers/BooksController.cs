@@ -14,54 +14,24 @@ namespace QuimeraReader.API.Controllers;
 [Route("api/[controller]")]
 public partial class BooksController : ControllerBase
 {
-        [HttpDelete]
+            [HttpDelete]
     public async Task<IActionResult> DeleteBooks([FromQuery] int[] ids)
     {
-        if (ids == null || ids.Length == 0) return BadRequest();
-        var books = await _dbContext.Books.Include(b => b.AudioTracks).Where(b => ids.Contains(b.Id)).ToListAsync();
-        if (books.Any()) {
-            await DeleteBooksInternalAsync(books);
-        }
+        await _mediator.Send(new QuimeraReader.Application.Books.Commands.DeleteBooks.DeleteBooksCommand { Ids = ids });
         return Ok();
     }
 
-    [HttpDelete("authors")]
+        [HttpDelete("authors")]
     public async Task<IActionResult> DeleteAuthors([FromQuery] int[] ids)
     {
-        if (ids == null || ids.Length == 0) return BadRequest();
-
-        var authors = await _dbContext.Authors.Where(a => ids.Contains(a.Id)).ToListAsync();
-        if (!authors.Any()) return Ok();
-
-        var books = await _dbContext.Books
-            .Include(b => b.AudioTracks)
-            .Where(b => b.Authors.Any(a => ids.Contains(a.AuthorId)))
-            .ToListAsync();
-
-        if (books.Any()) {
-            await DeleteBooksInternalAsync(books);
-        }
-
-        // Si quedaron autores vacios (por ej, subidos a mano) los borramos
-        var remainingAuthors = await _dbContext.Authors.Where(a => ids.Contains(a.Id)).ToListAsync();
-        if (remainingAuthors.Any())
-        {
-            _dbContext.Authors.RemoveRange(remainingAuthors);
-            await _dbContext.SaveChangesAsync();
-        }
+        await _mediator.Send(new QuimeraReader.Application.Books.Commands.DeleteAuthors.DeleteAuthorsCommand { Ids = ids });
         return Ok();
     }
 
-    [HttpDelete("categories")]
+        [HttpDelete("categories")]
     public async Task<IActionResult> DeleteCategories([FromQuery] int[] ids)
     {
-        if (ids == null || ids.Length == 0) return BadRequest();
-
-        var categories = await _dbContext.Categories.Where(c => ids.Contains(c.Id)).ToListAsync();
-        if (!categories.Any()) return Ok();
-
-        _dbContext.Categories.RemoveRange(categories);
-        await _dbContext.SaveChangesAsync();
+        await _mediator.Send(new QuimeraReader.Application.Books.Commands.DeleteCategories.DeleteCategoriesCommand { Ids = ids });
         return Ok();
     }
     private readonly AppDbContext _dbContext;
@@ -71,6 +41,7 @@ public partial class BooksController : ControllerBase
     private readonly LibraryScanState _scanState;
     private readonly ILogger<BooksController> _logger;
     private readonly IEnumerable<QuimeraReader.Domain.Interfaces.IMetadataProvider> _metadataProviders;
+    private readonly MediatR.IMediator _mediator;
 
     public BooksController(
         IEnumerable<QuimeraReader.Domain.Interfaces.IMetadataProvider> metadataProviders,
@@ -79,7 +50,7 @@ public partial class BooksController : ControllerBase
         AudioAlignmentService alignmentService, 
         AudioAlignmentQueue queue, 
         LibraryScanState scanState,
-        ILogger<BooksController> logger)
+        ILogger<BooksController> logger, MediatR.IMediator mediator)
     {
         _dbContext = dbContext;
         _scannerService = scannerService;
@@ -87,6 +58,7 @@ public partial class BooksController : ControllerBase
         _queue = queue;
         _scanState = scanState;
         _logger = logger;
+        _mediator = mediator;
         _metadataProviders = metadataProviders;
     }
 
@@ -710,7 +682,7 @@ public partial class BooksController : ControllerBase
         
         if (!book.AudioTracks.Any())
         {
-            await DeleteBooksInternalAsync(new List<Book> { book });
+            await _mediator.Send(new QuimeraReader.Application.Books.Commands.DeleteBooks.DeleteBooksCommand { Ids = new[] { book.Id } });
         }
         else 
         {
@@ -736,7 +708,7 @@ public partial class BooksController : ControllerBase
         
         if (string.IsNullOrEmpty(book.EpubFilePath))
         {
-            await DeleteBooksInternalAsync(new List<Book> { book });
+            await _mediator.Send(new QuimeraReader.Application.Books.Commands.DeleteBooks.DeleteBooksCommand { Ids = new[] { book.Id } });
         }
         else
         {
@@ -840,41 +812,16 @@ public partial class BooksController : ControllerBase
         return Ok();
     }
 
-    [HttpPut("{bookId}/metadata")]
+        [HttpPut("{bookId}/metadata")]
     public async Task<IActionResult> UpdateMetadata(int bookId, [FromBody] UpdateMetadataRequest request)
     {
-        var book = await _dbContext.Books.Include(b => b.Categories).ThenInclude(bc => bc.Category).FirstOrDefaultAsync(b => b.Id == bookId);
-        if (book == null) return NotFound();
-
-                if (book.ReadingStatus != request.ReadingStatus && 
-           (request.ReadingStatus == "Reading" || request.ReadingStatus == "NextToRead" || request.ReadingStatus == "Read"))
-        {
-            book.LastReadAt = DateTime.UtcNow;
-        }
-        
-        book.Title = request.Title;
-        book.ReadingStatus = request.ReadingStatus;
-        
-        // Remove old categories not in new list
-        var toRemove = book.Categories.Where(c => !request.Categories.Contains(c.Category.Name)).ToList();
-        foreach (var r in toRemove) book.Categories.Remove(r);
-
-        // Add new categories
-        var existingNames = book.Categories.Select(c => c.Category.Name).ToList();
-        var toAdd = request.Categories.Where(c => !existingNames.Contains(c)).ToList();
-        foreach (var newCatName in toAdd)
-        {
-            var cat = await _dbContext.Categories.FirstOrDefaultAsync(c => c.Name == newCatName);
-            if (cat == null) 
-            {
-                cat = new Category { Name = newCatName };
-                _dbContext.Categories.Add(cat);
-                await _dbContext.SaveChangesAsync(); // save to get ID
-            }
-            book.Categories.Add(new BookCategory { BookId = book.Id, CategoryId = cat.Id });
-        }
-
-        await _dbContext.SaveChangesAsync();
+        await _mediator.Send(new QuimeraReader.Application.Books.Commands.UpdateMetadata.UpdateMetadataCommand 
+        { 
+            BookId = bookId, 
+            Title = request.Title, 
+            ReadingStatus = request.ReadingStatus, 
+            Categories = request.Categories 
+        });
         return Ok();
     }
 
