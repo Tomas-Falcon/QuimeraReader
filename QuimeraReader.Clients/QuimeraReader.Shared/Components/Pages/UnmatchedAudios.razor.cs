@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Json;
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using QuimeraReader.Shared.Models;
 using Radzen;
@@ -19,18 +19,19 @@ public partial class UnmatchedAudios : ComponentBase
         public bool? Value { get; set; }
     }
 
-    private List<FilterOption> _filterOptions = new List<FilterOption>
-    {
-        new FilterOption { Text = "Todos los Audios", Value = null },
-        new FilterOption { Text = "Asignados", Value = true },
-        new FilterOption { Text = "Huérfanos", Value = false }
-    };
+    private List<FilterOption> _filterOptions = new();
 
     private List<ManagedAudioDto> _audios = new();
     private List<ManagedAudioDto> _filteredAudios = new();
 
     protected override async Task OnInitializedAsync()
     {
+        _filterOptions = new List<FilterOption>
+        {
+            new FilterOption { Text = TranslationService["AudioManagement_FilterAll"], Value = null },
+            new FilterOption { Text = TranslationService["AudioManagement_FilterMatched"], Value = true },
+            new FilterOption { Text = TranslationService["AudioManagement_FilterUnmatched"], Value = false }
+        };
         await LoadAudios();
     }
 
@@ -48,7 +49,7 @@ public partial class UnmatchedAudios : ComponentBase
         }
         catch (Exception ex)
         {
-            ToastService.ShowError("Error al cargar audios: " + ex.Message);
+            ToastService.ShowError(string.Format(TranslationService["AudioManagement_ErrorLoad"], ex.Message));
         }
         finally
         {
@@ -90,17 +91,17 @@ public partial class UnmatchedAudios : ComponentBase
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadAsStringAsync();
-                ToastService.ShowSuccess($"Proceso iniciado: {result}");
+                ToastService.ShowSuccess(string.Format(TranslationService["AudioManagement_ProcessStarted"], result));
                 await LoadAudios();
             }
             else
             {
-                ToastService.ShowError("Error al iniciar el proceso automático.");
+                ToastService.ShowError(TranslationService["AudioManagement_ErrorAutoMatch"]);
             }
         }
         catch (Exception ex)
         {
-            ToastService.ShowError("Error: " + ex.Message);
+            ToastService.ShowError(string.Format(TranslationService["Common_Error"], ex.Message));
         }
         finally
         {
@@ -128,7 +129,7 @@ public partial class UnmatchedAudios : ComponentBase
             }
             catch (Exception ex)
             {
-                ToastService.ShowError("Error: " + ex.Message);
+                ToastService.ShowError(string.Format(TranslationService["Common_Error"], ex.Message));
             }
         }
     }
@@ -143,17 +144,17 @@ public partial class UnmatchedAudios : ComponentBase
                 var response = await Http.PostAsync($"api/books/unmatched-audios/{audio.Id}/match/{bookId}", null);
                 if (response.IsSuccessStatusCode)
                 {
-                    ToastService.ShowSuccess("Audio asociado correctamente");
+                    ToastService.ShowSuccess(TranslationService["AudioManagement_MatchedSuccess"]);
                     await LoadAudios();
                 }
                 else
                 {
-                    ToastService.ShowError("No se pudo asociar el audio.");
+                    ToastService.ShowError(TranslationService["AudioManagement_ErrorMatch"]);
                 }
             }
             catch (Exception ex)
             {
-                ToastService.ShowError("Error: " + ex.Message);
+                ToastService.ShowError(string.Format(TranslationService["Common_Error"], ex.Message));
             }
         }
     }

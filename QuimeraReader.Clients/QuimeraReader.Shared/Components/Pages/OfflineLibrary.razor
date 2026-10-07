@@ -1,4 +1,4 @@
-﻿@page "/offline-library"
+@page "/offline-library"
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Interfaces
 @inject NavigationManager NavManager
@@ -15,14 +15,14 @@
     {
         <div class="text-center p-5">
             <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
-            <p class="mt-3 text-muted">Cargando descargas...</p>
+            <p class="mt-3 text-muted">@TranslationService["OfflineLibrary_Loading"]</p>
         </div>
     }
     else if (_books.Count == 0)
     {
         <div class="text-center p-5">
             <RadzenIcon Icon="cloud_off" Style="font-size: 3rem; color: var(--rz-text-disabled-color);" />
-            <p class="text-muted mt-2">No tienes libros descargados para leer sin conexión.</p>
+            <p class="text-muted mt-2">@TranslationService["OfflineLibrary_Empty"]</p>
         </div>
     }
     else

@@ -11,21 +11,21 @@
 @inject IServiceProvider ServiceProvider
 @inject QuimeraReader.Shared.Interfaces.ITranslationService Translation
 
-<PageTitle>Detalles del Libro</PageTitle>
+<PageTitle>@Translation["BookDetails_PageTitle"]</PageTitle>
 
 @if (_isLoading)
 {
     <div class="loading-state text-center py-5">
         <div class="spinner-border text-primary" role="status"></div>
-        <p class="mt-3">Cargando detalles...</p>
+        <p class="mt-3">@Translation["BookDetails_Loading"]</p>
     </div>
 }
 else if (_book == null)
 {
     <div class="empty-state text-center py-5">
         <i class="bi bi-exclamation-circle text-danger mb-3" style="font-size: 3rem;"></i>
-        <p>No se pudo encontrar el libro.</p>
-        <RadzenButton ButtonStyle="ButtonStyle.Primary" class="mt-3" Click="@GoBack" Text="Volver a la Biblioteca" />
+        <p>@Translation["BookDetails_NotFound"]</p>
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" class="mt-3" Click="@GoBack" Text="@Translation["BookDetails_BackToLibrary"]" />
     </div>
 }
 else
@@ -37,13 +37,13 @@ else
 
         <div class="container position-relative" style="z-index: 10; padding-top: 2rem; padding-bottom: 3rem;">
             <div class="mb-4">
-                <RadzenButton ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" class="text-white text-decoration-none px-0" Click="@GoBack" style="font-size: 1.1rem; opacity: 0.9;" Icon="arrow_back" Text="Volver a la Biblioteca" />
+                <RadzenButton ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" class="text-white text-decoration-none px-0" Click="@GoBack" style="font-size: 1.1rem; opacity: 0.9;" Icon="arrow_back" Text="@Translation["BookDetails_BackToLibrary"]" />
             </div>
 
             <div class="d-flex flex-column flex-md-row gap-5 align-items-center align-items-md-start">
                 <!-- Cover -->
                 <div class="cover-section" style="flex: 0 0 auto; width: 100%; max-width: 300px;">
-                    <img src="@QuimeraReader.Shared.Helpers.ImageHelper.GetImageSource(_book.CoverUrl, BookService.BaseAddress)" alt="Portada" class="img-fluid rounded shadow-lg" style="width: 100%;" onerror="this.outerHTML='<div class=\'placeholder-cover shadow-lg rounded d-flex align-items-center justify-content-center\' style=\'width:100%;aspect-ratio:2/3;background:#2a2a2a;color:#888;\'><span>Sin Portada</span></div>'" />
+                    <img src="@QuimeraReader.Shared.Helpers.ImageHelper.GetImageSource(_book.CoverUrl, BookService.BaseAddress)" alt="@Translation["EditBook_Cover"]" class="img-fluid rounded shadow-lg" style="width: 100%;" onerror="this.outerHTML='<div class=\'placeholder-cover shadow-lg rounded d-flex align-items-center justify-content-center\' style=\'width:100%;aspect-ratio:2/3;background:#2a2a2a;color:#888;\'><span>@Translation["BookDetails_NoCover"]</span></div>'" />
                 </div>
                 
                 <!-- Metadata -->
@@ -60,7 +60,7 @@ else
 
                     @if (!string.IsNullOrEmpty(_book.Series))
                     {
-                        <h5 class="text-warning mb-3"><i class="bi bi-collection"></i> Saga: @_book.Series</h5>
+                        <h5 class="text-warning mb-3"><i class="bi bi-collection"></i> @Translation["BookDetails_Series"] @_book.Series</h5>
                     }
 
                     @if (!string.IsNullOrEmpty(_book.Isbn))
@@ -85,21 +85,21 @@ else
                     <div class="badges mb-4 d-flex gap-2 flex-wrap align-items-center">
                         @if (_book.AverageRating.HasValue && _book.AverageRating.Value > 0)
                         {
-                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" class="text-dark fs-6" title="Puntuación Media">
+                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" class="text-dark fs-6" title="@Translation["BookDetails_AverageRating"]">
                                 <i class="bi bi-star-fill"></i> @_book.AverageRating.Value.ToString("0.0")
                             </RadzenBadge>
                         }
                         @if (_book.HasEpub)
                         {
-                            <RadzenBadge BadgeStyle="BadgeStyle.Primary" class="fs-6"><i class="bi bi-book"></i> Ebook</RadzenBadge>
+                            <RadzenBadge BadgeStyle="BadgeStyle.Primary" class="fs-6"><i class="bi bi-book"></i> @Translation["Badge_Ebook"]</RadzenBadge>
                         }
                         @if (_book.HasAudio)
                         {
-                            <RadzenBadge BadgeStyle="BadgeStyle.Success" class="fs-6"><i class="bi bi-headphones"></i> Audiobook</RadzenBadge>
+                            <RadzenBadge BadgeStyle="BadgeStyle.Success" class="fs-6"><i class="bi bi-headphones"></i> @Translation["Badge_Audiobook"]</RadzenBadge>
                         }
                         @if (_book.IsAligned)
                         {
-                            <RadzenBadge BadgeStyle="BadgeStyle.Info" class="text-dark fs-6"><i class="bi bi-stars"></i> Sincronizado</RadzenBadge>
+                            <RadzenBadge BadgeStyle="BadgeStyle.Info" class="text-dark fs-6"><i class="bi bi-stars"></i> @Translation["Badge_Synced"]</RadzenBadge>
                         }
                     </div>
                     
@@ -111,14 +111,14 @@ else
                     }
                     else
                     {
-                        <p class="text-white-50 fst-italic mb-4">No hay sinopsis disponible para este libro.</p>
+                        <p class="text-white-50 fst-italic mb-4">@Translation["BookDetails_NoDescription"]</p>
                     }
                     
                     <div class="reading-progress-section mt-4 mb-2" style="max-width: 400px;">
                         @if (_book.PercentageCompleted.HasValue && _book.PercentageCompleted.Value > 0)
                         {
                             <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="text-white-50 small fw-bold">PROGRESO DE LECTURA</span>
+                                <span class="text-white-50 small fw-bold">@Translation["BookDetails_ReadingProgress"]</span>
                                 <span class="text-primary fw-bold">@Math.Round(_book.PercentageCompleted.Value, 1)%</span>
                             </div>
                             <div class="progress" style="height: 6px; background-color: rgba(255,255,255,0.1);">
@@ -130,7 +130,7 @@ else
                     <div class="actions mt-3 d-flex gap-3 flex-wrap">
                         @if (!_book.HasEpub && !_book.HasAudio)
                         {
-                            <RadzenButton ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Large" class="px-5 py-3 rounded-pill fw-bold" Disabled="true" Icon="block" Text="Archivo no disponible" />
+                            <RadzenButton ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Large" class="px-5 py-3 rounded-pill fw-bold" Disabled="true" Icon="block" Text="@Translation["BookDetails_FileNotAvailable"]" />
                         }
                         else
                         {
@@ -153,11 +153,11 @@ else
                         <RadzenButton ButtonStyle="ButtonStyle.Light" Variant="Variant.Outlined" Size="ButtonSize.Large" class="px-4 py-3 rounded-pill fw-bold shadow-sm" Click="@FetchSingleMetadataAsync" Disabled="@_isFetchingMetadata" style="transition: transform 0.2s;" Icon="@(_isFetchingMetadata ? "" : "cloud_download")">
                             @if (_isFetchingMetadata)
                             {
-                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> <span>Buscando...</span>
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> <span>@Translation["BookDetails_Searching"]</span>
                             }
                             else
                             {
-                                <span>Buscar metadatos</span>
+                                <span>@Translation["BookDetails_FetchMetadata"]</span>
                             }
                         </RadzenButton>
                     </div>
@@ -165,20 +165,20 @@ else
                     <div class="mt-4 pt-4" style="border-top: 1px solid rgba(255,255,255,0.1);">
                         <div class="d-flex justify-content-between align-items-center mb-4">
                             <div>
-                                <h6 class="text-white mb-0"><i class="bi bi-cloud-arrow-down me-2"></i> Disponible sin conexión</h6>
-                                <small class="text-white-50">Descarga los archivos a tu dispositivo para leer y escuchar sin internet.</small>
+                                <h6 class="text-white mb-0"><i class="bi bi-cloud-arrow-down me-2"></i> @Translation["BookDetails_AvailableOffline"]</h6>
+                                <small class="text-white-50">@Translation["BookDetails_AvailableOfflineDesc"]</small>
                             </div>
                             <RadzenSwitch @bind-Value="_book.IsAvailableOffline" Change="@ToggleOfflineAsync" />
                         </div>
-                        <h6 class="text-white-50 mb-3"><i class="bi bi-gear me-2"></i> Gestión de archivos</h6>
+                        <h6 class="text-white-50 mb-3"><i class="bi bi-gear me-2"></i> @Translation["BookDetails_FileManagement"]</h6>
                         <div class="d-flex gap-2 flex-wrap">
                             @if (_book.HasEpub)
                             {
-                                <RadzenButton ButtonStyle="ButtonStyle.Danger" Variant="Variant.Outlined" Size="ButtonSize.Small" class="px-3 rounded-pill" Click="@DeleteEpubAsync" Icon="delete" Text="Borrar EPUB" />
+                                <RadzenButton ButtonStyle="ButtonStyle.Danger" Variant="Variant.Outlined" Size="ButtonSize.Small" class="px-3 rounded-pill" Click="@DeleteEpubAsync" Icon="delete" Text="@Translation["BookDetails_DeleteEpub"]" />
                             }
                             @if (_book.HasAudio)
                             {
-                                <RadzenButton ButtonStyle="ButtonStyle.Danger" Variant="Variant.Outlined" Size="ButtonSize.Small" class="px-3 rounded-pill" Click="@DeleteAudioAsync" Icon="delete" Text="Borrar Audio" />
+                                <RadzenButton ButtonStyle="ButtonStyle.Danger" Variant="Variant.Outlined" Size="ButtonSize.Small" class="px-3 rounded-pill" Click="@DeleteAudioAsync" Icon="delete" Text="@Translation["BookDetails_DeleteAudio"]" />
                             }
                         </div>
                     </div>
@@ -256,12 +256,12 @@ else
             // Refresh book details to show the new metadata
             await LoadBookAsync();
             if (_book != null) _book.CoverCacheBuster = DateTime.UtcNow.Ticks;
-            ToastService.ShowSuccess("Metadatos actualizados correctamente");
+            ToastService.ShowSuccess(Translation["BookDetails_MetadataUpdated"]);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error al buscar metadatos: {ex.Message}");
-            ToastService.ShowError($"Error al buscar metadatos: {ex.Message}");
+            ToastService.ShowError(string.Format(Translation["BookDetails_MetadataError"], ex.Message));
         }
         finally
         {
@@ -278,7 +278,7 @@ else
             await BookService.ToggleOfflineAvailabilityAsync(Id, value);
             var worker = (QuimeraReader.Shared.Interfaces.IOfflineSyncWorker?)ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.IOfflineSyncWorker));
             if (worker != null) { _ = worker.SyncNowAsync(); }
-            ToastService.ShowSuccess(value ? "Libro marcado para leer sin conexión." : "Libro eliminado de descargas automáticas.");
+            ToastService.ShowSuccess(value ? Translation["BookDetails_MarkedOffline"] : Translation["BookDetails_UnmarkedOffline"]);
         }
         catch (Exception ex)
         {
@@ -295,13 +295,13 @@ else
 
     private async Task DeleteEpubAsync()
     {
-        bool confirmed = await JS.InvokeAsync<bool>("confirm", "¿Seguro que deseas borrar el archivo EPUB de este libro?");
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", Translation["BookDetails_ConfirmDeleteEpub"]);
         if (!confirmed) return;
 
         try
         {
             await BookService.DeleteEpubAsync(Id);
-            ToastService.ShowSuccess("Archivo EPUB eliminado.");
+            ToastService.ShowSuccess(Translation["BookDetails_EpubDeleted"]);
             
             try 
             {
@@ -321,19 +321,19 @@ else
         }
         catch (Exception ex)
         {
-            ToastService.ShowError($"Error al borrar: {ex.Message}");
+            ToastService.ShowError(string.Format(Translation["BookDetails_DeleteError"], ex.Message));
         }
     }
 
     private async Task DeleteAudioAsync()
     {
-        bool confirmed = await JS.InvokeAsync<bool>("confirm", "¿Seguro que deseas borrar el Audiolibro de este libro?");
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", Translation["BookDetails_ConfirmDeleteAudio"]);
         if (!confirmed) return;
 
         try
         {
             await BookService.DeleteAudioAsync(Id);
-            ToastService.ShowSuccess("Audiolibro eliminado.");
+            ToastService.ShowSuccess(Translation["BookDetails_AudioDeleted"]);
             
             try 
             {
@@ -353,7 +353,7 @@ else
         }
         catch (Exception ex)
         {
-            ToastService.ShowError($"Error al borrar: {ex.Message}");
+            ToastService.ShowError(string.Format(Translation["BookDetails_DeleteError"], ex.Message));
         }
     }
 
@@ -364,7 +364,7 @@ else
 
     private async Task OpenEditModal()
     {
-        var result = await DialogService.OpenAsync<BookEditModal>("Editar Libro", 
+        var result = await DialogService.OpenAsync<BookEditModal>(Translation["EditBook_Title"], 
             new Dictionary<string, object?> { { "Book", _book } },
             new Radzen.DialogOptions() { Width = "500px", Height = "450px" });
         
