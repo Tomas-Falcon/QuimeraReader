@@ -5,19 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QuimeraReader - Self-Hosted Ebook & Audiobook Platform</title>
     
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://tomas-falcon.github.io/QuimeraReader/">
+
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="favicon.png?v=2">
     <link rel="apple-touch-icon" href="icon-192.png?v=2">
+
     <!-- SEO Meta Tags -->
-    <meta name="description" content="QuimeraReader is a comprehensive, self-hosted platform designed for managing massive ebook (EPUB) and audiobook libraries, featuring AI synchronization for a seamless read-along experience.">
-    <meta name="keywords" content="QuimeraReader, self-hosted, homelab, ebook reader, audiobook player, read-along, Whisper AI, docker, .NET, Blazor">
+    <meta name="description" content="QuimeraReader is a self-hosted platform for managing massive ebook (EPUB) and audiobook libraries with local Whisper AI read-along text synchronization.">
+    <meta name="keywords" content="QuimeraReader, self-hosted, homelab, ebook reader, audiobook player, read-along, Whisper AI, docker, .NET 10, Blazor, epub audio sync">
     <meta name="author" content="Tomas Falcon">
-    
-    <!-- Open Graph / Social Media Meta Tags -->
-    <meta property="og:title" content="QuimeraReader - AI-Powered Read-Along Library">
-    <meta property="og:description" content="Self-hosted homelab platform for ebooks and audiobooks, featuring Whisper.net AI synchronization.">
+    <meta name="robots" content="index, follow">
+
+    <!-- Open Graph / Facebook Meta Tags -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://tomas-falcon.github.io/QuimeraReader/">
+    <meta property="og:title" content="QuimeraReader - Self-Hosted Ebook & Audiobook Platform">
+    <meta property="og:description" content="Manage massive ebook and audiobook libraries with local AI-powered read-along synchronization.">
+    <meta property="og:image" content="https://tomas-falcon.github.io/QuimeraReader/icon-192.png">
+
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="QuimeraReader - AI Read-Along Ebook & Audiobook Platform">
+    <meta name="twitter:description" content="Self-hosted homelab platform for ebooks and audiobooks featuring local Whisper AI sync.">
+    <meta name="twitter:image" content="https://tomas-falcon.github.io/QuimeraReader/icon-192.png">
+
+    <!-- Schema.org JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "QuimeraReader",
+      "applicationCategory": "MultimediaApplication",
+      "operatingSystem": "Linux, Windows, macOS, Docker",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "description": "Comprehensive self-hosted platform designed for managing massive ebook (EPUB) and audiobook libraries with AI-powered synchronization.",
+      "url": "https://tomas-falcon.github.io/QuimeraReader/",
+      "downloadUrl": "https://github.com/Tomas-Falcon/QuimeraReader/releases",
+      "author": {
+        "@type": "Person",
+        "name": "Tomas Falcon",
+        "url": "https://github.com/Tomas-Falcon"
+      },
+      "license": "https://opensource.org/licenses/MIT"
+    }
+    </script>
     
     <style>
         :root {
@@ -31,6 +68,7 @@
             --code-text: #0f172a;
             --header-bg: #ffffff;
             --header-border: #e2e8f0;
+            --badge-bg: #e2e8f0;
         }
 
         [data-theme="dark"] {
@@ -40,10 +78,11 @@
             --accent-hover: #2563eb;
             --card-bg: #1e293b;
             --border-color: #334155;
-            --code-bg: #000000;
-            --code-text: #10b981;
+            --code-bg: #0b1120;
+            --code-text: #34d399;
             --header-bg: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
             --header-border: #334155;
+            --badge-bg: #334155;
         }
 
         * {
@@ -62,28 +101,57 @@
 
         nav {
             display: flex;
-            justify-content: flex-end;
+            justify-content: space-between;
+            align-items: center;
             padding: 1rem 2rem;
-            gap: 1rem;
             background-color: var(--bg-color);
             border-bottom: 1px solid var(--border-color);
+        }
+
+        .brand-link {
+            font-weight: 700;
+            text-decoration: none;
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .brand-link img {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
         }
 
         .controls select, .controls button {
             background-color: var(--card-bg);
             color: var(--text-color);
             border: 1px solid var(--border-color);
-            padding: 0.5rem;
-            border-radius: 0.25rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
             cursor: pointer;
             font-size: 0.875rem;
         }
 
         header {
             text-align: center;
-            padding: 4rem 2rem;
+            padding: 4rem 2rem 3rem 2rem;
             background: var(--header-bg);
             border-bottom: 1px solid var(--header-border);
+        }
+
+        .logo-img {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 1rem;
+            border-radius: 20%;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
         }
 
         h1 {
@@ -97,22 +165,33 @@
         .subtitle {
             font-size: 1.25rem;
             color: #64748b;
-            max-width: 600px;
-            margin: 0 auto 2rem auto;
+            max-width: 650px;
+            margin: 0 auto 1.5rem auto;
         }
         
         [data-theme="dark"] .subtitle {
             color: #94a3b8;
         }
 
+        .badges {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }
+
         .cta-buttons {
             display: flex;
             justify-content: center;
             gap: 1rem;
+            flex-wrap: wrap;
         }
 
         .btn {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
             padding: 0.75rem 1.5rem;
             border-radius: 0.5rem;
             text-decoration: none;
@@ -127,6 +206,7 @@
 
         .btn-primary:hover {
             background-color: var(--accent-hover);
+            transform: translateY(-1px);
         }
 
         .btn-secondary {
@@ -137,6 +217,7 @@
 
         .btn-secondary:hover {
             background-color: var(--border-color);
+            transform: translateY(-1px);
         }
 
         main {
@@ -145,11 +226,18 @@
             padding: 3rem 2rem;
         }
 
+        .section-title {
+            font-size: 1.75rem;
+            margin: 3rem 0 1.5rem 0;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
         .features {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-bottom: 4rem;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
         }
 
         .feature-card {
@@ -157,51 +245,149 @@
             padding: 2rem;
             border-radius: 1rem;
             border: 1px solid var(--border-color);
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-color);
         }
 
         .feature-card h3 {
             font-size: 1.25rem;
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
             color: var(--accent-color);
+        }
+
+        .code-container {
+            position: relative;
+            margin: 1.5rem 0;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            background: rgba(148, 163, 184, 0.2);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 0.35rem 0.75rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: background 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: var(--accent-color);
+            color: #ffffff;
         }
 
         .docker-command {
             background-color: var(--code-bg);
             padding: 1.5rem;
             border-radius: 0.5rem;
-            font-family: monospace;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.9rem;
+            line-height: 1.45;
             overflow-x: auto;
             color: var(--code-text);
-            margin: 2rem 0;
             border: 1px solid var(--border-color);
             white-space: pre;
         }
 
+        .faq-item {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .faq-question {
+            width: 100%;
+            text-align: left;
+            padding: 1rem 1.25rem;
+            background: none;
+            border: none;
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text-color);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .faq-answer {
+            padding: 0 1.25rem 1rem 1.25rem;
+            color: var(--text-color);
+            opacity: 0.9;
+        }
+
         footer {
             text-align: center;
-            padding: 2rem;
+            padding: 3rem 2rem;
             color: #64748b;
             border-top: 1px solid var(--border-color);
-            margin-top: 2rem;
+            margin-top: 4rem;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-links a {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .footer-links a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
 <body data-theme="dark">
 
-    <nav class="controls">
-        <select id="lang-toggle" onchange="changeLanguage()">
-            <option value="en">English</option>
-            <option value="es">Español</option>
-        </select>
-        <button id="theme-toggle" onclick="toggleTheme()" data-i18n="theme-toggle-btn">Toggle Theme</button>
+    <nav>
+        <a href="https://tomas-falcon.github.io/QuimeraReader/" class="brand-link">
+            <img src="favicon.png" alt="QuimeraReader Icon" width="28" height="28">
+            <span>QuimeraReader</span>
+        </a>
+        <div class="controls">
+            <select id="lang-toggle" onchange="changeLanguage()" aria-label="Select language">
+                <option value="en">English</option>
+                <option value="es">Español</option>
+            </select>
+            <button id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle visual theme" data-i18n="theme-toggle-btn">Toggle Theme</button>
+        </div>
     </nav>
 
     <header>
-        <img src="icon-192.png" alt="QuimeraReader Logo" style="width: 120px; height: 120px; margin-bottom: 1rem; border-radius: 20%;">
+        <img src="icon-192.png" alt="QuimeraReader Logo" class="logo-img" width="120" height="120">
         <h1>QuimeraReader</h1>
         <p class="subtitle" data-i18n="subtitle">A comprehensive, self-hosted platform designed for managing massive ebook (EPUB) and audiobook libraries with AI-powered synchronization.</p>
+        
+        <div class="badges">
+            <a href="https://github.com/Tomas-Falcon/QuimeraReader/releases" target="_blank" rel="noopener">
+                <img src="https://img.shields.io/github/v/release/Tomas-Falcon/QuimeraReader?color=blue&label=release" alt="GitHub Release">
+            </a>
+            <a href="https://github.com/Tomas-Falcon/QuimeraReader" target="_blank" rel="noopener">
+                <img src="https://img.shields.io/github/license/Tomas-Falcon/QuimeraReader?color=green" alt="MIT License">
+            </a>
+            <a href="https://github.com/Tomas-Falcon/QuimeraReader/pkgs/container/quimerareader" target="_blank" rel="noopener">
+                <img src="https://img.shields.io/badge/docker-GHCR-blue?logo=docker&logoColor=white" alt="Docker Container">
+            </a>
+        </div>
+
         <div class="cta-buttons">
             <a href="https://github.com/Tomas-Falcon/QuimeraReader" class="btn btn-primary" data-i18n="github-btn">View on GitHub</a>
+            <a href="https://github.com/Tomas-Falcon/QuimeraReader/releases" class="btn btn-secondary" data-i18n="releases-btn">Releases</a>
             <a href="#install" class="btn btn-secondary" data-i18n="install-btn">Installation</a>
         </div>
     </header>
@@ -222,10 +408,12 @@
             </div>
         </div>
 
-        <h2 id="install" style="margin-bottom: 1rem;" data-i18n="install-title">Docker Deployment (Recommended)</h2>
+        <h2 id="install" class="section-title" data-i18n="install-title">Docker Deployment (Recommended)</h2>
         <p data-i18n="install-desc">QuimeraReader is distributed as a multi-stage Docker container. Use the following <code>docker-compose.yml</code> configuration to mount your volumes and enable automatic updates.</p>
         
-        <div class="docker-command">services:
+        <div class="code-container">
+            <button class="copy-btn" onclick="copyDockerCompose()" id="copy-btn" data-i18n="copy-btn">Copy</button>
+            <div class="docker-command" id="docker-compose-code">services:
   quimerareader:
     image: ghcr.io/tomas-falcon/quimerareader:latest
     container_name: quimerareader
@@ -252,12 +440,46 @@
       - /var/run/docker.sock:/var/run/docker.sock
     command: --interval 300 --http-api-update --http-api-periodic-polls --http-api-token your_token_here quimerareader
     restart: unless-stopped</div>
+        </div>
+
+        <h2 class="section-title" data-i18n="faq-title">Frequently Asked Questions</h2>
         
-        <p><span data-i18n="footer-docs">For advanced configuration, please check the</span> <a href="https://github.com/Tomas-Falcon/QuimeraReader" style="color: var(--accent-color);">GitHub Repository</a>.</p>
+        <div class="faq-item">
+            <button class="faq-question">
+                <span data-i18n="faq1-q">Does QuimeraReader send my data to external AI servers?</span>
+            </button>
+            <div class="faq-answer">
+                <p data-i18n="faq1-a">No. QuimeraReader runs Whisper.net models locally inside your infrastructure. Audio files and transcripts never leave your self-hosted server.</p>
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <button class="faq-question">
+                <span data-i18n="faq2-q">What file formats are supported?</span>
+            </button>
+            <div class="faq-answer">
+                <p data-i18n="faq2-a">QuimeraReader supports standard EPUB files for ebooks and common audio formats (MP3, M4B, M4A, FLAC) for audiobooks.</p>
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <button class="faq-question">
+                <span data-i18n="faq3-q">Where does the book metadata come from?</span>
+            </button>
+            <div class="faq-answer">
+                <p data-i18n="faq3-a">Metadata and cover art are automatically retrieved by querying Hardcover, Google Books, and OpenLibrary APIs based on file tags and filenames.</p>
+            </div>
+        </div>
     </main>
 
     <footer>
-        <p>Built by Tomas Falcon. Open Source under the MIT License.</p>
+        <div class="footer-links">
+            <a href="https://github.com/Tomas-Falcon/QuimeraReader" target="_blank" rel="noopener">GitHub</a>
+            <a href="https://github.com/Tomas-Falcon/QuimeraReader/releases" target="_blank" rel="noopener">Releases</a>
+            <a href="https://github.com/Tomas-Falcon/QuimeraReader/issues" target="_blank" rel="noopener">Issues</a>
+            <a href="https://github.com/Tomas-Falcon/QuimeraReader/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+        </div>
+        <p>Built with ❤️ by Tomas Falcon. Open Source under the MIT License.</p>
     </footer>
 
     <script>
@@ -265,6 +487,7 @@
             en: {
                 "subtitle": "A comprehensive, self-hosted platform designed for managing massive ebook (EPUB) and audiobook libraries with AI-powered synchronization.",
                 "github-btn": "View on GitHub",
+                "releases-btn": "Releases",
                 "install-btn": "Installation",
                 "feat1-title": "AI Read-Along Sync",
                 "feat1-desc": "Utilizes local Whisper.net AI to generate synchronization maps, actively highlighting the EPUB text as the audiobook plays. A seamless, immersive experience.",
@@ -274,12 +497,21 @@
                 "feat3-desc": "Background scanners automatically detect, process, and scrape metadata for dropped EPUBs and Audiobooks from Hardcover, Google Books, and OpenLibrary.",
                 "install-title": "Docker Deployment (Recommended)",
                 "install-desc": "QuimeraReader is distributed as a multi-stage Docker container. Use the following docker-compose.yml configuration to mount your volumes and enable automatic updates.",
-                "footer-docs": "For advanced configuration, please check the",
-                "theme-toggle-btn": "Toggle Theme"
+                "copy-btn": "Copy",
+                "copied-btn": "Copied!",
+                "theme-toggle-btn": "Toggle Theme",
+                "faq-title": "Frequently Asked Questions",
+                "faq1-q": "Does QuimeraReader send my data to external AI servers?",
+                "faq1-a": "No. QuimeraReader runs Whisper.net models locally inside your infrastructure. Audio files and transcripts never leave your self-hosted server.",
+                "faq2-q": "What file formats are supported?",
+                "faq2-a": "QuimeraReader supports standard EPUB files for ebooks and common audio formats (MP3, M4B, M4A, FLAC) for audiobooks.",
+                "faq3-q": "Where does the book metadata come from?",
+                "faq3-a": "Metadata and cover art are automatically retrieved by querying Hardcover, Google Books, and OpenLibrary APIs based on file tags and filenames."
             },
             es: {
                 "subtitle": "Una plataforma homelab completa y self-hosted diseñada para gestionar librerías masivas de ebooks (EPUB) y audiolibros con sincronización impulsada por IA.",
                 "github-btn": "Ver en GitHub",
+                "releases-btn": "Versiones",
                 "install-btn": "Instalación",
                 "feat1-title": "Sincronización IA (Read-Along)",
                 "feat1-desc": "Utiliza IA local (Whisper.net) para generar mapas de sincronización, resaltando activamente el texto del EPUB mientras se reproduce el audiolibro.",
@@ -289,8 +521,16 @@
                 "feat3-desc": "Escáneres en segundo plano detectan, procesan y extraen metadatos automáticamente de EPUBs y audiolibros desde Hardcover, Google Books y OpenLibrary.",
                 "install-title": "Despliegue con Docker (Recomendado)",
                 "install-desc": "QuimeraReader se distribuye como un contenedor Docker multi-stage. Utiliza la siguiente configuración docker-compose.yml para montar tus volúmenes y habilitar actualizaciones automáticas.",
-                "footer-docs": "Para configuraciones avanzadas, por favor revisa el",
-                "theme-toggle-btn": "Cambiar Tema"
+                "copy-btn": "Copiar",
+                "copied-btn": "¡Copiado!",
+                "theme-toggle-btn": "Cambiar Tema",
+                "faq-title": "Preguntas Frecuentes",
+                "faq1-q": "¿QuimeraReader envía mis datos a servidores de IA externos?",
+                "faq1-a": "No. QuimeraReader ejecuta los modelos Whisper.net localmente en tu propia infraestructura. Los archivos y transcripciones nunca salen de tu servidor.",
+                "faq2-q": "¿Qué formatos de archivo son compatibles?",
+                "faq2-a": "QuimeraReader soporta archivos EPUB para libros electrónicos y formatos de audio comunes (MP3, M4B, M4A, FLAC) para audiolibros.",
+                "faq3-q": "¿De dónde se descargan los metadatos?",
+                "faq3-a": "Los metadatos y portadas se obtienen automáticamente consultando las APIs de Hardcover, Google Books y OpenLibrary."
             }
         };
 
@@ -304,15 +544,31 @@
 
         function changeLanguage() {
             const lang = document.getElementById('lang-toggle').value;
+            document.documentElement.lang = lang;
             const elements = document.querySelectorAll('[data-i18n]');
             
             elements.forEach(element => {
                 const key = element.getAttribute('data-i18n');
-                if (translations[lang][key]) {
+                if (translations[lang] && translations[lang][key]) {
                     element.textContent = translations[lang][key];
                 }
             });
             localStorage.setItem('lang', lang);
+        }
+
+        function copyDockerCompose() {
+            const code = document.getElementById('docker-compose-code').innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                const btn = document.getElementById('copy-btn');
+                const lang = document.getElementById('lang-toggle').value;
+                const copiedText = translations[lang]["copied-btn"] || "Copied!";
+                const defaultText = translations[lang]["copy-btn"] || "Copy";
+                
+                btn.textContent = copiedText;
+                setTimeout(() => {
+                    btn.textContent = defaultText;
+                }, 2000);
+            });
         }
 
         // Initialize state
