@@ -1,4 +1,4 @@
-﻿@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @using Microsoft.JSInterop
 @using System.Text.Json
@@ -33,10 +33,16 @@
                 <div class="text-center" style="flex: 1;">
                     <h5 class="mb-0 text-truncate" style="max-width: 300px; margin: 0 auto;">@Book.Title</h5>
                 </div>
-                <div style="width: 100px;" class="text-end d-flex justify-content-end gap-2">
-                                        <button class="btn btn-sm @(_isNavigationLocked ? "btn-danger" : "btn-outline-light")" @onclick="ToggleNavigationLock" title="Bloquear navegacion tactil para seleccionar texto">
+                <div style="width: 140px;" class="text-end d-flex justify-content-end gap-2">
+                    <button class="btn btn-sm @(_isNavigationLocked ? "btn-danger" : "btn-outline-light")" @onclick="ToggleNavigationLock" title="Bloquear navegación táctil para seleccionar texto">
                         <i class="bi @(_isNavigationLocked ? "bi-lock-fill" : "bi-unlock")"></i>
                     </button>
+                    @if (Book.HasEpub)
+                    {
+                        <button class="btn btn-sm @(_showAppearanceMenu ? "btn-primary" : "btn-outline-light")" @onclick="ToggleAppearanceMenu" title="Ajustes de lectura (Fuente, Tema)">
+                            <i class="bi bi-type"></i>
+                        </button>
+                    }
                     @if (Book.HasEpub && Book.HasAudio)
                     {
                         <button class="btn btn-sm btn-outline-light" @onclick="ToggleAudiobookMode" title="Alternar modo de lectura/audio">
@@ -51,6 +57,43 @@
                     }
                 </div>
             </div>
+
+            @if (_showAppearanceMenu)
+            {
+                <RadzenCard class="position-absolute" Style="top: 60px; right: 20px; width: 280px; z-index: 100; padding: 15px; box-shadow: 0 4px 16px rgba(0,0,0,0.6); background: var(--bg-card); border: 1px solid var(--border-color);">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0 text-white"><i class="bi bi-sliders me-2"></i> Ajustes de Lectura</h6>
+                        <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" Size="ButtonSize.ExtraSmall" Click="ToggleAppearanceMenu" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-white-50 small mb-1">Tema de fondo</label>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm w-100 @(_currentTheme == "dark" ? "btn-primary" : "btn-outline-light")" @onclick='() => ChangeTheme("dark")'>
+                                Oscuro
+                            </button>
+                            <button class="btn btn-sm w-100 @(_currentTheme == "sepia" ? "btn-warning text-dark" : "btn-outline-warning")" @onclick='() => ChangeTheme("sepia")'>
+                                Sepia
+                            </button>
+                            <button class="btn btn-sm w-100 @(_currentTheme == "light" ? "btn-light" : "btn-outline-light")" @onclick='() => ChangeTheme("light")'>
+                                Claro
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label text-white-50 small mb-0">Tamaño de fuente</label>
+                            <span class="text-white-50 small">@(_fontSize)%</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button class="btn btn-sm btn-outline-light px-2" @onclick="DecreaseFontSize" title="Reducir tamaño"><i class="bi bi-dash"></i></button>
+                            <input type="range" class="form-range flex-1" min="70" max="200" step="10" value="@_fontSize" @onchange="OnFontSizeSliderChanged" />
+                            <button class="btn btn-sm btn-outline-light px-2" @onclick="IncreaseFontSize" title="Aumentar tamaño"><i class="bi bi-plus"></i></button>
+                        </div>
+                    </div>
+                </RadzenCard>
+            }
 
             @if (_showPlaylist && Book.AudioTracks != null)
             {
@@ -87,9 +130,16 @@
                     <div class="reading-progress px-4 py-2" style="background: var(--bg-card); font-size: 0.85rem; color: var(--text-muted); border-top: 1px solid rgba(255,255,255,0.1);">
                         <div class="d-flex align-items-center justify-content-between mb-1" style="font-size: 0.75rem;">
                             <span class="fw-bold text-white-50">@(_totalPages > 0 ? $"Pág. {_currentPage}" : "")</span>
-                            <span class="fw-bold text-white-50">@(_totalPages > 0 ? $"{_totalPages} páginas -" : "") @($"{Math.Round(Book.PercentageCompleted ?? 0, 1)}%")</span>
+                            <span class="fw-bold text-white-50">@(_totalPages > 0 ? $"{_totalPages} páginas — " : "")@($"{Math.Round(_displayPercentage, 1)}%")</span>
                         </div>
-                        <input type="range" class="form-range custom-progress-bar" min="0" max="100" step="0.1" value="@(Book.PercentageCompleted ?? 0)" @onchange="OnProgressSliderChanged" />
+                        <input type="range" 
+                               class="form-range custom-progress-bar w-100" 
+                               min="0" 
+                               max="100" 
+                               step="0.1" 
+                               value="@_displayPercentage" 
+                               @oninput="OnProgressSliderInput" 
+                               @onchange="OnProgressSliderChange" />
                     </div>
                 </div>
 
@@ -227,8 +277,66 @@
     private double _currentTime = 0; private int _currentPage = 0; private int _totalPages = 0;
     private int _currentTrackNumber = 1;
     private bool _showPlaylist = false;
+    private bool _showAppearanceMenu = false;
+    private string _currentTheme = "dark";
+    private int _fontSize = 100;
+    private double _displayPercentage = 0;
+    private bool _isDraggingProgress = false;
+    private System.Threading.CancellationTokenSource? _sliderDebounceCts;
 
-    private void TogglePlaylist() => _showPlaylist = !_showPlaylist;
+    private void TogglePlaylist() 
+    { 
+        _showPlaylist = !_showPlaylist; 
+        if (_showPlaylist) _showAppearanceMenu = false;
+    }
+
+    private void ToggleAppearanceMenu()
+    {
+        _showAppearanceMenu = !_showAppearanceMenu;
+        if (_showAppearanceMenu) _showPlaylist = false;
+    }
+
+    private async Task ChangeTheme(string theme)
+    {
+        _currentTheme = theme;
+        if (_epubJsModule != null)
+        {
+            await _epubJsModule.InvokeVoidAsync("setTheme", theme);
+        }
+        StateHasChanged();
+    }
+
+    private async Task OnFontSizeSliderChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int size))
+        {
+            _fontSize = size;
+            if (_epubJsModule != null)
+            {
+                await _epubJsModule.InvokeVoidAsync("setFontSize", _fontSize);
+            }
+        }
+    }
+
+    private async Task IncreaseFontSize()
+    {
+        _fontSize = Math.Min(200, _fontSize + 10);
+        if (_epubJsModule != null)
+        {
+            await _epubJsModule.InvokeVoidAsync("setFontSize", _fontSize);
+        }
+        StateHasChanged();
+    }
+
+    private async Task DecreaseFontSize()
+    {
+        _fontSize = Math.Max(70, _fontSize - 10);
+        if (_epubJsModule != null)
+        {
+            await _epubJsModule.InvokeVoidAsync("setFontSize", _fontSize);
+        }
+        StateHasChanged();
+    }
 
     private string GetCurrentTrackUrl()
     {
@@ -276,7 +384,7 @@
             }
         }
         
-        if (Book != null && Book.IsAligned)
+        if (Book != null)
         {
             try
             {
@@ -288,6 +396,11 @@
                 }
             }
             catch { /* Ignorar error por ahora */ }
+        }
+
+        if (Book?.PercentageCompleted.HasValue == true)
+        {
+            _displayPercentage = Math.Clamp(Book.PercentageCompleted.Value, 0.0, 100.0);
         }
 
         _isLoading = false;
@@ -407,7 +520,13 @@
         {
             Book.CurrentEpubCfi = cfi;
             if (scaledPercentage.HasValue) 
+            {
                 Book.PercentageCompleted = scaledPercentage.Value;
+                if (!_isDraggingProgress)
+                {
+                    _displayPercentage = Math.Clamp(scaledPercentage.Value, 0.0, 100.0);
+                }
+            }
             if (totalPages > 0) Book.TotalPages = totalPages;
             if (currentPage > 0) { _currentPage = currentPage; _totalPages = totalPages; }
             StateHasChanged();
@@ -589,13 +708,44 @@
             await _epubJsModule.InvokeVoidAsync("prevEpubPage");
     }
 
-    private async Task OnProgressSliderChanged(ChangeEventArgs e)
+    private void OnProgressSliderInput(ChangeEventArgs e)
     {
         if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double newPct))
         {
+            _isDraggingProgress = true;
+            _displayPercentage = Math.Clamp(newPct, 0.0, 100.0);
+            
+            // Debounce visual preview / seek mientras se arrastra
+            _sliderDebounceCts?.Cancel();
+            _sliderDebounceCts = new System.Threading.CancellationTokenSource();
+            var token = _sliderDebounceCts.Token;
+            
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(80, token);
+                    if (!token.IsCancellationRequested && _epubJsModule != null)
+                    {
+                        await _epubJsModule.InvokeVoidAsync("goToPercentage", _displayPercentage);
+                    }
+                }
+                catch (TaskCanceledException) { }
+            });
+        }
+    }
+
+    private async Task OnProgressSliderChange(ChangeEventArgs e)
+    {
+        _sliderDebounceCts?.Cancel();
+        _isDraggingProgress = false;
+        
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double finalPct))
+        {
+            _displayPercentage = Math.Clamp(finalPct, 0.0, 100.0);
             if (_epubJsModule != null)
             {
-                await _epubJsModule.InvokeVoidAsync("goToPercentage", newPct);
+                await _epubJsModule.InvokeVoidAsync("goToPercentage", _displayPercentage);
             }
         }
     }
@@ -632,9 +782,9 @@
                 await _jsModule.InvokeVoidAsync("scrollToActiveSegment");
             }
         }
-        else
+        else if (_showAudiobookMode || !Book.HasEpub)
         {
-            StateHasChanged();
+            // En modo puro de texto sincronizado, refrescamos sólo si es necesario
         }
     }
 
@@ -693,6 +843,8 @@
         }
 
 
+        _sliderDebounceCts?.Cancel();
+        _sliderDebounceCts?.Dispose();
         _dotNetRef?.Dispose();
         if (_jsModule != null)
         {

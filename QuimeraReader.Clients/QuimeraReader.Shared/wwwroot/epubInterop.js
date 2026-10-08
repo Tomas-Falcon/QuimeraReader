@@ -15,7 +15,6 @@ export async function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi, epu
         initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache);
     } catch (err) {
         console.error("Error al inicializar EPUB desde URL:", err);
-        // Fallback al comportamiento nativo de epub.js si falla el fetch
         var book = ePub(epubUrl);
         initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache);
     }
@@ -29,6 +28,7 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         allowScriptedContent: false
     });
 
+    // Registrar temas de lectura
     rendition.themes.register("dark", {
         "body": { "background": "transparent !important", "color": "#f8f9fa !important" },
         "p": { "color": "#f8f9fa !important" },
@@ -41,14 +41,39 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         "span": { "color": "#f8f9fa !important" },
         "a": { "color": "#6ea8fe !important" }
     });
-    rendition.themes.select("dark");
 
+    rendition.themes.register("light", {
+        "body": { "background": "#ffffff !important", "color": "#212529 !important" },
+        "p": { "color": "#212529 !important" },
+        "h1": { "color": "#212529 !important" },
+        "h2": { "color": "#212529 !important" },
+        "h3": { "color": "#212529 !important" },
+        "h4": { "color": "#212529 !important" },
+        "h5": { "color": "#212529 !important" },
+        "h6": { "color": "#212529 !important" },
+        "span": { "color": "#212529 !important" },
+        "a": { "color": "#0d6efd !important" }
+    });
+
+    rendition.themes.register("sepia", {
+        "body": { "background": "#fbf0d9 !important", "color": "#5f4b32 !important" },
+        "p": { "color": "#5f4b32 !important" },
+        "h1": { "color": "#5f4b32 !important" },
+        "h2": { "color": "#5f4b32 !important" },
+        "h3": { "color": "#5f4b32 !important" },
+        "h4": { "color": "#5f4b32 !important" },
+        "h5": { "color": "#5f4b32 !important" },
+        "h6": { "color": "#5f4b32 !important" },
+        "span": { "color": "#5f4b32 !important" },
+        "a": { "color": "#8f5902 !important" }
+    });
+
+    rendition.themes.select("dark");
     rendition.display(lastCfi || undefined);
 
     book.ready.then(function () {
         if (epubLocationsCache && epubLocationsCache.length > 10) {
             try {
-                // If it's a JSON string representation of an array, parse it first
                 var parsed = typeof epubLocationsCache === 'string' ? JSON.parse(epubLocationsCache) : epubLocationsCache;
                 book.locations.load(parsed);
                 reportPercentage(rendition.location, dotNetRef, book);
@@ -65,7 +90,6 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
             
             var savedLocations = book.locations.save();
             if (dotNetRef) {
-                // Always send as JSON string to match C# 'string' parameter
                 var payload = typeof savedLocations === 'string' ? savedLocations : JSON.stringify(savedLocations);
                 dotNetRef.invokeMethodAsync("SaveLocationsCache", payload).catch(e => { console.error("Interop Error:", e); });
             }
@@ -80,7 +104,7 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         if(!el) return;
         var spinner = document.createElement('div');
         spinner.id = 'epub-loading-spinner';
-        spinner.innerHTML = '<div class="d-flex flex-column justify-content-center align-items-center" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;color:white;"><div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div><h5 class="fw-bold">Optimizando libro</h5><span class="text-white-50 small">Calculando p&aacute;ginas totales. Esto solo ocurrir&aacute; una vez...</span></div>';
+        spinner.innerHTML = '<div class="d-flex flex-column justify-content-center align-items-center" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;color:white;"><div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div><h5 class="fw-bold">Optimizando libro</h5><span class="text-white-50 small">Calculando páginas totales...</span></div>';
         el.appendChild(spinner);
     }
     
@@ -115,7 +139,6 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         }
     }
 
-    
     rendition.on("selected", function(cfiRange, contents) {
         book.getRange(cfiRange).then(function(range) {
             var text = range.toString();
@@ -133,15 +156,47 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
 
     let startX = 0;
     let endX = 0;
+    let startY = 0;
+    let endY = 0;
     let isDragging = false;
+    let touchStartTime = 0;
 
-    rendition.on("touchstart", event => { startX = event.changedTouches[0].screenX; });
-    rendition.on("touchend", event => { endX = event.changedTouches[0].screenX; handleSwipe(); });
-    rendition.on("mousedown", event => { isDragging = true; startX = event.screenX; });
-    rendition.on("mouseup", event => { if (!isDragging) return; isDragging = false; endX = event.screenX; handleSwipe(); });
+    rendition.on("touchstart", event => {
+        if (event.changedTouches && event.changedTouches.length > 0) {
+            startX = event.changedTouches[0].screenX;
+            startY = event.changedTouches[0].screenY;
+            touchStartTime = Date.now();
+        }
+    });
+
+    rendition.on("touchend", event => {
+        if (event.changedTouches && event.changedTouches.length > 0) {
+            endX = event.changedTouches[0].screenX;
+            endY = event.changedTouches[0].screenY;
+            handleSwipe(true);
+        }
+    });
+
+    rendition.on("mousedown", event => { 
+        isDragging = true; 
+        startX = event.screenX; 
+        startY = event.screenY; 
+        touchStartTime = Date.now();
+    });
+
+    rendition.on("mouseup", event => { 
+        if (!isDragging) return; 
+        isDragging = false; 
+        endX = event.screenX; 
+        endY = event.screenY; 
+        handleSwipe(false); 
+    });
     
-    function handleSwipe() {
-        // Ignorar click/swipe si el usuario seleccionÃƒÂ³ texto
+    function handleSwipe(isTouch = false) {
+        // 1. Si la navegacion está bloqueada, no hacer cambio de página automático
+        if (window.navigationLocked) return;
+
+        // 2. Ignorar si el usuario ha seleccionado texto
         let isTextSelected = false;
         try {
             const contents = rendition.getContents();
@@ -154,12 +209,25 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         } catch(e) {}
         if (isTextSelected) return;
 
-        if (endX < startX - 50) rendition.next();
-        else if (endX > startX + 50) rendition.prev();
-        else {
+        // 3. Evaluar distancia horizontal y vertical
+        const diffX = endX - startX;
+        const diffY = endY - startY;
+        const absDiffX = Math.abs(diffX);
+        const absDiffY = Math.abs(diffY);
+
+        // Deslizar horizontalmente con intención clara (> 45px y más horizontal que vertical)
+        if (absDiffX > 45 && absDiffX > absDiffY) {
+            if (diffX < 0) rendition.next();
+            else rendition.prev();
+            return;
+        }
+
+        // Toques estáticos breves (clicks) en los laterales sólo si fue un tap rápido (<300ms) y movimiento mínimo (<15px)
+        const touchDuration = Date.now() - touchStartTime;
+        if (absDiffX < 15 && absDiffY < 15 && touchDuration < 350) {
             const screenWidth = window.innerWidth;
-            if (endX < screenWidth * 0.3) rendition.prev();
-            else if (endX > screenWidth * 0.7) rendition.next();
+            if (endX < screenWidth * 0.22) rendition.prev();
+            else if (endX > screenWidth * 0.78) rendition.next();
         }
     }
 
@@ -168,10 +236,12 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         if (event.key === "ArrowRight") rendition.next();
     });
     
-    document.addEventListener("keyup", event => {
+    const globalKeyHandler = event => {
         if (event.key === "ArrowLeft") { try { rendition.prev(); } catch(e){} }
         if (event.key === "ArrowRight") { try { rendition.next(); } catch(e){} }
-    });
+    };
+    document.addEventListener("keyup", globalKeyHandler);
+    window._epubGlobalKeyHandler = globalKeyHandler;
 
     rendition.on("markClicked", function (cfiRange, data) {
         if (dotNetRef) {
@@ -187,8 +257,32 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
     window.epubPrev = () => { try { rendition.prev(); } catch (e) { } };
 }
 
+export function setFontSize(sizePercent) {
+    if (window.epubRendition) {
+        try {
+            window.epubRendition.themes.fontSize(`${sizePercent}%`);
+        } catch(e) {
+            console.error("Error setting font size:", e);
+        }
+    }
+}
+
+export function setTheme(themeName) {
+    if (window.epubRendition) {
+        try {
+            window.epubRendition.themes.select(themeName);
+        } catch(e) {
+            console.error("Error setting theme:", e);
+        }
+    }
+}
+
 export function destroyEpub() {
     try {
+        if (window._epubGlobalKeyHandler) {
+            document.removeEventListener("keyup", window._epubGlobalKeyHandler);
+            window._epubGlobalKeyHandler = null;
+        }
         if (window.epubRendition) {
             window.epubRendition.destroy();
             window.epubRendition = null;
@@ -271,54 +365,68 @@ export function highlightKaraokePhrase(text) {
     if (!contents || contents.length === 0) return;
     var doc = contents[0].document;
     
-    // Remove previous highlights
+    // 1. Limpiar marcas de karaoke anteriores sin destruir el DOM
     var prev = doc.querySelectorAll('.karaoke-highlight');
     prev.forEach(el => {
-        var parent = el.parentNode;
-        parent.replaceChild(doc.createTextNode(el.textContent), el);
-        parent.normalize();
+        el.style.backgroundColor = '';
+        el.style.borderRadius = '';
+        el.style.boxShadow = '';
+        el.classList.remove('karaoke-highlight');
     });
 
     if (!text || text.trim().length === 0) return;
     
-    // Normalize string for fuzzy matching (Whisper text vs EPUB text)
-    var searchStr = text.toLowerCase().replace(/[^a-z0-9áéíóúñ]/gi, '').trim();
-    if(searchStr.length < 5) return; // Too short to accurately match
+    // Normalizar texto para fuzzy matching sin tildes ni signos
+    function normalize(str) {
+        return str.toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]/gi, '')
+            .trim();
+    }
+
+    var searchStr = normalize(text);
+    if (searchStr.length < 4) return;
 
     var treeWalker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
     var currentNode = treeWalker.nextNode();
-    var matchFound = false;
+    var bestMatch = null;
+    var bestMatchScore = 0;
 
-    while (currentNode && !matchFound) {
-        var nodeText = currentNode.nodeValue;
-        var nodeTextNorm = nodeText.toLowerCase().replace(/[^a-z0-9áéíóúñ]/gi, '');
-        
-        // Simple subset matching for now (Whisper sentence often fits inside a paragraph's text node)
-        if (nodeTextNorm.includes(searchStr) || searchStr.includes(nodeTextNorm)) {
-            // Found a text node that contains the text (or viceversa). 
-            // We highlight the whole node for simplicity if it's a good chunk, or we can use mark.js
-            // Let's just wrap the node's parent if it's small, or use a RegExp if it contains it.
-            try {
-                // very rough highlight of the parent element
-                if (currentNode.parentNode && currentNode.parentNode.tagName !== 'SCRIPT' && currentNode.parentNode.tagName !== 'STYLE') {
-                    currentNode.parentNode.classList.add('karaoke-highlight');
-                    currentNode.parentNode.style.backgroundColor = 'rgba(255, 193, 7, 0.4)';
-                    currentNode.parentNode.style.borderRadius = '4px';
-                    currentNode.parentNode.style.transition = 'background-color 0.3s';
-                    
-                    // Optional: scroll into view
-                    // currentNode.parentNode.scrollIntoView({behavior: "smooth", block: "center"});
-                }
-            } catch(e){}
-            matchFound = true;
+    while (currentNode) {
+        var nodeText = currentNode.nodeValue || '';
+        var normNodeText = normalize(nodeText);
+
+        if (normNodeText.length >= 4) {
+            if (normNodeText.includes(searchStr) || searchStr.includes(normNodeText)) {
+                bestMatch = currentNode;
+                break;
+            }
+
+            // Comparar las primeras 4 palabras o subcadenas clave
+            var words = searchStr.substring(0, Math.min(25, searchStr.length));
+            if (normNodeText.includes(words)) {
+                bestMatch = currentNode;
+                break;
+            }
         }
         currentNode = treeWalker.nextNode();
     }
+
+    if (bestMatch && bestMatch.parentElement) {
+        var targetEl = bestMatch.parentElement;
+        if (targetEl.tagName !== 'SCRIPT' && targetEl.tagName !== 'STYLE') {
+            targetEl.classList.add('karaoke-highlight');
+            targetEl.style.backgroundColor = 'rgba(255, 193, 7, 0.45)';
+            targetEl.style.borderRadius = '4px';
+            targetEl.style.boxShadow = '0 0 8px rgba(255, 193, 7, 0.3)';
+            targetEl.style.transition = 'all 0.25s ease';
+
+            try {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } catch(e) {}
+        }
+    }
 }
-
-
-
-
 
 export function setAudioBookmark(cfiRange) {
     if (window.epubRendition) {
@@ -350,7 +458,8 @@ export function convertKaraokeToHardMark() {
     if (!contents || contents.length === 0) return;
     var prev = contents[0].document.querySelectorAll('.karaoke-highlight');
     prev.forEach(el => {
-        el.style.backgroundColor = 'transparent';
+        el.style.backgroundColor = '';
+        el.style.boxShadow = '';
         el.classList.remove('karaoke-highlight');
     });
 }
