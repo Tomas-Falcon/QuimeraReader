@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -56,7 +56,8 @@ public class LocalBookRepository : ILocalBookRepository
             CurrentAudioPosition = domainBook.CurrentAudioPosition,
             CurrentAudioTrackNumber = domainBook.CurrentAudioTrackNumber,
             Authors = domainBook.Authors?.Select(a => a.Author?.Name ?? "").ToList() ?? new List<string>(),
-            Categories = domainBook.Categories?.Select(c => c.Category?.Name ?? "").ToList() ?? new List<string>()
+            Categories = domainBook.Categories?.Select(c => c.Category?.Name ?? "").ToList() ?? new List<string>(),
+            SyncMapJson = domainBook.SyncMap?.SyncMapJson
         };
     }
 
@@ -269,3 +270,4 @@ public class LocalBookRepository : ILocalBookRepository
         };
     }
 }
+
