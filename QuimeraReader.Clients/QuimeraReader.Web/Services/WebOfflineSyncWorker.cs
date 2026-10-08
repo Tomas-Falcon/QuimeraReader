@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -111,20 +111,26 @@ namespace QuimeraReader.Web.Services
                     if (string.IsNullOrEmpty(epubPath) || !epubPath.StartsWith("blob:")) {
                         epubPath = await DownloadFileToDbAsync(serverBook.Id, "epub", serverBook.EpubUrl, baseUrl);
                     }
-                    if (!string.IsNullOrEmpty(epubPath) && epubPath.StartsWith("blob:")) serverBook.LocalEpubPath = epubPath;
+                    if (!string.IsNullOrEmpty(epubPath)) serverBook.LocalEpubPath = epubPath;
 
                     var coverPath = localBook?.LocalCoverPath;
-                    if (string.IsNullOrEmpty(coverPath) || !coverPath.StartsWith("blob:")) {
+                    if (string.IsNullOrEmpty(coverPath) || (!coverPath.StartsWith("blob:") && !coverPath.StartsWith("data:"))) {
                         coverPath = await DownloadFileToDbAsync(serverBook.Id, "cover", serverBook.CoverUrl, baseUrl);
                     }
-                    if (!string.IsNullOrEmpty(coverPath) && coverPath.StartsWith("blob:")) serverBook.LocalCoverPath = coverPath;
+                    if (!string.IsNullOrEmpty(coverPath)) serverBook.LocalCoverPath = coverPath;
 
                     var audioPath = localBook?.LocalAudioPath;
                     if (serverBook.HasAudio && (string.IsNullOrEmpty(audioPath) || !audioPath.StartsWith("blob:"))) {
                         audioPath = await DownloadFileToDbAsync(serverBook.Id, "audio", serverBook.AudioUrl, baseUrl);
                     }
-                    if (!string.IsNullOrEmpty(audioPath) && audioPath.StartsWith("blob:")) serverBook.LocalAudioPath = audioPath;
+                    if (!string.IsNullOrEmpty(audioPath)) serverBook.LocalAudioPath = audioPath;
 
+                                        if (serverBook.HasAudio && serverBook.IsAligned && string.IsNullOrEmpty(serverBook.SyncMapJson))
+                    {
+                        try {
+                            serverBook.SyncMapJson = await _httpClient.GetStringAsync($"api/Books/{serverBook.Id}/syncmap");
+                        } catch { }
+                    }
                     await _localRepo.SaveBookAsync(serverBook);
                 }
 
@@ -170,4 +176,6 @@ namespace QuimeraReader.Web.Services
         }
     }
 }
+
+
 

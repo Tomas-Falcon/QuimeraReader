@@ -1,4 +1,4 @@
-﻿name: Docker Build and Publish
+name: Docker Build and Publish
 
 on:
   push:
@@ -23,6 +23,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Application Version
+        id: version_step
+        shell: bash
+        run: |
+          RAW_VER=$(git describe --tags --abbrev=7 --always 2>/dev/null || echo "1.0.6")
+          # Remove leading 'v' if present for clean semantic versioning
+          CLEAN_VER=${RAW_VER#v}
+          echo "VERSION=${CLEAN_VER}" >> $GITHUB_OUTPUT
+          echo "Calculated version: ${CLEAN_VER}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -54,5 +66,5 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            APP_VERSION_SUFFIX=${{ github.run_number }}
+            APP_VERSION=${{ steps.version_step.outputs.VERSION }}
 

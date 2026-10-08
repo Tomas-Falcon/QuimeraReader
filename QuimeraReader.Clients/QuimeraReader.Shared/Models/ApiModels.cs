@@ -1,4 +1,4 @@
-namespace QuimeraReader.Shared.Models;
+﻿namespace QuimeraReader.Shared.Models;
 
 public record Book
 {
@@ -26,6 +26,7 @@ public record Book
     public System.Collections.Generic.List<AudioTrackDto> AudioTracks { get; set; } = new();
     public double? PercentageCompleted { get; set; }
     public string? ReadingStatus { get; set; }
+    public string? SyncMapJson { get; set; }
     public string? EpubLocationsCache { get; set; }
     public int? TotalPages { get; set; }
     
@@ -56,6 +57,7 @@ public class UpdatePositionRequest
     public System.Collections.Generic.List<AudioTrackDto> AudioTracks { get; set; } = new();
     public double? PercentageCompleted { get; set; }
     public string? ReadingStatus { get; set; }
+    public string? SyncMapJson { get; set; }
     public string? EpubLocationsCache { get; set; }
     public int? TotalPages { get; set; }
 }
@@ -111,6 +113,7 @@ public class UpdateMetadataRequest
 {
     public string Title { get; set; } = string.Empty;
     public string? ReadingStatus { get; set; }
+    public string? SyncMapJson { get; set; }
     public List<string> Categories { get; set; } = new();
 }
 
@@ -143,4 +146,5 @@ public class ManagedAudioDto
     public int? BookId { get; set; }
     public string BookTitle { get; set; } = string.Empty;
 }
+
 

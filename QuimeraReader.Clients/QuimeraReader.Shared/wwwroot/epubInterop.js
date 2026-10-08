@@ -270,7 +270,7 @@ export function highlightKaraokePhrase(text) {
     if (!text || text.trim().length === 0) return;
     
     // Normalize string for fuzzy matching (Whisper text vs EPUB text)
-    var searchStr = text.toLowerCase().replace(/[^a-z0-9ÃƒÂ¡ÃƒÂ©ÃƒÂ­ÃƒÂ³ÃƒÂºÃƒÂ±]/gi, '').trim();
+    var searchStr = text.toLowerCase().replace(/[^a-z0-9áéíóúñ]/gi, '').trim();
     if(searchStr.length < 5) return; // Too short to accurately match
 
     var treeWalker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
@@ -279,7 +279,7 @@ export function highlightKaraokePhrase(text) {
 
     while (currentNode && !matchFound) {
         var nodeText = currentNode.nodeValue;
-        var nodeTextNorm = nodeText.toLowerCase().replace(/[^a-z0-9ÃƒÂ¡ÃƒÂ©ÃƒÂ­ÃƒÂ³ÃƒÂºÃƒÂ±]/gi, '');
+        var nodeTextNorm = nodeText.toLowerCase().replace(/[^a-z0-9áéíóúñ]/gi, '');
         
         // Simple subset matching for now (Whisper sentence often fits inside a paragraph's text node)
         if (nodeTextNorm.includes(searchStr) || searchStr.includes(nodeTextNorm)) {
@@ -355,3 +355,4 @@ export function clearAudioBookmark() {
 export function setNavigationLock(isLocked) {
     window.navigationLocked = isLocked;
 }
+

@@ -1,4 +1,4 @@
-@using QuimeraReader.Shared.Models
+ï»¿@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @using Microsoft.JSInterop
 @using System.Text.Json
@@ -34,7 +34,7 @@
                     <h5 class="mb-0 text-truncate" style="max-width: 300px; margin: 0 auto;">@Book.Title</h5>
                 </div>
                 <div style="width: 100px;" class="text-end d-flex justify-content-end gap-2">
-                                        <button class="btn btn-sm @(_isNavigationLocked ? "btn-danger" : "btn-outline-light")" @onclick="ToggleNavigationLock" title="Bloquear navegación táctil para seleccionar texto">
+                                        <button class="btn btn-sm @(_isNavigationLocked ? "btn-danger" : "btn-outline-light")" @onclick="ToggleNavigationLock" title="Bloquear navegaciï¿½n tï¿½ctil para seleccionar texto">
                         <i class="bi @(_isNavigationLocked ? "bi-lock-fill" : "bi-unlock")"></i>
                     </button>
                     @if (Book.HasEpub && Book.HasAudio)
@@ -232,6 +232,11 @@
 
     private string GetCurrentTrackUrl()
     {
+        if (!string.IsNullOrEmpty(_audioSourceUrl) && _audioSourceUrl.StartsWith("blob:"))
+        {
+            return _audioSourceUrl;
+        }
+
         if (Book?.AudioTracks == null || Book.AudioTracks.Count == 0)
             return $"{BookService.BaseAddress.TrimEnd('/')}/" + Book?.AudioUrl;
 
@@ -275,7 +280,7 @@
         {
             try
             {
-                var syncMapJson = await BookService.GetSyncMapAsync(BookId);
+                var syncMapJson = !string.IsNullOrEmpty(Book.SyncMapJson) ? Book.SyncMapJson : await BookService.GetSyncMapAsync(BookId);
                 if (!string.IsNullOrEmpty(syncMapJson))
                 {
                     var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
@@ -727,3 +732,7 @@
         }
     }
 }
+
+
+
+
