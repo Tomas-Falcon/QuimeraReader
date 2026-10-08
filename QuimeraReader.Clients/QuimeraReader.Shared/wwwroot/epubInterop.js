@@ -1,12 +1,24 @@
-﻿export async function initializeEpubFromStream(elementId, streamRef, dotNetRef, lastCfi, epubLocationsCache) {
+export async function initializeEpubFromStream(elementId, streamRef, dotNetRef, lastCfi, epubLocationsCache) {
     var arrayBuffer = await streamRef.arrayBuffer();
     var book = ePub(arrayBuffer);
     initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache);
 }
 
-export function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi, epubLocationsCache) {
-    var book = ePub(epubUrl);
-    initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache);
+export async function initializeEpub(elementId, epubUrl, dotNetRef, lastCfi, epubLocationsCache) {
+    try {
+        var response = await fetch(epubUrl);
+        if (!response.ok) {
+            throw new Error(`Error HTTP al descargar EPUB (${response.status} ${response.statusText})`);
+        }
+        var arrayBuffer = await response.arrayBuffer();
+        var book = ePub(arrayBuffer);
+        initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache);
+    } catch (err) {
+        console.error("Error al inicializar EPUB desde URL:", err);
+        // Fallback al comportamiento nativo de epub.js si falla el fetch
+        var book = ePub(epubUrl);
+        initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache);
+    }
 }
 
 function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache) {

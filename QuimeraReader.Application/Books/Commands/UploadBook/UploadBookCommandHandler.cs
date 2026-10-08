@@ -27,7 +27,7 @@ public class UploadBookCommandHandler : IRequestHandler<UploadBookCommand, Uploa
     public async Task<UploadBookResultDto> Handle(UploadBookCommand request, CancellationToken cancellationToken)
     {
         if (request.FileStream == null || request.Length == 0)
-            throw new Exception("No se proporcionó ningún archivo.");
+            throw new Exception("No se proporcionÃ³ ningÃºn archivo.");
 
         string[] audioExtensions = { ".mp3", ".m4b", ".m4a", ".wav", ".ogg" };
         bool isAudio = audioExtensions.Contains(Path.GetExtension(request.FileName).ToLowerInvariant());
@@ -79,7 +79,7 @@ public class UploadBookCommandHandler : IRequestHandler<UploadBookCommand, Uploa
             File.Move(tempPath, orphanPath, true);
             _dbContext.UnmatchedAudioTracks.Add(new UnmatchedAudioTrack { OriginalFileName = request.FileName, PhysicalPath = orphanPath, FileSizeBytes = request.Length, UploadedAt = DateTime.UtcNow });
             await _dbContext.SaveChangesAsync(cancellationToken);
-            return new UploadBookResultDto { Message = "El audio fue guardado como huérfano porque no se encontró coincidencia." };
+            return new UploadBookResultDto { Message = "El audio fue guardado como huÃ©rfano porque no se encontrÃ³ coincidencia." };
         }
 
         var book = await _scannerService.ScanEpubAsync(tempPath, "GoogleBooks", request.FileName, forceMove: true);
@@ -102,5 +102,5 @@ public class UploadBookCommandHandler : IRequestHandler<UploadBookCommand, Uploa
             Message = "Libro subido correctamente."
         };
     }
-}
-
+}
+

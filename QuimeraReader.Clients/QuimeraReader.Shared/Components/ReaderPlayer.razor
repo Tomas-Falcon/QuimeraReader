@@ -34,7 +34,7 @@
                     <h5 class="mb-0 text-truncate" style="max-width: 300px; margin: 0 auto;">@Book.Title</h5>
                 </div>
                 <div style="width: 100px;" class="text-end d-flex justify-content-end gap-2">
-                                        <button class="btn btn-sm @(_isNavigationLocked ? "btn-danger" : "btn-outline-light")" @onclick="ToggleNavigationLock" title="Bloquear navegaci�n t�ctil para seleccionar texto">
+                                        <button class="btn btn-sm @(_isNavigationLocked ? "btn-danger" : "btn-outline-light")" @onclick="ToggleNavigationLock" title="Bloquear navegacion tactil para seleccionar texto">
                         <i class="bi @(_isNavigationLocked ? "bi-lock-fill" : "bi-unlock")"></i>
                     </button>
                     @if (Book.HasEpub && Book.HasAudio)

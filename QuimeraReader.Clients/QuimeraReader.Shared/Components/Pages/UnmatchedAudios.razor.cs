@@ -111,7 +111,7 @@ public partial class UnmatchedAudios : ComponentBase
 
     private async Task DeleteAudio(ManagedAudioDto audio)
     {
-        var confirm = await DialogService.Confirm($"Â¿Eliminar definitivamente '{audio.FileName}'?", "Eliminar Audio", new ConfirmOptions { OkButtonText = "Sí", CancelButtonText = "No" });
+        var confirm = await DialogService.Confirm($"Ã‚Â¿Eliminar definitivamente '{audio.FileName}'?", "Eliminar Audio", new ConfirmOptions { OkButtonText = "SÃ­", CancelButtonText = "No" });
         if (confirm == true)
         {
             try
@@ -185,7 +185,7 @@ public partial class UnmatchedAudios : ComponentBase
 
     private async Task UnmatchAudio(ManagedAudioDto audio)
     {
-        var confirm = await DialogService.Confirm($"�Desvincular '{audio.FileName}' de su libro actual?", "Desvincular Audio", new ConfirmOptions { OkButtonText = "S�", CancelButtonText = "No" });
+        var confirm = await DialogService.Confirm($"¿Desvincular '{audio.FileName}' de su libro actual?", "Desvincular Audio", new ConfirmOptions { OkButtonText = "Sí", CancelButtonText = "No" });
         if (confirm == true)
         {
             try
@@ -193,7 +193,7 @@ public partial class UnmatchedAudios : ComponentBase
                 var response = await Http.PostAsync($"api/books/audio-tracks/{audio.Id}/unmatch", null);
                 if (response.IsSuccessStatusCode)
                 {
-                    ToastService.ShowSuccess("Audio desvinculado. Ahora es hu�rfano.");
+                    ToastService.ShowSuccess("Audio desvinculado. Ahora es huérfano.");
                     await LoadAudios();
                 }
                 else
@@ -207,4 +207,4 @@ public partial class UnmatchedAudios : ComponentBase
             }
         }
     }
-}
+}
