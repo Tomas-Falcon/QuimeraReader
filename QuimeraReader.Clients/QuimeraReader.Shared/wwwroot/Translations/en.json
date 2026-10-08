@@ -116,11 +116,9 @@
   "Common_Error": "Error: {0}",
   "Common_Confirm": "Confirm",
   "Common_Delete": "Delete",
-
   "Badge_Ebook": "Ebook",
   "Badge_Audiobook": "Audiobook",
   "Badge_Synced": "Synced",
-
   "BookDetails_PageTitle": "Book Details",
   "BookDetails_Loading": "Loading details...",
   "BookDetails_NotFound": "Could not find the book.",
@@ -147,10 +145,8 @@
   "BookDetails_ConfirmDeleteAudio": "Are you sure you want to delete the Audiobook for this book?",
   "BookDetails_AudioDeleted": "Audiobook deleted.",
   "BookDetails_DeleteError": "Error deleting: {0}",
-
   "OfflineLibrary_Loading": "Loading downloads...",
   "OfflineLibrary_Empty": "You have no downloaded books to read offline.",
-
   "AudioManagement_Title": "Audio Management",
   "AudioManagement_AutoMatch": "Auto-match",
   "AudioManagement_Reload": "Reload",
@@ -176,6 +172,18 @@
   "AudioManagement_ErrorMatch": "Could not associate audio.",
   "AudioManagement_ProcessStarted": "Process started: {0}",
   "AudioManagement_ErrorAutoMatch": "Error starting automatic process.",
-  "AudioManagement_ErrorLoad": "Error loading audios: {0}"
+  "AudioManagement_ErrorLoad": "Error loading audios: {0}",
+  "Settings_ClientApp": "Client (App)",
+  "Settings_ServerConnection": "Server Connection",
+  "Settings_ServerConnectionDesc": "Change the server address that this application connects to.",
+  "Settings_ServerUrl": "Server URL",
+  "Settings_ServerUrlPlaceholder": "Example: http://192.168.1.10:5000/",
+  "Settings_ApplyConnection": "Apply Connection",
+  "Settings_Connecting": "Testing connection...",
+  "Settings_ConnectionSuccess": "Connection to the server established successfully.",
+  "Settings_ConnectionFailed": "Could not connect to the server, but the address has been saved.",
+  "Settings_InvalidUrl": "The entered URL is invalid. Please make sure to include http:// or https:// and a valid format.",
+  "Settings_WelcomeConfigTitle": "Server Configuration",
+  "Settings_WelcomeConfigDesc": "Enter the IP address or domain of your QuimeraReader server.",
+  "Settings_Connect": "Connect"
 }
-

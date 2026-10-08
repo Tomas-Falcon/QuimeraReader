@@ -12,9 +12,11 @@ public partial class SettingsPanel : ComponentBase
     [Inject] public ToastService ToastService { get; set; } = default!;
     [Inject] public IServerConfigService ServerConfig { get; set; } = default!;
     [Inject] public NavigationManager NavManager { get; set; } = default!;
+    [Inject] public HttpClient HttpClient { get; set; } = default!;
 
     private bool _isLoading = true;
     private bool _isSaving = false;
+    private bool _isTestingClientConnection = false;
     private string _message = string.Empty;
     private string _clientServerUrl = string.Empty;
     private bool _isSuccess = false;
@@ -140,14 +142,61 @@ public partial class SettingsPanel : ComponentBase
         }
     }
 
-    private void SaveClientConfig()
+    private async Task SaveClientConfig()
     {
-        if (!string.IsNullOrWhiteSpace(_clientServerUrl))
+        if (string.IsNullOrWhiteSpace(_clientServerUrl)) return;
+
+        var rawUrl = _clientServerUrl.Trim();
+        if (!rawUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && 
+            !rawUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
-            ServerConfig.SaveServerUrl(_clientServerUrl);
-            ShowMessage("Conexión del cliente guardada. Recargando...", true);
-            NavManager.NavigateTo(NavManager.Uri, forceLoad: true);
+            rawUrl = "http://" + rawUrl;
         }
+        if (!rawUrl.EndsWith("/")) rawUrl += "/";
+
+        if (!Uri.TryCreate(rawUrl, UriKind.Absolute, out var testUri))
+        {
+            ToastService.ShowError(TranslationService["Settings_InvalidUrl"]);
+            return;
+        }
+
+        _isTestingClientConnection = true;
+        StateHasChanged();
+
+        bool canConnect = false;
+        try
+        {
+            using var testClient = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
+            var pingUri = new Uri(testUri, "api/Books?page=1&pageSize=1");
+            using var response = await testClient.GetAsync(pingUri);
+            if (response.IsSuccessStatusCode)
+            {
+                canConnect = true;
+            }
+        }
+        catch
+        {
+            canConnect = false;
+        }
+        finally
+        {
+            _isTestingClientConnection = false;
+        }
+
+        // Se guarda de todas formas según solicitado
+        ServerConfig.SaveServerUrl(rawUrl);
+
+        if (canConnect)
+        {
+            ToastService.ShowSuccess(TranslationService["Settings_ConnectionSuccess"]);
+        }
+        else
+        {
+            ToastService.ShowError(TranslationService["Settings_ConnectionFailed"]);
+        }
+
+        await Task.Delay(1500);
+        NavManager.NavigateTo(NavManager.Uri, forceLoad: true);
     }
 
     private async Task DownloadWhisperModelAsync()

@@ -10,20 +10,32 @@
 @inject QuimeraReader.Shared.Services.IBookService BookService
 @inject QuimeraReader.Shared.Services.IScanService ScanService
 @inject QuimeraReader.Shared.Services.ISettingsService SettingsService
+@inject QuimeraReader.Shared.Services.ToastService ToastService
 @namespace QuimeraReader.Shared.Components.Layout
 
 @if (ServerConfig.NeedsConfiguration)
 {
     <div class="d-flex align-items-center justify-content-center vh-100 bg-dark text-light">
         <div class="card p-4 bg-secondary" style="max-width: 400px; width: 100%; border-radius: 12px;">
-            <h3 class="mb-4 text-center">Configuración del Servidor</h3>
-            <p class="text-center mb-4">Introduce la dirección IP o dominio de tu servidor QuimeraReader.</p>
+            <h3 class="mb-4 text-center">@TranslationService["Settings_WelcomeConfigTitle"]</h3>
+            <p class="text-center mb-4">@TranslationService["Settings_WelcomeConfigDesc"]</p>
             <div class="mb-3">
-                <input type="url" class="form-control" @bind="_serverInput" placeholder="http://192.168.1.10:5000/" />
+                <input type="url" class="form-control" @bind="_serverInput" placeholder="@TranslationService["Settings_ServerUrlPlaceholder"]" disabled="@_isTestingConfig" />
             </div>
-            <button class="btn btn-primary w-100" @onclick="SaveConfig">Conectar</button>
+            <button class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2" @onclick="SaveConfig" disabled="@_isTestingConfig">
+                @if (_isTestingConfig)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span>@TranslationService["Settings_Connecting"]</span>
+                }
+                else
+                {
+                    <span>@TranslationService["Settings_Connect"]</span>
+                }
+            </button>
         </div>
     </div>
+    <QuimeraReader.Shared.Components.ToastContainer />
 }
 else if (!_isLoaded)
 {
@@ -175,13 +187,64 @@ else
         }
     }
 
-    private void SaveConfig()
+    private bool _isTestingConfig = false;
+
+    private async Task SaveConfig()
     {
-        if (!string.IsNullOrWhiteSpace(_serverInput))
+        if (string.IsNullOrWhiteSpace(_serverInput)) return;
+
+        var rawUrl = _serverInput.Trim();
+        if (!rawUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && 
+            !rawUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
-            ServerConfig.SaveServerUrl(_serverInput);
-            NavManager.NavigateTo(NavManager.Uri, forceLoad: true);
+            rawUrl = "http://" + rawUrl;
         }
+        if (!rawUrl.EndsWith("/")) rawUrl += "/";
+
+        if (!Uri.TryCreate(rawUrl, UriKind.Absolute, out var testUri))
+        {
+            ToastService.ShowError(TranslationService["Settings_InvalidUrl"]);
+            return;
+        }
+
+        _isTestingConfig = true;
+        StateHasChanged();
+
+        bool canConnect = false;
+        try
+        {
+            using var testClient = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
+            var pingUri = new Uri(testUri, "api/Books?page=1&pageSize=1");
+            using var response = await testClient.GetAsync(pingUri);
+            if (response.IsSuccessStatusCode)
+            {
+                canConnect = true;
+            }
+        }
+        catch
+        {
+            canConnect = false;
+        }
+        finally
+        {
+            _isTestingConfig = false;
+            StateHasChanged();
+        }
+
+        // Se guarda la conexión de todas formas
+        ServerConfig.SaveServerUrl(rawUrl);
+
+        if (canConnect)
+        {
+            ToastService.ShowSuccess(TranslationService["Settings_ConnectionSuccess"]);
+        }
+        else
+        {
+            ToastService.ShowError(TranslationService["Settings_ConnectionFailed"]);
+        }
+
+        await Task.Delay(1500);
+        NavManager.NavigateTo(NavManager.Uri, forceLoad: true);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

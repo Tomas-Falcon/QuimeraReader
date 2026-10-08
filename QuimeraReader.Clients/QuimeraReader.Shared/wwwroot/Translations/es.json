@@ -170,7 +170,20 @@
   "AudioManagement_ErrorMatch": "No se pudo asociar el audio.",
   "AudioManagement_ProcessStarted": "Proceso iniciado: {0}",
   "AudioManagement_ErrorAutoMatch": "Error al iniciar el proceso automático.",
-  "AudioManagement_ErrorLoad": "Error al cargar audios: {0}"
+  "AudioManagement_ErrorLoad": "Error al cargar audios: {0}",
+  "Settings_ClientApp": "Cliente (App)",
+  "Settings_ServerConnection": "Conexión al Servidor",
+  "Settings_ServerConnectionDesc": "Cambia la dirección del servidor al que se conecta esta aplicación.",
+  "Settings_ServerUrl": "URL del Servidor",
+  "Settings_ServerUrlPlaceholder": "Ejemplo: http://192.168.1.10:5000/",
+  "Settings_ApplyConnection": "Aplicar Conexión",
+  "Settings_Connecting": "Probando conexión...",
+  "Settings_ConnectionSuccess": "Conexión establecida correctamente con el servidor.",
+  "Settings_ConnectionFailed": "No se pudo conectar con el servidor, pero la dirección ha sido guardada.",
+  "Settings_InvalidUrl": "La URL ingresada no es válida. Asegúrate de incluir http:// o https:// y el formato correcto.",
+  "Settings_WelcomeConfigTitle": "Configuración del Servidor",
+  "Settings_WelcomeConfigDesc": "Introduce la dirección IP o dominio de tu servidor QuimeraReader.",
+  "Settings_Connect": "Conectar"
 }
 
 
