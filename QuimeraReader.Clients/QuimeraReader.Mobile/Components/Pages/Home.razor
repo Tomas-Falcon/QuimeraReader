@@ -1,42 +1,6 @@
-﻿@page "/"
+@page "/"
 @using QuimeraReader.Shared.Components
-@using QuimeraReader.Shared.Interfaces
-@implements IDisposable
-@inject INetworkStateService NetworkState
-@inject NavigationManager NavManager
 
-@if (!NetworkState.IsOffline)
-{
-    <h1>Tu Biblioteca Móvil</h1>
-    <BookList />
-}
-
-@code {
-    protected override void OnInitialized()
-    {
-        NetworkState.OnNetworkStateChanged += StateChanged;
-        
-        if (NetworkState.IsOffline)
-        {
-            NavManager.NavigateTo("/offline-library");
-        }
-    }
-
-    private void StateChanged()
-    {
-        if (NetworkState.IsOffline)
-        {
-            InvokeAsync(() => NavManager.NavigateTo("/offline-library"));
-        }
-        else
-        {
-            InvokeAsync(StateHasChanged);
-        }
-    }
-
-    public void Dispose()
-    {
-        NetworkState.OnNetworkStateChanged -= StateChanged;
-    }
-}
+<h1>Tu Biblioteca Móvil</h1>
+<BookList />
 

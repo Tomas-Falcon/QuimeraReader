@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using QuimeraReader.Shared.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -55,24 +55,16 @@ public class BookService : IBookService
 
         public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null, bool? isAvailableOffline = null)
     {
+        var network = _serviceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.INetworkStateService)) as QuimeraReader.Shared.Interfaces.INetworkStateService;
+        var localRepo = _serviceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
+
+        if (network != null && network.IsOffline && localRepo != null)
+        {
+            return await GetOfflineFilteredBooksAsync(localRepo, page, pageSize, search, readingStatus, skip, take);
+        }
+
         try
         {
-            var network = _serviceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.INetworkStateService)) as QuimeraReader.Shared.Interfaces.INetworkStateService;
-            var localRepo = _serviceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
-            
-            if (network != null && network.IsOffline && localRepo != null)
-            {
-                var localBooks = await localRepo.GetOfflineBooksAsync();
-                var filtered = localBooks.AsEnumerable();
-                
-                if (!string.IsNullOrWhiteSpace(search))
-                    filtered = filtered.Where(b => b.Title.Contains(search, StringComparison.OrdinalIgnoreCase));
-                if (!string.IsNullOrWhiteSpace(readingStatus))
-                    filtered = filtered.Where(b => b.ReadingStatus == readingStatus);
-                
-                var data = filtered.Skip(skip ?? ((page - 1) * pageSize)).Take(take ?? pageSize).ToArray();
-                return new PaginatedResult<Book> { Page = page, PageSize = pageSize, Total = filtered.Count(), Data = data };
-            }
             _logger.LogDebug("[BookService] Obteniendo lista de libros. Page: {Page}, Search: {Search}", page, search);
             var url = $"api/Books?page={page}&pageSize={pageSize}";
             if (skip.HasValue) url += $"&skip={skip.Value}";
@@ -91,23 +83,41 @@ public class BookService : IBookService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[BookService] Error obteniendo lista de libros. Intentando recuperar versión local.");
-            var localRepo = _serviceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
+            _logger.LogWarning(ex, "[BookService] Error conectando con el servidor. Intentando recuperar version local.");
             if (localRepo != null)
             {
                 try 
                 {
-                    var localBooks = await localRepo.GetOfflineBooksAsync();
-                    var filtered = localBooks.AsEnumerable();
-                    if (!string.IsNullOrWhiteSpace(search)) filtered = filtered.Where(b => b.Title.Contains(search, StringComparison.OrdinalIgnoreCase));
-                    if (!string.IsNullOrWhiteSpace(readingStatus)) filtered = filtered.Where(b => b.ReadingStatus == readingStatus);
-                    var data = filtered.Skip(skip ?? ((page - 1) * pageSize)).Take(take ?? pageSize).ToArray();
-                    return new PaginatedResult<Book> { Page = page, PageSize = pageSize, Total = filtered.Count(), Data = data };
+                    return await GetOfflineFilteredBooksAsync(localRepo, page, pageSize, search, readingStatus, skip, take);
                 }
                 catch { }
             }
             return new PaginatedResult<Book> { Page = page, PageSize = pageSize, Total = 0, Data = [] };
         }
+    }
+
+    private async Task<PaginatedResult<Book>> GetOfflineFilteredBooksAsync(
+        QuimeraReader.Shared.Interfaces.ILocalBookRepository localRepo,
+        int page, int pageSize, string? search, string? readingStatus, int? skip, int? take)
+    {
+        var localBooks = await localRepo.GetOfflineBooksAsync();
+        var filtered = localBooks.AsEnumerable();
+        
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            filtered = filtered.Where(b => 
+                (b.Title != null && b.Title.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                (b.Authors != null && b.Authors.Any(a => a.Contains(search, StringComparison.OrdinalIgnoreCase))));
+        }
+        
+        if (!string.IsNullOrWhiteSpace(readingStatus))
+        {
+            filtered = filtered.Where(b => string.Equals(b.ReadingStatus, readingStatus, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var totalCount = filtered.Count();
+        var data = filtered.Skip(skip ?? ((page - 1) * pageSize)).Take(take ?? pageSize).ToArray();
+        return new PaginatedResult<Book> { Page = page, PageSize = pageSize, Total = totalCount, Data = data };
     }
 
     public async Task<Book?> GetBookAsync(int id)
