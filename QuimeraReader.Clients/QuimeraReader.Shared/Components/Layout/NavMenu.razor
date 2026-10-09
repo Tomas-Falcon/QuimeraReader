@@ -28,23 +28,44 @@
 
     protected override void OnInitialized()
     {
-        var informationalVersion = (System.Reflection.Assembly.GetEntryAssembly() ?? typeof(NavMenu).Assembly)
-            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
-            .Cast<System.Reflection.AssemblyInformationalVersionAttribute>()
-            .FirstOrDefault()?.InformationalVersion;
-
-        if (!string.IsNullOrEmpty(informationalVersion))
+        // En Blazor WebAssembly, GetEntryAssembly() puede ser nulo o diferir del ensamblado host.
+        // Inspeccionamos los ensamblados cargados para encontrar la versión generada por MinVer.
+        var candidateAssemblies = new[]
         {
-            if (informationalVersion.Contains("+"))
+            System.Reflection.Assembly.GetEntryAssembly(),
+            typeof(NavMenu).Assembly,
+            AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "QuimeraReader.Web"),
+            AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "QuimeraReader.Mobile")
+        }.Where(a => a != null);
+
+        string? rawVersion = null;
+
+        foreach (var asm in candidateAssemblies)
+        {
+            var infoVer = asm!.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+                .Cast<System.Reflection.AssemblyInformationalVersionAttribute>()
+                .FirstOrDefault()?.InformationalVersion;
+
+            if (!string.IsNullOrEmpty(infoVer) && !infoVer.StartsWith("1.0.0+"))
             {
-                var parts = informationalVersion.Split('+');
-                string hash = parts[1].Length >= 7 ? parts[1].Substring(0, 7) : parts[1];
-                AppVersion = parts[0] + " (dev-" + hash + ")";
+                rawVersion = infoVer;
+                break;
             }
-            else
+            else if (!string.IsNullOrEmpty(infoVer) && rawVersion == null)
             {
-                AppVersion = informationalVersion;
+                rawVersion = infoVer;
             }
+        }
+
+        if (!string.IsNullOrEmpty(rawVersion))
+        {
+            // Limpiar commit hash si existe
+            string cleanVersion = rawVersion.Contains('+') ? rawVersion.Split('+')[0] : rawVersion;
+            AppVersion = cleanVersion.StartsWith("v", StringComparison.OrdinalIgnoreCase) ? cleanVersion : $"v{cleanVersion}";
+        }
+        else
+        {
+            AppVersion = "v1.0.0";
         }
     }
 }
