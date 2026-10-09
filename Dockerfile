@@ -10,7 +10,7 @@ COPY ["QuimeraReader.Clients/QuimeraReader.Shared/QuimeraReader.Shared.csproj", 
 RUN dotnet restore "QuimeraReader.Clients/QuimeraReader.Web/QuimeraReader.Web.csproj"
 COPY QuimeraReader.Clients/ QuimeraReader.Clients/
 WORKDIR "/src/QuimeraReader.Clients/QuimeraReader.Web"
-RUN dotnet publish "QuimeraReader.Web.csproj" -c Release -p:Version="${APP_VERSION}" -p:PublishTrimmed=false -o /app/web
+RUN dotnet publish "QuimeraReader.Web.csproj" -c Release -p:Version="${APP_VERSION}" -p:MinVerVersionOverride="${APP_VERSION}" -p:PublishTrimmed=false -o /app/web
 
 # Etapa 2: Construir el Backend API
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build-api
@@ -27,7 +27,7 @@ COPY QuimeraReader.Application/ QuimeraReader.Application/
 COPY QuimeraReader.Domain/ QuimeraReader.Domain/
 COPY QuimeraReader.Infrastructure/ QuimeraReader.Infrastructure/
 WORKDIR "/src/QuimeraReader.API"
-RUN dotnet publish "QuimeraReader.API.csproj" -c Release -p:Version="${APP_VERSION}" -o /app/api
+RUN dotnet publish "QuimeraReader.API.csproj" -c Release -p:Version="${APP_VERSION}" -p:MinVerVersionOverride="${APP_VERSION}" -o /app/api
 
 # Etapa 3: Ensamblar la imagen final
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final

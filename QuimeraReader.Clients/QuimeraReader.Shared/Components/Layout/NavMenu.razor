@@ -19,7 +19,7 @@
     </div>
 
     <div class="px-3 pb-3 pt-3 text-muted mt-auto" style="font-size: 0.8rem; text-align: center; border-top: 1px solid var(--border-color); background-color: var(--bg-card); width: 100%;">
-        v. @AppVersion
+        @AppVersion
     </div>
 </div>
 
@@ -46,12 +46,12 @@
                 .Cast<System.Reflection.AssemblyInformationalVersionAttribute>()
                 .FirstOrDefault()?.InformationalVersion;
 
-            if (!string.IsNullOrEmpty(infoVer) && !infoVer.StartsWith("1.0.0+"))
+            if (!string.IsNullOrEmpty(infoVer) && !infoVer.StartsWith("1.0.0+") && !infoVer.StartsWith("0.0.0"))
             {
                 rawVersion = infoVer;
                 break;
             }
-            else if (!string.IsNullOrEmpty(infoVer) && rawVersion == null)
+            else if (!string.IsNullOrEmpty(infoVer) && !infoVer.StartsWith("0.0.0") && rawVersion == null)
             {
                 rawVersion = infoVer;
             }
