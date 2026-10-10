@@ -1,4 +1,4 @@
-name: Build & Release Clients (Android & Windows)
+name: Build & Release Clients (Android, Windows & Linux)
 
 on:
   workflow_dispatch:
@@ -12,6 +12,7 @@ on:
           - all
           - android
           - windows
+          - linux
       create_release:
         description: '¿Crear GitHub Release descargable?'
         required: true
@@ -135,10 +136,49 @@ jobs:
           name: QuimeraReader-Windows-x64
           path: ./dist/QuimeraReader-Windows-x64.zip
 
+  build-linux:
+    name: Build Linux Desktop App
+    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'linux'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build & Publish Linux Desktop App
+        run: |
+          dotnet publish QuimeraReader.Clients/QuimeraReader.Desktop/QuimeraReader.Desktop.csproj \
+            -c Release \
+            -r linux-x64 \
+            --self-contained true \
+            -p:PublishSingleFile=false \
+            -o ./publish/linux
+
+      - name: Package Linux Archive
+        shell: bash
+        run: |
+          mkdir -p ./dist
+          chmod +x ./publish/linux/QuimeraReader.Desktop
+          tar -czvf ./dist/QuimeraReader-Linux-x64.tar.gz -C ./publish/linux .
+          echo "Paquete Linux comprimido en ./dist/QuimeraReader-Linux-x64.tar.gz"
+
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuimeraReader-Linux-x64
+          path: ./dist/QuimeraReader-Linux-x64.tar.gz
+
   publish-release:
     name: Publish GitHub Release
-    needs: [build-android, build-windows]
-    if: always() && (github.event_name == 'push' || inputs.create_release == true) && (needs.build-android.result == 'success' || needs.build-windows.result == 'success')
+    needs: [build-android, build-windows, build-linux]
+    if: always() && (github.event_name == 'push' || inputs.create_release == true) && (needs.build-android.result == 'success' || needs.build-windows.result == 'success' || needs.build-linux.result == 'success')
     runs-on: ubuntu-latest
 
     steps:
@@ -171,5 +211,6 @@ jobs:
           files: |
             ./release-assets/*.apk
             ./release-assets/*.zip
+            ./release-assets/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
