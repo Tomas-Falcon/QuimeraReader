@@ -15,22 +15,22 @@
 
 @if (ServerConfig.NeedsConfiguration)
 {
-    <div class="d-flex align-items-center justify-content-center vh-100 bg-dark text-light">
-        <div class="card p-4 bg-secondary" style="max-width: 400px; width: 100%; border-radius: 12px;">
-            <h3 class="mb-4 text-center">@TranslationService["Settings_WelcomeConfigTitle"]</h3>
-            <p class="text-center mb-4">@TranslationService["Settings_WelcomeConfigDesc"]</p>
+    <div class="d-flex align-items-center justify-content-center vh-100 bg-dark text-light p-3">
+        <div class="card p-4 bg-secondary shadow-lg" style="max-width: 400px; width: 100%; border-radius: 16px;">
+            <h3 class="mb-3 text-center fw-bold">@(string.IsNullOrEmpty(TranslationService["Settings_WelcomeConfigTitle"]) || TranslationService["Settings_WelcomeConfigTitle"] == "Settings_WelcomeConfigTitle" ? "Bienvenido a QuimeraReader" : TranslationService["Settings_WelcomeConfigTitle"])</h3>
+            <p class="text-center small text-white-50 mb-4">@(string.IsNullOrEmpty(TranslationService["Settings_WelcomeConfigDesc"]) || TranslationService["Settings_WelcomeConfigDesc"] == "Settings_WelcomeConfigDesc" ? "Introduce la dirección de tu servidor QuimeraReader para sincronizar tu biblioteca." : TranslationService["Settings_WelcomeConfigDesc"])</p>
             <div class="mb-3">
-                <input type="url" class="form-control" @bind="_serverInput" placeholder="@TranslationService["Settings_ServerUrlPlaceholder"]" disabled="@_isTestingConfig" />
+                <input type="url" class="form-control" @bind="_serverInput" placeholder="http://192.168.1.100:5000" disabled="@_isTestingConfig" />
             </div>
-            <button class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2" @onclick="SaveConfig" disabled="@_isTestingConfig">
+            <button class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2 py-2" @onclick="SaveConfig" disabled="@_isTestingConfig">
                 @if (_isTestingConfig)
                 {
                     <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    <span>@TranslationService["Settings_Connecting"]</span>
+                    <span>Conectando...</span>
                 }
                 else
                 {
-                    <span>@TranslationService["Settings_Connect"]</span>
+                    <span>Conectar</span>
                 }
             </button>
         </div>
@@ -50,54 +50,121 @@ else
     <RadzenLayout Style="grid-template-areas: 'rz-header rz-header' 'rz-sidebar rz-body';">
         @if (!IsReadingMode)
         {
-            <!-- Add pt-safe to give space for mobile status bar -->
-            <RadzenHeader style="border-bottom: 1px solid var(--border-color); background-color: var(--bg-card); display: flex; align-items: center; justify-content: space-between; padding: 0 1rem; min-height: 60px;">
+            <RadzenHeader class="pt-safe" style="border-bottom: 1px solid var(--border-color); background-color: var(--bg-card); display: flex; align-items: center; justify-content: space-between; padding: 0 0.85rem; min-height: 56px;">
                 <div class="d-flex align-items-center">
-                    <RadzenSidebarToggle Click="@(() => _sidebarExpanded = !_sidebarExpanded)" />
-                    <span class="ms-2 fw-bold" style="font-size: 1.2rem;">QuimeraReader</span>
+                    <RadzenSidebarToggle Click="@(() => _sidebarExpanded = !_sidebarExpanded)" class="me-1" />
+                    <a href="/" class="text-decoration-none d-flex align-items-center" style="color: var(--text-main);">
+                        <span class="ms-1 fw-bold" style="font-size: 1.15rem; letter-spacing: -0.3px;">QuimeraReader</span>
+                    </a>
                 </div>
                 
-                <div class="d-flex align-items-center gap-2 flex-wrap">
+                <div class="d-flex align-items-center gap-2">
                     @if (_scanStatus != null && _scanStatus.IsScanning)
                     {
                         <div class="d-flex align-items-center gap-2 d-none d-md-flex text-primary fw-bold pulse-animation">
                             <div class="spinner-grow spinner-grow-sm text-primary" role="status"></div>
-                            <span style="font-size: 0.9rem;">@(_scanStatus.TotalFilesFound > 0 ? $"{(_scanStatus.FilesProcessed * 100) / _scanStatus.TotalFilesFound}%" : "...")</span>
+                            <span style="font-size: 0.85rem;">@(_scanStatus.TotalFilesFound > 0 ? $"{(_scanStatus.FilesProcessed * 100) / _scanStatus.TotalFilesFound}%" : "...")</span>
                         </div>
                     }
 
-                    <RadzenDropDown TValue="string" Value="@_currentLang" Data="@_languages" ValueProperty="Code" TextProperty="Name" Change="OnLanguageChanged" Style="width: 125px;" />
-                    
-                    <RadzenButton Icon="cloud_download" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Size="ButtonSize.Small" Click="FetchMissingMetadata" IsBusy="@_isFetchingMetadata" title="Metadatos" />
+                    <!-- Botón rápido de estado Online / Modo Offline -->
+                    <button class="btn btn-sm @(NetworkStateService.IsOffline ? "btn-warning text-dark fw-bold" : "btn-outline-success") d-flex align-items-center gap-1 rounded-pill px-2 py-1"
+                            @onclick="ToggleOfflineMode"
+                            title="@(NetworkStateService.IsOffline ? "Modo Offline activo (Pulsa para conectar)" : "Conectado al servidor (Pulsa para forzar Modo Offline)")">
+                        <i class="bi @(NetworkStateService.IsOffline ? "bi-wifi-off" : "bi-wifi")"></i>
+                        <span class="small d-none d-sm-inline">@(NetworkStateService.IsOffline ? "Offline" : "Online")</span>
+                    </button>
 
-                    <RadzenButton Icon="@(isDarkTheme ? "light_mode" : "dark_mode")" ButtonStyle="ButtonStyle.Primary" Variant="Variant.Outlined" Size="ButtonSize.Small" Click="ToggleThemeAsync" title="Tema" />
+                    <!-- Selector de idioma y re-escaneo solo en pantallas medianas/grandes para no saturar el móvil -->
+                    <div class="d-none d-md-flex align-items-center gap-2">
+                        <RadzenDropDown TValue="string" Value="@_currentLang" Data="@_languages" ValueProperty="Code" TextProperty="Name" Change="OnLanguageChanged" Style="width: 85px;" />
+                        <RadzenButton Icon="cloud_download" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Size="ButtonSize.Small" Click="FetchMissingMetadata" IsBusy="@_isFetchingMetadata" title="Buscar metadatos faltantes" />
+                    </div>
+
+                    <RadzenButton Icon="@(isDarkTheme ? "light_mode" : "dark_mode")" ButtonStyle="ButtonStyle.Primary" Variant="Variant.Outlined" Size="ButtonSize.Small" Click="ToggleThemeAsync" title="Cambiar tema" />
                 </div>
             </RadzenHeader>
 
-            <RadzenSidebar @bind-Expanded="@_sidebarExpanded" style="background-color: var(--bg-card); border-right: 1px solid var(--border-color);">
+            <RadzenSidebar @bind-Expanded="@_sidebarExpanded" style="background-color: var(--bg-card); border-right: 1px solid var(--border-color); z-index: 1050;">
                 <NavMenu />
             </RadzenSidebar>
         }
 
-        <RadzenBody class="@(IsReadingMode ? "p-0" : "p-4")">
+        <RadzenBody class="@(IsReadingMode ? "p-0" : "p-2 p-md-4 pb-mobile-nav")" style="overflow-y: auto; overflow-x: hidden;">
             @Body
         </RadzenBody>
     </RadzenLayout>
+
+    @if (!IsReadingMode)
+    {
+        <!-- Barra de Navegación Inferior Mobile-First (visible en móviles < 768px) -->
+        <nav class="mobile-bottom-nav d-flex d-md-none">
+            <a href="" class="mobile-nav-item @(IsRouteActive("", exact: true) ? "active" : "")">
+                <i class="bi bi-house-door-fill"></i>
+                <span>@TranslationService["Nav_Library"]</span>
+            </a>
+            <a href="categories" class="mobile-nav-item @(IsRouteActive("categories") || IsRouteActive("authors") ? "active" : "")">
+                <i class="bi bi-grid-fill"></i>
+                <span>@TranslationService["Nav_Genres"]</span>
+            </a>
+            <a href="read-books" class="mobile-nav-item @(IsRouteActive("read-books") ? "active" : "")">
+                <i class="bi bi-check2-circle"></i>
+                <span>@TranslationService["Nav_ReadBooks"]</span>
+            </a>
+            @if (HasLocalRepo)
+            {
+                <a href="offline-library" class="mobile-nav-item @(IsRouteActive("offline-library") ? "active" : "")">
+                    <i class="bi bi-cloud-arrow-down-fill"></i>
+                    <span>Offline</span>
+                </a>
+            }
+            <a href="settings" class="mobile-nav-item @(IsRouteActive("settings") ? "active" : "")">
+                <i class="bi bi-gear-fill"></i>
+                <span>@TranslationService["Nav_Settings"]</span>
+            </a>
+        </nav>
+    }
 
     <QuimeraReader.Shared.Components.ToastContainer />
     <RadzenDialog />
 }
 
 @code {
-    private bool _sidebarExpanded = true; private bool _isMobile = false;
+    private bool _sidebarExpanded = false;
+    private bool _isMobile = false;
     private bool isDarkTheme = true;
     private bool _isLoaded = false;
     private string _currentLang = "es";
+    private bool HasLocalRepo => ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) != null;
+
     private List<dynamic> _languages = new List<dynamic>
     {
         new { Code = "es", Name = "ES" },
         new { Code = "en", Name = "EN" }
     };
+
+    private bool IsRouteActive(string relativePath, bool exact = false)
+    {
+        var currentPath = NavManager.ToBaseRelativePath(NavManager.Uri).Split('?')[0].Trim('/');
+        var target = relativePath.Trim('/');
+        if (exact) return string.Equals(currentPath, target, StringComparison.OrdinalIgnoreCase);
+        return currentPath.StartsWith(target, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ToggleOfflineMode()
+    {
+        bool newForceState = !NetworkStateService.IsForceOffline;
+        NetworkStateService.SetForceOffline(newForceState);
+        if (newForceState)
+        {
+            ToastService.ShowInfo("Modo Offline activado. Usando biblioteca descargada en el dispositivo.");
+        }
+        else
+        {
+            ToastService.ShowSuccess("Modo Online activado.");
+        }
+        StateHasChanged();
+    }
 
     private async Task OnLanguageChanged(object value)
     {
@@ -105,9 +172,10 @@ else
         {
             _currentLang = value.ToString()!;
             await TranslationService.LoadLanguageAsync(_currentLang);
-            NavManager.NavigateTo(NavManager.Uri, forceLoad: true);
+            StateHasChanged();
         }
     }
+
     private string _serverInput = "http://";
     private bool _isFetchingMetadata = false;
     private bool IsReadingMode => NavManager.Uri.Contains("/read/", StringComparison.OrdinalIgnoreCase);
@@ -117,18 +185,31 @@ else
     protected override void OnInitialized()
     {
         NetworkStateService.OnNetworkStateChanged += HandleNetworkChange;
+        TranslationService.OnTranslationsLoaded += HandleTranslationsLoaded;
         _ = NetworkStateService.InitializeAsync();
 
-        NavManager.LocationChanged += (s, e) => { if (_isMobile) _sidebarExpanded = false; StateHasChanged(); };
+        NavManager.LocationChanged += OnLocationChanged;
         if (!ServerConfig.NeedsConfiguration)
         {
             _ = PollScanStatusAsync();
         }
         
         var worker = (QuimeraReader.Shared.Interfaces.IOfflineSyncWorker?)ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.IOfflineSyncWorker));
-        if (worker != null) {
+        if (worker != null)
+        {
             _ = worker.SyncNowAsync();
         }
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        if (_isMobile) _sidebarExpanded = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleTranslationsLoaded()
+    {
+        InvokeAsync(StateHasChanged);
     }
 
     private void HandleNetworkChange()
@@ -137,7 +218,8 @@ else
         if (!NetworkStateService.IsOffline)
         {
             var worker = (QuimeraReader.Shared.Interfaces.IOfflineSyncWorker?)ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.IOfflineSyncWorker));
-            if (worker != null) {
+            if (worker != null)
+            {
                 _ = worker.SyncNowAsync();
             }
         }
@@ -147,13 +229,18 @@ else
     {
         try
         {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
             while (await timer.WaitForNextTickAsync(_cts.Token))
             {
-                if (!IsReadingMode)
+                if (!IsReadingMode && !NetworkStateService.IsOffline)
                 {
+                    var prevScanning = _scanStatus?.IsScanning;
+                    var prevProcessed = _scanStatus?.FilesProcessed;
                     _scanStatus = await ScanService.GetScanStatusAsync();
-                    StateHasChanged();
+                    if (_scanStatus?.IsScanning != prevScanning || _scanStatus?.FilesProcessed != prevProcessed)
+                    {
+                        StateHasChanged();
+                    }
                 }
             }
         }
@@ -163,12 +250,15 @@ else
     public void Dispose()
     {
         NetworkStateService.OnNetworkStateChanged -= HandleNetworkChange;
+        TranslationService.OnTranslationsLoaded -= HandleTranslationsLoaded;
+        NavManager.LocationChanged -= OnLocationChanged;
         _cts.Cancel();
         _cts.Dispose();
     }
 
     private async Task FetchMissingMetadata()
     {
+        if (NetworkStateService.IsOffline) return;
         _isFetchingMetadata = true;
         StateHasChanged();
         
@@ -231,7 +321,6 @@ else
             StateHasChanged();
         }
 
-        // Se guarda la conexión de todas formas
         ServerConfig.SaveServerUrl(rawUrl);
 
         if (canConnect)
@@ -243,7 +332,7 @@ else
             ToastService.ShowError(TranslationService["Settings_ConnectionFailed"]);
         }
 
-        await Task.Delay(1500);
+        await Task.Delay(1200);
         NavManager.NavigateTo(NavManager.Uri, forceLoad: true);
     }
 
@@ -261,12 +350,9 @@ else
                 isDarkTheme = false;
             }
             
-            // Auto collapse sidebar on mobile
             var screenWidth = await JSRuntime.InvokeAsync<int>("eval", "window.innerWidth");
-            if (screenWidth < 768) { _isMobile = true; } if (screenWidth < 768)
-            {
-                _sidebarExpanded = false;
-            }
+            _isMobile = screenWidth < 768;
+            _sidebarExpanded = !_isMobile;
 
             _isLoaded = true;
             StateHasChanged();

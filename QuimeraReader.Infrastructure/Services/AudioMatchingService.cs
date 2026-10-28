@@ -92,7 +92,9 @@ public class AudioMatchingService : QuimeraReader.Application.Interfaces.IAudioM
 
             using var process = Process.Start(processInfo);
             if (process == null) return null;
-            await process.WaitForExitAsync(cancellationToken);
+            var stdOutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            var stdErrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            await Task.WhenAll(stdOutTask, stdErrTask, process.WaitForExitAsync(cancellationToken));
 
             if (!File.Exists(tempWavFile)) return null;
 

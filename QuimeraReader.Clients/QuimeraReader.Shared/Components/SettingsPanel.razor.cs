@@ -43,6 +43,16 @@ public partial class SettingsPanel : ComponentBase
         public string Value { get; set; } = string.Empty;
     }
 
+    private List<OptionItem> _languageOptions = new()
+    {
+        new OptionItem { Text = "Español (ES)", Value = "es" },
+        new OptionItem { Text = "English (EN)", Value = "en" },
+        new OptionItem { Text = "Deutsch (DE)", Value = "de" },
+        new OptionItem { Text = "Français (FR)", Value = "fr" },
+        new OptionItem { Text = "Italiano (IT)", Value = "it" },
+        new OptionItem { Text = "Português (PT)", Value = "pt" }
+    };
+
     private List<OptionItem> _ingestionModes = new()
     {
         new OptionItem { Text = "Mover y Organizar (Ahorra Espacio)", Value = "Move" },
@@ -54,6 +64,22 @@ public partial class SettingsPanel : ComponentBase
         new OptionItem { Text = "Plug & Play: Ejecutar Whisper localmente en este Servidor", Value = "LocalServer" },
         new OptionItem { Text = "API Externa: Conectar a OpenAI o red local (Ollama / LLMStudio)", Value = "ExternalApi" }
     };
+
+    private void OnForceOfflineChanged(bool value)
+    {
+        NetworkStateService.SetForceOffline(value);
+        ToastService.ShowSuccess(value ? "Modo sin conexión activado." : "Modo en línea restaurado.");
+        StateHasChanged();
+    }
+
+    private async Task OnLanguageChanged(object value)
+    {
+        if (value is string lang && !string.IsNullOrEmpty(lang))
+        {
+            await TranslationService.LoadLanguageAsync(lang);
+            StateHasChanged();
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -183,7 +209,6 @@ public partial class SettingsPanel : ComponentBase
             _isTestingClientConnection = false;
         }
 
-        // Se guarda de todas formas según solicitado
         ServerConfig.SaveServerUrl(rawUrl);
 
         if (canConnect)

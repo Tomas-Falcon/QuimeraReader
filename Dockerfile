@@ -1,5 +1,5 @@
 # Etapa 1: Construir el Frontend WebAssembly
-ARG APP_VERSION="1.0.6"
+ARG APP_VERSION="1.0.13"
 
 # Etapa 1: Construir el Frontend WebAssembly
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build-web

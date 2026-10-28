@@ -12,14 +12,19 @@ export function initializePlayer(audioElement, dotNetReference) {
     audioElement.addEventListener('pause', () => {
         dotNetReference.invokeMethodAsync('OnPlayStateChanged', false);
     });
-    
+
     audioElement.addEventListener('ended', () => {
         dotNetReference.invokeMethodAsync('OnAudioEnded');
     });
 }
 
 export function playAudio(audioElement) {
-    if (audioElement) audioElement.play();
+    if (audioElement) {
+        var playPromise = audioElement.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch(() => {});
+        }
+    }
 }
 
 export function pauseAudio(audioElement) {
@@ -27,7 +32,16 @@ export function pauseAudio(audioElement) {
 }
 
 export function seekAudio(audioElement, time) {
-    if (audioElement) audioElement.currentTime = time;
+    if (!audioElement) return;
+    if (audioElement.readyState >= 1) {
+        audioElement.currentTime = time;
+    } else {
+        const onLoaded = () => {
+            audioElement.currentTime = time;
+            audioElement.removeEventListener('loadedmetadata', onLoaded);
+        };
+        audioElement.addEventListener('loadedmetadata', onLoaded);
+    }
 }
 
 export function scrollToActiveSegment() {
@@ -36,6 +50,7 @@ export function scrollToActiveSegment() {
         activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 }
+
 export function skipAudio(audioElement, offsetSeconds) {
     if (audioElement) {
         audioElement.currentTime = Math.max(0, audioElement.currentTime + offsetSeconds);

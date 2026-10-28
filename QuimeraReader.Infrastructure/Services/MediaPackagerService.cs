@@ -1,5 +1,6 @@
-﻿using System.IO;
+using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using QuimeraReader.Domain.Entities;
@@ -8,7 +9,7 @@ namespace QuimeraReader.Infrastructure.Services;
 
 public class MediaPackagerService
 {
-        public async Task<bool> NormalizeAudioAsync(string sourcePath, string destPath)
+    public async Task<bool> NormalizeAudioAsync(string sourcePath, string destPath)
     {
         try
         {
@@ -26,7 +27,9 @@ public class MediaPackagerService
             using var process = System.Diagnostics.Process.Start(processInfo);
             if (process != null)
             {
-                await process.WaitForExitAsync();
+                var stdOutTask = process.StandardOutput.ReadToEndAsync();
+                var stdErrTask = process.StandardError.ReadToEndAsync();
+                await Task.WhenAll(stdOutTask, stdErrTask, process.WaitForExitAsync());
                 return process.ExitCode == 0 && File.Exists(destPath);
             }
         }

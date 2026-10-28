@@ -2,13 +2,9 @@
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @inject QuimeraReader.Shared.Interfaces.INetworkStateService NetworkStateService
 @using QuimeraReader.Shared.Services
-
-
-
-
 @namespace QuimeraReader.Shared.Components
 
-<div class="container mt-4 mb-5">
+<div class="container mt-4 mb-5 pb-mobile-nav">
     <RadzenCard class="mb-4 rz-background-color-transparent rz-border-radius-0" style="padding:0; border: none; background: transparent;">
         <h2 class="text-light fw-bold mb-0">@TranslationService["Settings_ServerConfig"]</h2>
     </RadzenCard>
@@ -43,6 +39,30 @@
                 }
                 
                 <RadzenTabsItem Text="@TranslationService["Settings_General"]" Icon="settings">
+                    <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
+                        <h4 class="text-primary"><RadzenIcon Icon="tune" /> Preferencias del Cliente</h4>
+                        <p class="text-white-50 small mb-4">Ajustes locales de idioma y conectividad en este dispositivo.</p>
+
+                        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary gap-3">
+                            <div>
+                                <h6 class="text-light fw-bold mb-1"><i class="bi bi-wifi-off me-2 text-warning"></i> Modo Sin Conexión Forzado (Offline)</h6>
+                                <p class="text-white-50 small mb-0">Trabaja únicamente con los libros y audios descargados localmente sin consultar el servidor.</p>
+                            </div>
+                            <RadzenSwitch Value="@NetworkStateService.IsForceOffline" Change="@OnForceOfflineChanged" />
+                        </div>
+
+                        <div class="mb-2">
+                            <RadzenLabel Text="Idioma de la interfaz" class="fw-bold mb-2 d-block" />
+                            <RadzenDropDown Value="@TranslationService.CurrentLanguage"
+                                            Data="@_languageOptions"
+                                            TextProperty="Text"
+                                            ValueProperty="Value"
+                                            Change="@OnLanguageChanged"
+                                            class="w-100 bg-secondary text-light border-0"
+                                            Style="max-width: 320px;" />
+                        </div>
+                    </RadzenCard>
+
                     <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
                         <h4 class="text-primary"><RadzenIcon Icon="folder" /> @TranslationService["Settings_ServerFolders"]</h4>
                         <p class="text-white-50 small mb-4">@TranslationService["Settings_ServerFoldersDesc"]</p>
@@ -83,10 +103,10 @@
                                     <p class="text-white-50 small">@TranslationService["Settings_LocalConfigWhisperDesc"]</p>
                                     <div class="mb-3">
                                         <RadzenLabel Text="@TranslationService["Settings_BaseModelPath"]" class="small d-block mb-1" />
-                                        <div class="d-flex gap-2">
+                                        <div class="d-flex flex-column flex-sm-row gap-2">
                                             <RadzenTextBox @bind-Value="_whisperModelPath" class="flex-grow-1 bg-dark text-light border-0" />
                                             @if (_isWhisperDownloaded) {
-                                                <RadzenBadge BadgeStyle="Radzen.BadgeStyle.Success" Text="Modelo Listo" class="py-2 px-3 align-self-center" />
+                                                <RadzenBadge BadgeStyle="Radzen.BadgeStyle.Success" Text="Modelo Listo" class="py-2 px-3 align-self-start align-self-sm-center" />
                                             } else {
                                                 <RadzenButton Text="@TranslationService["Settings_DownloadNow"]" Click="DownloadWhisperModelAsync" IsBusy="@_isDownloadingWhisper" ButtonStyle="Radzen.ButtonStyle.Primary" Variant="Radzen.Variant.Outlined" />
                                             }

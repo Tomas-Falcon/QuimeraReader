@@ -355,7 +355,7 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
                     {
                         if (File.Exists(newAudioPath)) File.Delete(newAudioPath);
                         File.CreateSymbolicLink(newAudioPath, possibleAudioPath);
-                        newAudioPath = newAudioPath; // keep same variable for next steps if needed
+                        // keep same variable for next steps if needed
                     }
                     catch (Exception ex)
                     {

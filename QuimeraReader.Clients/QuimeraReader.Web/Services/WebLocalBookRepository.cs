@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.JSInterop;
@@ -54,7 +55,7 @@ namespace QuimeraReader.Web.Services
             await _jsRuntime.InvokeVoidAsync("window.quimeraIndexedDb.deleteBook", id);
         }
 
-        public async Task UpdateProgressAsync(int id, string cfi, double? audioPosition, double? percentage)
+        public async Task UpdateProgressAsync(int id, string cfi, double? audioPosition, double? percentage, int? audioTrackNumber = null)
         {
             var book = await GetBookByIdAsync(id);
             if (book != null)
@@ -62,10 +63,12 @@ namespace QuimeraReader.Web.Services
                 if (!string.IsNullOrEmpty(cfi)) book.CurrentEpubCfi = cfi;
                 if (audioPosition.HasValue) book.CurrentAudioPosition = audioPosition.Value;
                 if (percentage.HasValue) book.PercentageCompleted = percentage.Value;
+                if (audioTrackNumber.HasValue) book.CurrentAudioTrackNumber = audioTrackNumber.Value;
+                book.LastReadAt = DateTime.UtcNow;
                 await SaveBookAsync(book);
             }
             
-            var syncAction = new { Type = "Progress", BookId = id, Cfi = cfi, AudioPosition = audioPosition, Percentage = percentage };
+            var syncAction = new { Type = "Progress", BookId = id, Cfi = cfi, AudioPosition = audioPosition, Percentage = percentage, AudioTrackNumber = audioTrackNumber };
             await _jsRuntime.InvokeVoidAsync("window.quimeraIndexedDb.enqueueSync", JsonSerializer.Serialize(syncAction, _jsonOptions));
         }
 
@@ -81,16 +84,25 @@ namespace QuimeraReader.Web.Services
             };
             await _jsRuntime.InvokeVoidAsync("window.quimeraIndexedDb.enqueueSync", JsonSerializer.Serialize(syncAction, _jsonOptions));
             
-            // Fetch current annotations for book and append
             var anns = await GetAnnotationsAsync(bookId);
-            anns.Add(new AnnotationDto {
-                
-                CfiRange = cfiRange,
-                SelectedText = selectedText,
-                ColorHex = colorHex,
-                Note = note,
-                CreatedAt = DateTime.UtcNow
-            });
+            var existing = anns.FirstOrDefault(a => a.CfiRange == cfiRange);
+            if (existing != null)
+            {
+                existing.ColorHex = colorHex;
+                existing.Note = note;
+            }
+            else
+            {
+                int tempId = -(int)(DateTime.UtcNow.Ticks % 1000000000);
+                anns.Add(new AnnotationDto {
+                    Id = tempId,
+                    CfiRange = cfiRange,
+                    SelectedText = selectedText,
+                    ColorHex = colorHex,
+                    Note = note,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
             await SyncAnnotationsAsync(bookId, anns);
         }
 

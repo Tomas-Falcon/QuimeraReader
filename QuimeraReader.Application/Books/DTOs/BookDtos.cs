@@ -26,6 +26,7 @@ public record BookDto
     public DateTime? LastReadAt { get; init; }
     public string? CurrentEpubCfi { get; init; }
     public double? CurrentAudioPosition { get; init; }
+    public int? CurrentAudioTrackNumber { get; init; }
     public double? PercentageCompleted { get; init; }
     public string? ReadingStatus { get; init; }
     public string? EpubLocationsCache { get; init; }
@@ -58,8 +59,6 @@ public record CategoryDto
     public string? SampleCoverUrl { get; init; }
 }
 
-
-
 public class ManagedAudioDto
 {
     public int Id { get; set; }
@@ -68,4 +67,3 @@ public class ManagedAudioDto
     public int? BookId { get; set; }
     public string BookTitle { get; set; } = string.Empty;
 }
-

@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Net.Http.Json;
 using System.Collections.Generic;
@@ -20,6 +21,7 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
     private readonly ILogger<MauiOfflineSyncWorker> _logger;
     private readonly INetworkStateService _networkState;
     private readonly IServiceProvider _serviceProvider;
+    private readonly SemaphoreSlim _syncLock = new(1, 1);
     private bool _isSyncing;
 
     public MauiOfflineSyncWorker(ILogger<MauiOfflineSyncWorker> logger, INetworkStateService networkState, IServiceProvider serviceProvider)
@@ -33,7 +35,8 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
 
     public async Task SyncNowAsync()
     {
-        if (_isSyncing || _networkState.IsOffline) return;
+        if (_networkState.IsOffline) return;
+        if (!await _syncLock.WaitAsync(0)) return;
 
         try
         {
@@ -54,7 +57,6 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
                 var localLogs = await dbContext.ClientLogs.ToListAsync();
                 if (localLogs.Any())
                 {
-                    /* REMOVED VAR */ httpClient = scope.ServiceProvider.GetRequiredService<HttpClient>();
                     var logDtos = localLogs.Select(l => new QuimeraReader.Shared.Models.ClientLogDto 
                     { 
                         Level = l.Level, Message = l.Message, Exception = l.Exception, CreatedAt = l.CreatedAt 
@@ -71,62 +73,52 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
             }
             catch (Exception ex)
             {
-                // No loguear esto con el logger para no hacer loop, o loguearlo y se intentara despues
                 Console.WriteLine("Error syncing logs: " + ex.Message);
             }
 
             // 1. PUSH: Local -> Server
             var localBooks = await localRepo.GetOfflineBooksAsync();
-            // Get ALL offline books from the server directly! 
-            // (We request up to 10,000 to ensure we get all offline books)
-            // To prevent catastrophic deletion if the API fails or returns empty unexpectedly,
-            // we will catch exceptions specifically here.
-            QuimeraReader.Shared.Models.PaginatedResult<QuimeraReader.Shared.Models.Book> paginatedBooks = null;
-            try {
-                // Manually make the HTTP call here to ensure we catch network errors that BookService swallows
-                httpClient = scope.ServiceProvider.GetRequiredService<HttpClient>();
+            QuimeraReader.Shared.Models.PaginatedResult<QuimeraReader.Shared.Models.Book>? paginatedBooks = null;
+            try
+            {
                 var response = await httpClient.GetAsync("api/Books?page=1&pageSize=10000&isAvailableOffline=true");
-                if (!response.IsSuccessStatusCode) {
+                if (!response.IsSuccessStatusCode)
+                {
                     _logger.LogWarning("API failed with status {Status}. Aborting sync to prevent deletion.", response.StatusCode);
                     return;
                 }
                 paginatedBooks = await response.Content.ReadFromJsonAsync<QuimeraReader.Shared.Models.PaginatedResult<QuimeraReader.Shared.Models.Book>>();
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 _logger.LogError(ex, "Network error during sync pull. Aborting sync.");
                 return;
             }
 
             if (paginatedBooks == null || paginatedBooks.Data == null) return;
             var serverBooks = paginatedBooks.Data;
-
-            // Also we need to get the status of currently local books, even if they are no longer offline on the server.
-            // But wait, if they are no longer offline, they won't be in serverBooks.
-            // We should fetch the specific local books that are no longer in serverBooks to update their progress?
-            // Progress push is step 1. If it's no longer offline, maybe we should push it first?
-            // We can just push progress blindly to the API for all local books, since they have their IDs.
             
             foreach (var localBook in localBooks)
             {
                 var serverBook = serverBooks.FirstOrDefault(b => b.Id == localBook.Id);
                 if (serverBook == null)
                 {
-                    try {
+                    try
+                    {
                         serverBook = await bookService.GetBookAsync(localBook.Id);
-                    } catch { }
+                    }
+                    catch { }
                 }
 
                 if (serverBook != null)
                 {
-                    // Estrategia de sincronización pedida por el usuario:
-                    // Quedarnos con el que esté más adelantado (PercentageCompleted mayor).
+                    // Sincronizar si el progreso local es más reciente (LastReadAt) o está más adelantado
                     bool shouldPush = false;
-                    
-                    if (localBook.PercentageCompleted > (serverBook.PercentageCompleted ?? 0))
+                    if (localBook.LastReadAt.HasValue && (!serverBook.LastReadAt.HasValue || localBook.LastReadAt.Value > serverBook.LastReadAt.Value))
                     {
                         shouldPush = true;
                     }
-                    else if (localBook.PercentageCompleted == serverBook.PercentageCompleted && 
-                            (localBook.LastReadAt > serverBook.LastReadAt || (localBook.LastReadAt != null && serverBook.LastReadAt == null)))
+                    else if ((localBook.PercentageCompleted ?? 0) > (serverBook.PercentageCompleted ?? 0))
                     {
                         shouldPush = true;
                     }
@@ -144,7 +136,6 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
                             );
                             _logger.LogInformation("Push completado para libro {Id}", localBook.Id);
                             
-                            // Prevenir que luego se pise el local actualizando el serverBook en memoria
                             serverBook.CurrentEpubCfi = localBook.CurrentEpubCfi;
                             serverBook.CurrentAudioPosition = localBook.CurrentAudioPosition;
                             serverBook.CurrentAudioTrackNumber = localBook.CurrentAudioTrackNumber;
@@ -174,7 +165,7 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Failed to sync queued annotation {ann.Id}");
+                    _logger.LogError(ex, "Failed to sync queued annotation {Id}", ann.Id);
                 }
             }
 
@@ -200,40 +191,47 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
             }
 
             // 3. PULL: Server -> Local
-
-            /* REMOVED VAR */ httpClient = scope.ServiceProvider.GetRequiredService<HttpClient>();
-
             foreach (var book in offlineBooks)
             {
-                var localEpub = await DownloadFileAsync(httpClient, book.EpubUrl, $"epub_{book.Id}.epub");
-                if (localEpub != book.EpubUrl) book.LocalEpubPath = localEpub;
+                if (book.HasEpub)
+                {
+                    var localEpub = await DownloadFileAtomicAsync(httpClient, book.EpubUrl, $"epub_{book.Id}.epub");
+                    if (localEpub != book.EpubUrl) book.LocalEpubPath = localEpub;
+                }
                 
-                var localCover = await DownloadFileAsync(httpClient, book.CoverUrl, $"cover_{book.Id}.jpg");
-                if (localCover != book.CoverUrl) book.LocalCoverPath = localCover;
+                if (book.HasCover)
+                {
+                    var localCover = await DownloadFileAtomicAsync(httpClient, book.CoverUrl, $"cover_{book.Id}.jpg");
+                    if (localCover != book.CoverUrl) book.LocalCoverPath = localCover;
+                }
 
-                var localAudio = await DownloadFileAsync(httpClient, book.AudioUrl, $"audio_{book.Id}.mp3");
-                if (localAudio != book.AudioUrl) book.LocalAudioPath = localAudio;
+                if (book.HasAudio)
+                {
+                    var localAudio = await DownloadFileAtomicAsync(httpClient, book.AudioUrl, $"audio_{book.Id}.mp3");
+                    if (localAudio != book.AudioUrl) book.LocalAudioPath = localAudio;
+                }
+
+                try
+                {
+                    var syncMapStr = await bookService.GetSyncMapAsync(book.Id);
+                    if (!string.IsNullOrEmpty(syncMapStr))
+                    {
+                        book.SyncMapJson = syncMapStr;
+                    }
+                }
+                catch { }
 
                 await localRepo.SaveBookAsync(book);
 
-                try {
-                    var syncMapStr = await bookService.GetSyncMapAsync(book.Id);
-                    if (!string.IsNullOrEmpty(syncMapStr)) {
-                        var existingMap = await dbContext.Books.Include(b => b.SyncMap).FirstOrDefaultAsync(b => b.Id == book.Id);
-                        if (existingMap != null) {
-                            if (existingMap.SyncMap == null) existingMap.SyncMap = new QuimeraReader.Domain.Entities.SyncMap { BookId = book.Id, SyncMapJson = syncMapStr };
-                            else existingMap.SyncMap.SyncMapJson = syncMapStr;
-                            await dbContext.SaveChangesAsync();
-                        }
-                    }
-                } catch { }
-
-                try {
+                try
+                {
                     var serverAnnotations = await bookService.GetAnnotationsAsync(book.Id);
-                    if (serverAnnotations != null && serverAnnotations.Any()) {
+                    if (serverAnnotations != null && serverAnnotations.Any())
+                    {
                         await localRepo.SyncAnnotationsAsync(book.Id, serverAnnotations);
                     }
-                } catch { }
+                }
+                catch { }
             }
             
             _logger.LogInformation("Sincronización offline completada.");
@@ -245,44 +243,43 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
         finally
         {
             _isSyncing = false;
+            _syncLock.Release();
         }
     }
 
-    private async Task<string> DownloadFileAsync(HttpClient httpClient, string serverPath, string localFileName)
+    private async Task<string> DownloadFileAtomicAsync(HttpClient httpClient, string serverPath, string localFileName)
     {
         if (string.IsNullOrEmpty(serverPath)) return serverPath;
-        if (serverPath.StartsWith(FileSystem.AppDataDirectory)) return serverPath;
+        if (serverPath.StartsWith(FileSystem.AppDataDirectory, StringComparison.OrdinalIgnoreCase)) return serverPath;
 
         var localPath = Path.Combine(FileSystem.AppDataDirectory, localFileName);
-        // FIXME: Esto deberia verificar si el archivo en el servidor fue modificado.
-        // Por ahora, para no romper compatibilidad offline actual, checamos solo si existe.
-        if (File.Exists(localPath)) return localPath; 
+        if (File.Exists(localPath))
+        {
+            var info = new FileInfo(localPath);
+            if (info.Length > 0) return localPath;
+            try { File.Delete(localPath); } catch { }
+        }
 
+        var tempPath = localPath + ".tmp";
         try
         {
-            using var response = await httpClient.GetAsync(serverPath, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+            using var response = await httpClient.GetAsync(serverPath, HttpCompletionOption.ResponseHeadersRead, cts.Token);
             if (response.IsSuccessStatusCode)
             {
-                using var fs = new FileStream(localPath, FileMode.Create);
-                await response.Content.CopyToAsync(fs);
+                await using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    await response.Content.CopyToAsync(fs, cts.Token);
+                }
+                File.Move(tempPath, localPath, overwrite: true);
                 return localPath;
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error descargando archivo {Path}", serverPath);
+            try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
         }
         return serverPath; 
     }
 }
-
-
-
-
-
-
-
-
-
-
-

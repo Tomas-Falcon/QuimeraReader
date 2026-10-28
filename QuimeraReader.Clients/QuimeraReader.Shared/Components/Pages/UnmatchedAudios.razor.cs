@@ -111,7 +111,7 @@ public partial class UnmatchedAudios : ComponentBase
 
     private async Task DeleteAudio(ManagedAudioDto audio)
     {
-        var confirm = await DialogService.Confirm($"Ã‚Â¿Eliminar definitivamente '{audio.FileName}'?", "Eliminar Audio", new ConfirmOptions { OkButtonText = "SÃ­", CancelButtonText = "No" });
+        var confirm = await DialogService.Confirm($"¿Eliminar definitivamente '{audio.FileName}'?", "Eliminar Audio", new ConfirmOptions { OkButtonText = "Sí", CancelButtonText = "No" });
         if (confirm == true)
         {
             try

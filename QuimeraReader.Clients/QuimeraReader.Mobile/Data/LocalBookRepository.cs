@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -19,10 +20,12 @@ public class LocalBookRepository : ILocalBookRepository
     public async Task EnsureCreatedAsync()
     {
         await _dbContext.Database.EnsureCreatedAsync();
+        try { await _dbContext.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN ReadingStatus TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN EpubLocationsCache TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN TotalPages INTEGER;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN Description TEXT;"); } catch { }
+        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN CurrentAudioTrackNumber INTEGER;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS ClientLogs (Id INTEGER PRIMARY KEY AUTOINCREMENT, Level TEXT, Message TEXT, Exception TEXT, CreatedAt TEXT);"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS Author (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, FileAs TEXT);"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Author ADD COLUMN FileAs TEXT;"); } catch { }
@@ -33,9 +36,12 @@ public class LocalBookRepository : ILocalBookRepository
         try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS BookCategory (BookId INTEGER, CategoryId INTEGER, PRIMARY KEY(BookId, CategoryId));"); } catch { }
     }
 
-    private Book MapToShared(QuimeraReader.Domain.Entities.Book domainBook)
+    private Book MapToShared(QuimeraReader.Domain.Entities.Book? domainBook)
     {
         if (domainBook == null) return null!;
+        var orderedTracks = domainBook.AudioTracks?.OrderBy(t => t.TrackNumber).ToList()
+                            ?? new List<QuimeraReader.Domain.Entities.BookAudioTrack>();
+        var firstAudioPath = orderedTracks.FirstOrDefault()?.FilePath;
         return new Book
         {
             Id = domainBook.Id,
@@ -43,9 +49,11 @@ public class LocalBookRepository : ILocalBookRepository
             Description = domainBook.Description,
             LocalCoverPath = domainBook.CoverImagePath,
             LocalEpubPath = domainBook.EpubFilePath,
+            LocalAudioPath = firstAudioPath,
             HasCover = !string.IsNullOrEmpty(domainBook.CoverImagePath),
             HasEpub = !string.IsNullOrEmpty(domainBook.EpubFilePath),
-            HasAudio = domainBook.AudioTracks != null && domainBook.AudioTracks.Any(),
+            HasAudio = orderedTracks.Any(),
+            IsAligned = domainBook.SyncMap != null && !string.IsNullOrEmpty(domainBook.SyncMap.SyncMapJson),
             IsAvailableOffline = domainBook.IsAvailableOffline,
             CurrentEpubCfi = domainBook.CurrentEpubCfi,
             PercentageCompleted = domainBook.PercentageCompleted,
@@ -55,8 +63,14 @@ public class LocalBookRepository : ILocalBookRepository
             TotalPages = domainBook.TotalPages,
             CurrentAudioPosition = domainBook.CurrentAudioPosition,
             CurrentAudioTrackNumber = domainBook.CurrentAudioTrackNumber,
-            Authors = domainBook.Authors?.Select(a => a.Author?.Name ?? "").ToList() ?? new List<string>(),
-            Categories = domainBook.Categories?.Select(c => c.Category?.Name ?? "").ToList() ?? new List<string>(),
+            AudioTracks = orderedTracks.Select(t => new AudioTrackDto
+            {
+                Id = t.Id,
+                TrackNumber = t.TrackNumber,
+                FileName = t.FileName ?? Path.GetFileName(t.FilePath)
+            }).ToList(),
+            Authors = domainBook.Authors?.Select(a => a.Author?.Name ?? "").Where(n => !string.IsNullOrEmpty(n)).ToList() ?? new List<string>(),
+            Categories = domainBook.Categories?.Select(c => c.Category?.Name ?? "").Where(n => !string.IsNullOrEmpty(n)).ToList() ?? new List<string>(),
             SyncMapJson = domainBook.SyncMap?.SyncMapJson
         };
     }
@@ -85,10 +99,10 @@ public class LocalBookRepository : ILocalBookRepository
     public async Task<List<Book>> GetOfflineBooksAsync()
     {
         var domainBooks = await _dbContext.Books
-            .Include(b => b.Authors)
-            .ThenInclude(a => a.Author)
-            .Include(b => b.Categories)
-            .ThenInclude(c => c.Category)
+            .Include(b => b.Authors).ThenInclude(a => a.Author)
+            .Include(b => b.Categories).ThenInclude(c => c.Category)
+            .Include(b => b.AudioTracks)
+            .Include(b => b.SyncMap)
             .ToListAsync();
         return domainBooks.Select(MapToShared).ToList();
     }
@@ -111,6 +125,8 @@ public class LocalBookRepository : ILocalBookRepository
         var existing = await _dbContext.Books
             .Include(b => b.Authors).ThenInclude(a => a.Author)
             .Include(b => b.Categories).ThenInclude(c => c.Category)
+            .Include(b => b.AudioTracks)
+            .Include(b => b.SyncMap)
             .FirstOrDefaultAsync(b => b.Id == book.Id);
 
         var dom = MapToDomain(book);
@@ -121,10 +137,23 @@ public class LocalBookRepository : ILocalBookRepository
         }
         else
         {
+            // No pisar el progreso local más reciente ni el caché de páginas local si vienen vacíos
+            if (string.IsNullOrEmpty(dom.EpubLocationsCache) && !string.IsNullOrEmpty(existing.EpubLocationsCache))
+            {
+                dom.EpubLocationsCache = existing.EpubLocationsCache;
+            }
+            if (existing.LastReadAt.HasValue && (!dom.LastReadAt.HasValue || existing.LastReadAt > dom.LastReadAt))
+            {
+                dom.CurrentEpubCfi = existing.CurrentEpubCfi;
+                dom.PercentageCompleted = existing.PercentageCompleted;
+                dom.CurrentAudioPosition = existing.CurrentAudioPosition;
+                dom.CurrentAudioTrackNumber = existing.CurrentAudioTrackNumber;
+                dom.LastReadAt = existing.LastReadAt;
+                dom.ReadingStatus = existing.ReadingStatus;
+            }
             _dbContext.Entry(existing).CurrentValues.SetValues(dom);
         }
         
-        // Handle Authors and Categories carefully for SQLite cache
         if (existing.Authors != null && existing.Authors.Any()) {
             _dbContext.RemoveRange(existing.Authors);
             existing.Authors.Clear();
@@ -138,16 +167,51 @@ public class LocalBookRepository : ILocalBookRepository
         } else {
             existing.Categories = new List<QuimeraReader.Domain.Entities.BookCategory>();
         }
+
+        if (!string.IsNullOrEmpty(book.LocalAudioPath))
+        {
+            existing.AudioTracks ??= new List<QuimeraReader.Domain.Entities.BookAudioTrack>();
+            if (!existing.AudioTracks.Any())
+            {
+                existing.AudioTracks.Add(new QuimeraReader.Domain.Entities.BookAudioTrack
+                {
+                    BookId = existing.Id,
+                    TrackNumber = 1,
+                    FilePath = book.LocalAudioPath,
+                    FileName = Path.GetFileName(book.LocalAudioPath)
+                });
+            }
+            else
+            {
+                existing.AudioTracks.First().FilePath = book.LocalAudioPath;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(book.SyncMapJson))
+        {
+            if (existing.SyncMap == null)
+            {
+                existing.SyncMap = new QuimeraReader.Domain.Entities.SyncMap
+                {
+                    BookId = existing.Id,
+                    SyncMapJson = book.SyncMapJson
+                };
+            }
+            else
+            {
+                existing.SyncMap.SyncMapJson = book.SyncMapJson;
+            }
+        }
         
         await _dbContext.SaveChangesAsync();
 
         if (book.Authors != null)
         {
-            foreach (var authorName in book.Authors)
+            foreach (var authorName in book.Authors.Where(a => !string.IsNullOrWhiteSpace(a)).Distinct())
             {
                 var author = await _dbContext.Set<QuimeraReader.Domain.Entities.Author>().FirstOrDefaultAsync(a => a.Name == authorName);
                 if (author == null) {
-                    author = new QuimeraReader.Domain.Entities.Author { Name = authorName };
+                    author = new QuimeraReader.Domain.Entities.Author { Name = authorName, FileAs = authorName };
                     _dbContext.Set<QuimeraReader.Domain.Entities.Author>().Add(author);
                     await _dbContext.SaveChangesAsync(); 
                 }
@@ -157,7 +221,7 @@ public class LocalBookRepository : ILocalBookRepository
         
         if (book.Categories != null)
         {
-            foreach (var catName in book.Categories)
+            foreach (var catName in book.Categories.Where(c => !string.IsNullOrWhiteSpace(c)).Distinct())
             {
                 var cat = await _dbContext.Set<QuimeraReader.Domain.Entities.Category>().FirstOrDefaultAsync(c => c.Name == catName);
                 if (cat == null) {
@@ -190,14 +254,20 @@ public class LocalBookRepository : ILocalBookRepository
         }
     }
 
-    public async Task UpdateProgressAsync(int id, string cfi, double? audioPosition, double? percentage)
+    public async Task UpdateProgressAsync(int id, string cfi, double? audioPosition, double? percentage, int? audioTrackNumber = null)
     {
         var book = await _dbContext.Books.FindAsync(id);
         if (book != null)
         {
             if (!string.IsNullOrEmpty(cfi)) book.CurrentEpubCfi = cfi;
-            if (percentage.HasValue) book.PercentageCompleted = percentage.Value;
+            if (percentage.HasValue)
+            {
+                book.PercentageCompleted = percentage.Value;
+                if (percentage.Value >= 99.5) book.ReadingStatus = "Read";
+                else if (book.ReadingStatus != "Read") book.ReadingStatus = "Reading";
+            }
             if (audioPosition.HasValue) book.CurrentAudioPosition = audioPosition.Value;
+            if (audioTrackNumber.HasValue) book.CurrentAudioTrackNumber = audioTrackNumber.Value;
             book.LastReadAt = System.DateTime.UtcNow;
             await _dbContext.SaveChangesAsync();
         }
@@ -207,7 +277,16 @@ public class LocalBookRepository : ILocalBookRepository
     {
         var queueStr = Microsoft.Maui.Storage.Preferences.Get("AnnotationQueue", "[]");
         var queue = System.Text.Json.JsonSerializer.Deserialize<List<AnnotationQueueItem>>(queueStr) ?? new List<AnnotationQueueItem>();
-        queue.Add(new AnnotationQueueItem { BookId = bookId, CfiRange = cfiRange, SelectedText = selectedText, ColorHex = colorHex, Note = note });
+        var existing = queue.FirstOrDefault(q => q.BookId == bookId && q.CfiRange == cfiRange);
+        if (existing != null)
+        {
+            existing.ColorHex = colorHex;
+            existing.Note = note;
+        }
+        else
+        {
+            queue.Add(new AnnotationQueueItem { BookId = bookId, CfiRange = cfiRange, SelectedText = selectedText, ColorHex = colorHex, Note = note });
+        }
         Microsoft.Maui.Storage.Preferences.Set("AnnotationQueue", System.Text.Json.JsonSerializer.Serialize(queue));
         return Task.CompletedTask;
     }
@@ -228,20 +307,44 @@ public class LocalBookRepository : ILocalBookRepository
         return Task.CompletedTask;
     }
 
-
-
-
-
-
-
-
-
     public async Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId)
     {
         var queued = await GetQueuedAnnotationsAsync();
-        var dbAnns = await _dbContext.Books.Where(b => b.Id == bookId).SelectMany(b => b.Annotations).Select(a => new AnnotationDto { Id = a.Id, CfiRange = a.CfiRange, SelectedText = a.SelectedText, Note = a.Note, ColorHex = a.ColorHex, CreatedAt = a.CreatedAt }).ToListAsync();
-        foreach(var q in queued.Where(x => x.BookId == bookId)) {
-            dbAnns.Add(new AnnotationDto { CfiRange = q.CfiRange, SelectedText = q.SelectedText, Note = q.Note, ColorHex = q.ColorHex });
+        var dbAnns = await _dbContext.Books
+            .Where(b => b.Id == bookId)
+            .SelectMany(b => b.Annotations)
+            .Select(a => new AnnotationDto
+            {
+                Id = a.Id,
+                CfiRange = a.CfiRange,
+                SelectedText = a.SelectedText,
+                Note = a.Note,
+                ColorHex = a.ColorHex,
+                CreatedAt = a.CreatedAt
+            })
+            .ToListAsync();
+
+        int idx = 1;
+        foreach (var q in queued.Where(x => x.BookId == bookId))
+        {
+            var existing = dbAnns.FirstOrDefault(a => a.CfiRange == q.CfiRange);
+            if (existing != null)
+            {
+                existing.ColorHex = q.ColorHex;
+                existing.Note = q.Note;
+            }
+            else
+            {
+                dbAnns.Add(new AnnotationDto
+                {
+                    Id = -idx++,
+                    CfiRange = q.CfiRange,
+                    SelectedText = q.SelectedText,
+                    Note = q.Note,
+                    ColorHex = q.ColorHex,
+                    CreatedAt = q.CreatedAt
+                });
+            }
         }
         return dbAnns;
     }
@@ -251,7 +354,15 @@ public class LocalBookRepository : ILocalBookRepository
         var book = await _dbContext.Books.Include(b => b.Annotations).FirstOrDefaultAsync(b => b.Id == bookId);
         if (book != null) {
             _dbContext.RemoveRange(book.Annotations);
-            book.Annotations = annotations.Select(a => new QuimeraReader.Domain.Entities.BookAnnotation { BookId = bookId, CfiRange = a.CfiRange, SelectedText = a.SelectedText, Note = a.Note, ColorHex = a.ColorHex, CreatedAt = a.CreatedAt }).ToList();
+            book.Annotations = annotations.Select(a => new QuimeraReader.Domain.Entities.BookAnnotation
+            {
+                BookId = bookId,
+                CfiRange = a.CfiRange,
+                SelectedText = a.SelectedText,
+                Note = a.Note ?? "",
+                ColorHex = a.ColorHex ?? "",
+                CreatedAt = a.CreatedAt
+            }).ToList();
             await _dbContext.SaveChangesAsync();
         }
     }
@@ -270,4 +381,3 @@ public class LocalBookRepository : ILocalBookRepository
         };
     }
 }
-

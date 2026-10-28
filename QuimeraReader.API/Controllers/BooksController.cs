@@ -617,7 +617,7 @@ public partial class BooksController : ControllerBase
 
         if (book.AudioTracks.Any() && 
             (string.IsNullOrEmpty(book.ProcessingStatus) || 
-             (book.ProcessingStatus != "SYNCED" && book.ProcessingStatus != "PROCESSING" && book.ProcessingStatus != "PENDING_SYNC")))
+             (book.ProcessingStatus == "NONE" || book.ProcessingStatus == "CREATED")))
         {
             book.ProcessingStatus = "PENDING_SYNC";
             await _queue.EnqueueAsync(book.Id);
@@ -961,8 +961,10 @@ public partial class BooksController : ControllerBase
         var book = await _dbContext.Books.FindAsync(id);
         if (book == null) return NotFound();
 
+        annotation.Id = 0;
         annotation.BookId = id;
         annotation.CreatedAt = DateTime.UtcNow;
+        annotation.UpdatedAt = DateTime.UtcNow;
         
         _dbContext.BookAnnotations.Add(annotation);
         await _dbContext.SaveChangesAsync();
@@ -998,6 +1000,7 @@ public partial class BooksController : ControllerBase
 
         annotation.Note = updatedAnnotation.Note;
         annotation.ColorHex = updatedAnnotation.ColorHex;
+        annotation.UpdatedAt = DateTime.UtcNow;
         
         await _dbContext.SaveChangesAsync();
         return Ok(annotation);
@@ -1077,7 +1080,10 @@ public partial class BooksController : ControllerBase
         string newAudioPath = audio.PhysicalPath;
         if (!string.IsNullOrEmpty(outDir))
         {
-            newAudioPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(book.EpubFilePath) + $"_track{nextTrack}" + Path.GetExtension(audio.OriginalFileName));
+            string baseName = !string.IsNullOrEmpty(book.EpubFilePath)
+                ? Path.GetFileNameWithoutExtension(book.EpubFilePath)
+                : string.Join("_", book.Title.Split(Path.GetInvalidFileNameChars()));
+            newAudioPath = Path.Combine(outDir, baseName + $"_track{nextTrack}" + Path.GetExtension(audio.OriginalFileName));
             if (System.IO.File.Exists(audio.PhysicalPath))
             {
                 System.IO.File.Move(audio.PhysicalPath, newAudioPath, true);
@@ -1132,11 +1138,14 @@ public partial class BooksController : ControllerBase
                         {
                             int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
                             
-                            string outDir = await GetBookOutputDirAsync(book, _dbContext);
+                            string outDir = await GetBookOutputDirAsync(book, db);
                             string newAudioPath = audio.PhysicalPath;
                             if (!string.IsNullOrEmpty(outDir))
                             {
-                                newAudioPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(book.EpubFilePath) + $"_track{nextTrack}" + Path.GetExtension(audio.OriginalFileName));
+                                string baseName = !string.IsNullOrEmpty(book.EpubFilePath)
+                    ? Path.GetFileNameWithoutExtension(book.EpubFilePath)
+                    : string.Join("_", book.Title.Split(Path.GetInvalidFileNameChars()));
+                newAudioPath = Path.Combine(outDir, baseName + $"_track{nextTrack}" + Path.GetExtension(audio.OriginalFileName));
                                 if (System.IO.File.Exists(audio.PhysicalPath))
                                 {
                                     System.IO.File.Move(audio.PhysicalPath, newAudioPath, true);

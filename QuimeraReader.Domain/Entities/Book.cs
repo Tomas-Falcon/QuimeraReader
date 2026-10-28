@@ -1,4 +1,4 @@
-﻿namespace QuimeraReader.Domain.Entities;
+namespace QuimeraReader.Domain.Entities;
 
 public class Book
 {
@@ -33,14 +33,14 @@ public class Book
     // Metadata Tracking
     public bool IsMetadataComplete { get; set; } = false;
     
-    // Sincronizacin
+    // Sincronización
     public bool IsReadInHardcover { get; set; }
 
     // Relations
     public ICollection<BookAuthor> Authors { get; set; } = new List<BookAuthor>();
     public ICollection<BookCategory> Categories { get; set; } = new List<BookCategory>();
     public ICollection<BookAudioTrack> AudioTracks { get; set; } = new List<BookAudioTrack>();
-        public ICollection<BookAnnotation> Annotations { get; set; } = new List<BookAnnotation>();
-        public bool IsAvailableOffline { get; set; } = false;
+    public ICollection<BookAnnotation> Annotations { get; set; } = new List<BookAnnotation>();
+    public bool IsAvailableOffline { get; set; } = false;
     public SyncMap? SyncMap { get; set; }
 }

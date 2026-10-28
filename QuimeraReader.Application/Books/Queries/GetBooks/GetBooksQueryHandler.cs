@@ -1,8 +1,9 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Application.Interfaces;
 using QuimeraReader.Application.Books.DTOs;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -29,24 +30,36 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
         // Ocultar libros "fantasma" que no tienen archivo asociado (ni EPUB ni Audio)
         query = query.Where(b => !string.IsNullOrEmpty(b.EpubFilePath) || b.AudioTracks.Any());
 
-                if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
+        if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
         {
             query = query.Where(b => b.ReadingStatus == request.ReadingStatus);
         }
 
-                if (!string.IsNullOrWhiteSpace(request.Search))
+        if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var s = request.Search.Trim();
             if (!string.IsNullOrEmpty(s))
             {
-                var ftsSearch = s + "*";
-                var ftsQuery = _dbContext.Books.FromSqlInterpolated($"SELECT b.* FROM Books b INNER JOIN BooksFTS fts ON b.Id = fts.rowid WHERE BooksFTS MATCH {ftsSearch}");
-                
-                // Unimos la busqueda FTS con el IQueryable original usando un join virtual o aplicando los filtros encima.
-                // Como FromSqlInterpolated devuelve un IQueryable, podemos seguir encadenando los filtros.
-                query = query.Where(b => ftsQuery.Select(f => f.Id).Contains(b.Id) || 
-                                         b.Authors.Any(a => a.Author!.Name.ToLower().Contains(s.ToLower())) || 
-                                         b.Categories.Any(c => c.Category!.Name.ToLower().Contains(s.ToLower())));
+                // Sanitizar caracteres especiales de FTS5 (como ":", "-", "\"", "(", ")") para evitar SqliteException
+                var safeFtsTokens = Regex.Replace(s, @"[^\p{L}\p{N}\s]", " ")
+                    .Split(' ', System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries);
+
+                if (safeFtsTokens.Length > 0)
+                {
+                    var ftsSearch = string.Join(" ", safeFtsTokens.Select(t => $"\"{t}\"*"));
+                    var ftsQuery = _dbContext.Books.FromSqlInterpolated($"SELECT b.* FROM Books b INNER JOIN BooksFTS fts ON b.Id = fts.rowid WHERE BooksFTS MATCH {ftsSearch}");
+
+                    query = query.Where(b => ftsQuery.Select(f => f.Id).Contains(b.Id) ||
+                                             b.Title.ToLower().Contains(s.ToLower()) ||
+                                             b.Authors.Any(a => a.Author != null && a.Author.Name.ToLower().Contains(s.ToLower())) ||
+                                             b.Categories.Any(c => c.Category != null && c.Category.Name.ToLower().Contains(s.ToLower())));
+                }
+                else
+                {
+                    query = query.Where(b => b.Title.ToLower().Contains(s.ToLower()) ||
+                                             b.Authors.Any(a => a.Author != null && a.Author.Name.ToLower().Contains(s.ToLower())) ||
+                                             b.Categories.Any(c => c.Category != null && c.Category.Name.ToLower().Contains(s.ToLower())));
+                }
             }
         }
 
@@ -55,11 +68,14 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
             query = query.Where(b => b.Categories.Any(c => request.CategoryIds.Contains(c.CategoryId)));
         }
 
-        if (request.IsAvailableOffline == true) { query = query.Where(b => b.IsAvailableOffline == true); }
+        if (request.IsAvailableOffline == true)
+        {
+            query = query.Where(b => b.IsAvailableOffline == true);
+        }
 
         var totalBooks = await query.CountAsync(cancellationToken);
 
-if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
+        if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
         {
             query = query.OrderByDescending(b => b.LastReadAt).ThenByDescending(b => b.Id);
         }
@@ -71,7 +87,8 @@ if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
         var booksList = await query
             .Include(b => b.Authors).ThenInclude(ba => ba.Author)
             .Include(b => b.Categories).ThenInclude(bc => bc.Category)
-            .Include(b => b.Series).ThenInclude(s => s.Universe)
+            .Include(b => b.Series).ThenInclude(s => s!.Universe)
+            .Include(b => b.AudioTracks)
             .Skip(skip)
             .Take(take)
             .ToListAsync(cancellationToken);
@@ -91,11 +108,12 @@ if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
             IsAvailableOffline = b.IsAvailableOffline,
             HasCover = !string.IsNullOrEmpty(b.CoverImagePath),
             HasEpub = !string.IsNullOrEmpty(b.EpubFilePath),
-            HasAudio = b.AudioTracks.Any(),
+            HasAudio = b.AudioTracks != null && b.AudioTracks.Any(),
             IsAligned = b.ProcessingStatus == "SYNCED",
             LastReadAt = b.LastReadAt,
             CurrentEpubCfi = b.CurrentEpubCfi,
             CurrentAudioPosition = b.CurrentAudioPosition,
+            CurrentAudioTrackNumber = b.CurrentAudioTrackNumber,
             PercentageCompleted = b.PercentageCompleted,
             ReadingStatus = b.ReadingStatus,
             EpubLocationsCache = b.EpubLocationsCache,
@@ -111,8 +129,3 @@ if (!string.IsNullOrWhiteSpace(request.ReadingStatus))
         };
     }
 }
-
-
-
-
-

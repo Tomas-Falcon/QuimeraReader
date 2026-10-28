@@ -1,4 +1,4 @@
-﻿@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @using Radzen
 @using Radzen.Blazor
@@ -12,34 +12,48 @@
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @namespace QuimeraReader.Shared.Components
 
-<div class="library-container" style="height: calc(100vh - 120px); overflow-y: auto; overflow-x: hidden;">
-    <div class="library-toolbar d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3 mb-4">
+<div class="library-container">
+    <div class="library-toolbar d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-2 gap-md-3 mb-3 mb-md-4">
         <div class="search-box w-100" style="max-width: 500px;">
             <RadzenTextBox Placeholder="Buscar libros, autores..." @bind-Value="@_searchQuery" @oninput="@(args => OnSearchInput(args.Value?.ToString() ?? string.Empty))" class="w-100" />
         </div>
-        <div class="filters d-flex flex-column flex-sm-row flex-wrap gap-2 align-items-stretch align-items-sm-center w-100">
+        <div class="filters d-flex flex-wrap gap-2 align-items-center w-100">
             @if (_selectionMode)
             {
-                                <span class="text-primary fw-bold me-2">@_selectedBookIds.Count seleccionados</span>
-                <RadzenDropDown TValue="string" Placeholder="Marcar como..." Data="@_bulkActions" ValueProperty="Value" TextProperty="Text" Change="OnBulkActionSelected" Style="width: 180px;" />
-                <RadzenButton Text="Cancelar Selección" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Size="ButtonSize.Small" />
+                <span class="text-primary fw-bold me-1 small">@_selectedBookIds.Count seleccionados</span>
+                <RadzenDropDown TValue="string" Placeholder="Marcar como..." Data="@_bulkActions" ValueProperty="Value" TextProperty="Text" Change="OnBulkActionSelected" Style="width: 165px;" />
+                <RadzenButton Text="Cancelar" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Size="ButtonSize.Small" />
                 <RadzenButton Text="Borrar" Click="DeleteSelected" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Icon="delete" Disabled="@(_selectedBookIds.Count == 0)" />
             }
             else
             {
-                <RadzenButton Text="Seleccionar" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Icon="check_box" />
-                <div class="d-flex align-items-center gap-2">
+                <RadzenButton Text="Seleccionar" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Size="ButtonSize.Small" Icon="check_box" />
+                <div class="d-none d-sm-flex align-items-center gap-2">
                     @if (_isUploading)
                     {
                         <span class="text-muted small me-2"><RadzenIcon Icon="refresh" class="rz-spin" /> Subiendo...</span>
                     }
-                    <label class="rz-button rz-button-md rz-variant-filled rz-primary rz-shade-default m-0 d-flex align-items-center gap-2" style="cursor: pointer;">
+                    <label class="rz-button rz-button-sm rz-variant-filled rz-primary rz-shade-default m-0 d-flex align-items-center gap-1" style="cursor: pointer;">
                         <RadzenIcon Icon="cloud_upload" /> Subir EPUB
                         <InputFile @key='"fileUploadInput"' OnChange="HandleFileUpload" accept=".epub,.mp3,.m4b,.m4a,.wav" class="d-none" multiple />
                     </label>
                 </div>
-                                <RadzenDropDown Multiple="true" Placeholder="Categorías" Data="@_availableCategories" TextProperty="Name" ValueProperty="Id" @bind-Value="_selectedCategories"  Style="min-width: 200px; max-width: 100%;" AllowClear="true" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
-                <RadzenDropDown TValue="string" Data="@_sortOptions" @bind-Value="_selectedSort" Style="width: auto;" />
+                <RadzenDropDown Multiple="true"
+                                Placeholder="Categorías"
+                                Data="@_availableCategories"
+                                TextProperty="Name"
+                                ValueProperty="Id"
+                                @bind-Value="_selectedCategories"
+                                Change="@OnCategoryChanged"
+                                Style="min-width: 150px; flex: 1; max-width: 260px;"
+                                AllowClear="true"
+                                AllowFiltering="true"
+                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
+                <RadzenDropDown TValue="string"
+                                Data="@_sortOptions"
+                                @bind-Value="_selectedSort"
+                                Change="@OnSortChanged"
+                                Style="min-width: 160px;" />
             }
         </div>
     </div>
@@ -48,8 +62,8 @@
     {
         @if (_readingBooks != null && _readingBooks.Any())
         {
-            <h3 class="rz-color-primary rz-mt-4 mb-3">@TranslationService["Status_Reading"]</h3>
-            <div class="netflix-row mb-5">
+            <h4 class="rz-color-primary mt-2 mb-2 fw-bold">@TranslationService["Status_Reading"]</h4>
+            <div class="netflix-row mb-4">
                 @foreach (var book in _readingBooks)
                 {
                     <div class="netflix-item"><BookCard Book="book" /></div>
@@ -63,10 +77,10 @@
             </div>
         }
 
-                @if (_nextToReadBooks != null && _nextToReadBooks.Any())
+        @if (_nextToReadBooks != null && _nextToReadBooks.Any())
         {
-            <h3 class="rz-color-primary rz-mt-4 mb-3">@TranslationService["Status_NextToRead"]</h3>
-            <div class="netflix-row mb-5">
+            <h4 class="rz-color-primary mt-2 mb-2 fw-bold">@TranslationService["Status_NextToRead"]</h4>
+            <div class="netflix-row mb-4">
                 @foreach (var book in _nextToReadBooks)
                 {
                     <div class="netflix-item"><BookCard Book="book" /></div>
@@ -79,10 +93,11 @@
                 }
             </div>
         }
-                @if (_readBooks != null && _readBooks.Any())
+
+        @if (_readBooks != null && _readBooks.Any())
         {
-            <h3 class="rz-color-primary rz-mt-4 mb-3">@TranslationService["Status_Read"]</h3>
-            <div class="netflix-row mb-5">
+            <h4 class="rz-color-primary mt-2 mb-2 fw-bold">@TranslationService["Status_Read"]</h4>
+            <div class="netflix-row mb-4">
                 @foreach (var book in _readBooks)
                 {
                     <div class="netflix-item"><BookCard Book="book" /></div>
@@ -95,10 +110,11 @@
                 }
             </div>
         }
+
         @if (_recommendations != null && _recommendations.Any())
         {
-            <h3 class="rz-color-primary rz-mt-4 mb-3">@TranslationService["Status_Recommended"]</h3>
-            <div class="netflix-row mb-5">
+            <h4 class="rz-color-primary mt-2 mb-2 fw-bold">@TranslationService["Status_Recommended"]</h4>
+            <div class="netflix-row mb-4">
                 @foreach (var book in _recommendations)
                 {
                     <div class="netflix-item"><BookCard Book="book" /></div>
@@ -107,46 +123,38 @@
         }
     }
 
-    <h3 class="rz-color-primary rz-mt-4 mb-3">@(string.IsNullOrWhiteSpace(_searchQuery) ? TranslationService["Library_AllBooks"] : TranslationService["Library_SearchResults"])</h3>
+    <h4 class="rz-color-primary mt-2 mb-3 fw-bold">@(string.IsNullOrWhiteSpace(_searchQuery) ? TranslationService["Library_AllBooks"] : TranslationService["Library_SearchResults"])</h4>
     
-    @if (false)
-    {
-        <div class="text-center p-5">
-            <RadzenIcon Icon="library_books" Style="font-size: 3rem; color: var(--rz-text-disabled-color);" />
-            <p class="text-muted mt-2">No hay libros en la biblioteca.</p>
-        </div>
-    }
-    else
-    {
-        <Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize ItemsProvider="ProvideBookChunks" Context="chunk" OverscanCount="3" @ref="_virtualizeComponent">
-            <ItemContent>
-                <div class="row m-0 row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-4 row-cols-xl-5 g-4 mb-4">
-                    @foreach (var book in chunk)
-                    {
-                        <div class="col">
-                            <BookCard Book="book" SelectionMode="_selectionMode" IsSelected="_selectedBookIds.Contains(book.Id)" IsSelectedChanged="@(isSelected => OnBookSelectionChanged(book.Id, isSelected))" />
-                        </div>
-                    }
-                </div>
-            </ItemContent>
-            <Placeholder>
-                <div class="row m-0 row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-4 row-cols-xl-5 g-4 mb-4">
-                    @for (int i = 0; i < 5; i++)
-                    {
-                        <div class="col">
-                            <div style="height: 350px; background: var(--bg-card); border-radius: 8px; opacity: 0.5;"></div>
-                        </div>
-                    }
-                </div>
-            </Placeholder>
-        </Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize>
-    }
+    <Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize ItemsProvider="ProvideBookChunks" Context="chunk" OverscanCount="3" @ref="_virtualizeComponent">
+        <ItemContent>
+            <div class="row m-0 row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-4 row-cols-xl-6 g-2 g-md-4 mb-3 mb-md-4">
+                @foreach (var book in chunk)
+                {
+                    <div class="col">
+                        <BookCard Book="book" SelectionMode="_selectionMode" IsSelected="_selectedBookIds.Contains(book.Id)" IsSelectedChanged="@(isSelected => OnBookSelectionChanged(book.Id, isSelected))" />
+                    </div>
+                }
+            </div>
+        </ItemContent>
+        <Placeholder>
+            <div class="row m-0 row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-4 row-cols-xl-6 g-2 g-md-4 mb-3 mb-md-4">
+                @for (int i = 0; i < 6; i++)
+                {
+                    <div class="col">
+                        <div style="height: 280px; background: var(--bg-card); border-radius: 8px; opacity: 0.5;"></div>
+                    </div>
+                }
+            </div>
+        </Placeholder>
+    </Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize>
 </div>
 
 <style>
     .library-container {
         max-width: 100%;
         overflow-x: hidden;
+        padding: 4px 0 24px 0 !important;
+        min-height: auto !important;
     }
     .netflix-row {
         width: 100%;
@@ -154,17 +162,25 @@
         display: flex;
         overflow-x: auto;
         scroll-snap-type: x mandatory;
-        gap: 1.5rem;
-        padding-bottom: 1rem;
-        padding-top: 0.5rem;
+        gap: 0.85rem;
+        padding-bottom: 0.75rem;
+        padding-top: 0.25rem;
     }
     .netflix-item {
         flex: 0 0 auto;
         scroll-snap-align: start;
-        width: 220px;
+        width: 150px;
+    }
+    @@media (min-width: 768px) {
+        .netflix-row {
+            gap: 1.35rem;
+        }
+        .netflix-item {
+            width: 200px;
+        }
     }
     .netflix-row::-webkit-scrollbar {
-        height: 8px;
+        height: 6px;
     }
     .netflix-row::-webkit-scrollbar-thumb {
         background-color: var(--rz-primary-light);
@@ -179,35 +195,45 @@
     [Parameter]
     public string? QueryParam { get; set; }
 
-    private Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize<List<Book>> _virtualizeComponent;
+    private Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize<List<Book>>? _virtualizeComponent;
 
     private async ValueTask<Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderResult<List<Book>>> ProvideBookChunks(Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderRequest request)
     {
         try 
         {
-            int chunkSize = 5;
+            // Usar 12 como tamaño de bloque (múltiplo común de 2, 3, 4 y 6 columnas) para no dejar nunca huecos vacíos en móvil ni tablet
+            int chunkSize = 12;
             int skip = request.StartIndex * chunkSize;
             int take = request.Count * chunkSize;
 
             var result = await BookService.GetBooksAsync(1, 50, _searchQuery, _selectedCategories?.ToArray(), null, skip, take);
+            var booksData = result.Data ?? Array.Empty<Book>();
+
+            if (_selectedSort == "Título (A-Z)")
+            {
+                booksData = booksData.OrderBy(b => b.Title).ToArray();
+            }
+            else if (_selectedSort == "Autor (A-Z)")
+            {
+                booksData = booksData.OrderBy(b => b.Authors?.FirstOrDefault() ?? "").ThenBy(b => b.Title).ToArray();
+            }
+
             var totalChunks = (int)Math.Ceiling((double)result.Total / chunkSize);
 
             var chunks = new List<List<Book>>();
-            for (int i = 0; i < result.Data.Length; i += chunkSize)
+            for (int i = 0; i < booksData.Length; i += chunkSize)
             {
-                chunks.Add(result.Data.Skip(i).Take(chunkSize).ToList());
+                chunks.Add(booksData.Skip(i).Take(chunkSize).ToList());
             }
 
             return new Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderResult<List<Book>>(chunks, totalChunks);
         }
-        catch (Exception ex)
+        catch
         {
             return new Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderResult<List<Book>>(new List<List<Book>>(), 0);
         }
     }
 
-    
-    // Pagination fields for carousels
     private List<Book> _readingBooks = new();
     private int _readingPage = 1;
     private bool _hasMoreReading = false;
@@ -243,7 +269,7 @@
     private List<string> _sortOptions = new List<string> { "Añadidos recientemente", "Título (A-Z)", "Autor (A-Z)" };
     private string _selectedSort = "Añadidos recientemente";
 
-        private List<dynamic> _bulkActions = new List<dynamic>
+    private List<dynamic> _bulkActions = new List<dynamic>
     {
         new { Text = "Marcar Leído", Value = "Read" },
         new { Text = "Marcar No Leído", Value = "Unread" },
@@ -259,9 +285,9 @@
             await BookService.BulkUpdateStatusAsync(_selectedBookIds.ToList(), status);
             ToastService.ShowSuccess("Libros actualizados");
             ToggleSelectionMode();
-            if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync(); // Reload
+            if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             ToastService.ShowError("Error al actualizar: " + ex.Message);
         }
@@ -289,9 +315,9 @@
         if (_selectedBookIds.Count == 0) return;
         
         var result = await _dialogService.Confirm(
-            $"ATENCION! Vas a borrar {_selectedBookIds.Count} libros. Esta accion ELIMINARA PERMANENTEMENTE los archivos fisicos (EPUBs, audios, portadas).", 
-            "Eliminar Libros", 
-            new ConfirmOptions() { OkButtonText = "Si, ELIMINAR", CancelButtonText = "Cancelar" });
+            $"ATENCIÓN: Vas a borrar {_selectedBookIds.Count} libros. Esta acción ELIMINARÁ PERMANENTEMENTE los archivos físicos del servidor (EPUBs, audios, portadas).", 
+            "Eliminar Libros del Servidor", 
+            new ConfirmOptions() { OkButtonText = "Sí, ELIMINAR", CancelButtonText = "Cancelar" });
 
         if (result == true)
         {
@@ -300,7 +326,7 @@
                 await BookService.DeleteBooksAsync(_selectedBookIds.ToArray());
                 _selectedBookIds.Clear();
                 _selectionMode = false;
-                ToastService.ShowSuccess("Libros borrados correctamente de forma permanente");
+                ToastService.ShowSuccess("Libros borrados correctamente");
                 if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync(); 
                 StateHasChanged();
             }
@@ -344,7 +370,7 @@
             if (successCount > 0)
             {
                 ToastService.ShowSuccess($"{successCount} libro(s) subido(s) correctamente!");
-                                if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
+                if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
             }
         }
         catch (Exception ex)
@@ -357,10 +383,9 @@
             StateHasChanged();
         }
     }
+
     private IEnumerable<QuimeraReader.Shared.Models.Category> _availableCategories = Array.Empty<QuimeraReader.Shared.Models.Category>();
     private IEnumerable<int> _selectedCategories = new List<int>();
-
-    
     private bool _isInitialized = false;
 
     protected override bool ShouldRender() => _isInitialized;
@@ -382,12 +407,13 @@
         }
         catch { }
         
-        _debounceTimer = new System.Timers.Timer(500);
+        _debounceTimer = new System.Timers.Timer(400);
         _debounceTimer.AutoReset = false;
         _debounceTimer.Elapsed += async (sender, args) =>
         {
             await InvokeAsync(async () => {
-                if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync(); StateHasChanged();
+                if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
+                StateHasChanged();
             });
         };
         
@@ -410,7 +436,6 @@
         }
         catch { }
 
-        _ = PollNewBooksAsync();
         _isInitialized = true;
     }
 
@@ -421,15 +446,18 @@
             _searchQuery = QueryParam;
             if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
         }
-        else if (string.IsNullOrWhiteSpace(QueryParam) && _virtualizeComponent != null)
-        {
-            // await _virtualizeComponent.RefreshDataAsync();
-        }
     }
 
-        private async Task OnCategoryChanged(object value)
+    private async Task OnCategoryChanged(object value)
     {
         if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnSortChanged(object value)
+    {
+        if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
+        StateHasChanged();
     }
 
     private void OnSearchInput(string value)
@@ -446,8 +474,6 @@
     {
         try
         {
-            
-
             if (_hasMoreReading && _loadMoreReadingElement.Id != null && !_readingScrollInitialized)
             {
                 await JSRuntime.InvokeVoidAsync("infiniteScroll.initialize", _loadMoreReadingElement, _objRef, "LoadMoreReadingRequested");
@@ -467,7 +493,6 @@
         catch { }
     }
 
-
     [JSInvokable]
     public async Task LoadMoreReadingRequested()
     {
@@ -479,7 +504,7 @@
             var result = await BookService.GetBooksAsync(_readingPage, 20, "", readingStatus: "Reading");
             if (result.Data.Length > 0) _readingBooks.AddRange(result.Data);
             _hasMoreReading = result.Data.Length >= 20;
-            _readingScrollInitialized = false; // re-init on next render if needed
+            _readingScrollInitialized = false;
         }
         catch { }
         finally { _isLoadingReading = false; StateHasChanged(); }
@@ -519,29 +544,6 @@
         finally { _isLoadingRead = false; StateHasChanged(); }
     }
 
-
-
-    private async Task PollNewBooksAsync()
-    {
-        try
-        {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
-            while (await timer.WaitForNextTickAsync(_cts.Token))
-            {
-                // We could poll to check for new books, but Virtualize handles its own data loading.
-                // We'll just refresh it periodically if not searching.
-                if (string.IsNullOrWhiteSpace(_searchQuery) && _virtualizeComponent != null)
-                {
-                    // For performance, we shouldn't force refresh every 10s if user is scrolling. 
-                    // Let's omit aggressive polling for the virtualized list.
-                }
-            }
-        }
-        catch (OperationCanceledException) { }
-    }
-
-
-
     public async ValueTask DisposeAsync()
     {
         _cts.Cancel();
@@ -552,5 +554,3 @@
         _objRef?.Dispose();
     }
 }
-
-

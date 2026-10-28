@@ -30,49 +30,49 @@ else if (_book == null)
 }
 else
 {
-    <div class="book-details-hero">
+    <div class="book-details-hero pb-mobile-nav">
         <!-- Background Blur effect similar to Spotify/Reader -->
         <div class="hero-bg" style="background-image: url('@(BookService.BaseAddress + _book.CoverUrl)');"></div>
         <div class="hero-overlay"></div>
 
-        <div class="container position-relative" style="z-index: 10; padding-top: 2rem; padding-bottom: 3rem;">
-            <div class="mb-4">
-                <RadzenButton ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" class="text-white text-decoration-none px-0" Click="@GoBack" style="font-size: 1.1rem; opacity: 0.9;" Icon="arrow_back" Text="@Translation["BookDetails_BackToLibrary"]" />
+        <div class="container position-relative" style="z-index: 10; padding-top: 1.5rem; padding-bottom: 3rem;">
+            <div class="mb-3 mb-md-4">
+                <RadzenButton ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" class="text-white text-decoration-none px-0" Click="@GoBack" style="font-size: 1.05rem; opacity: 0.9;" Icon="arrow_back" Text="@Translation["BookDetails_BackToLibrary"]" />
             </div>
 
-            <div class="d-flex flex-column flex-md-row gap-5 align-items-center align-items-md-start">
+            <div class="d-flex flex-column flex-md-row gap-4 gap-md-5 align-items-center align-items-md-start">
                 <!-- Cover -->
-                <div class="cover-section" style="flex: 0 0 auto; width: 100%; max-width: 300px;">
+                <div class="cover-section" style="flex: 0 0 auto; width: 100%; max-width: min(260px, 65vw);">
                     <img src="@QuimeraReader.Shared.Helpers.ImageHelper.GetImageSource(_book.CoverUrl, BookService.BaseAddress)" alt="@Translation["EditBook_Cover"]" class="img-fluid rounded shadow-lg" style="width: 100%;" onerror="this.outerHTML='<div class=\'placeholder-cover shadow-lg rounded d-flex align-items-center justify-content-center\' style=\'width:100%;aspect-ratio:2/3;background:#2a2a2a;color:#888;\'><span>@Translation["BookDetails_NoCover"]</span></div>'" />
                 </div>
                 
                 <!-- Metadata -->
-                <div class="info-section text-white mt-3 mt-md-0" style="flex: 1;">
-                    <div class="d-flex align-items-center mb-2">
-                        <h1 class="display-5 fw-bold mb-0 me-3">@_book.Title</h1>
-                        <RadzenButton Icon="edit" ButtonStyle="Radzen.ButtonStyle.Light" Size="Radzen.ButtonSize.Medium" Click="@OpenEditModal" />
+                <div class="info-section text-white mt-2 mt-md-0 w-100" style="flex: 1; min-width: 0;">
+                    <div class="d-flex align-items-start justify-content-between justify-content-md-start mb-2 gap-2">
+                        <h1 class="fs-2 fw-bold mb-0 me-2" style="word-break: break-word;">@_book.Title</h1>
+                        <RadzenButton Icon="edit" ButtonStyle="Radzen.ButtonStyle.Light" Size="Radzen.ButtonSize.Medium" Click="@OpenEditModal" class="flex-shrink-0" />
                     </div>
                     
                     @if (_book.Authors.Any())
                     {
-                        <h4 class="text-white-50 mb-3">@string.Join(", ", _book.Authors)</h4>
+                        <h4 class="text-white-50 mb-3 fs-5">@string.Join(", ", _book.Authors)</h4>
                     }
 
                     @if (!string.IsNullOrEmpty(_book.Series))
                     {
-                        <h5 class="text-warning mb-3"><i class="bi bi-collection"></i> @Translation["BookDetails_Series"] @_book.Series</h5>
+                        <h5 class="text-warning mb-3 fs-6"><i class="bi bi-collection"></i> @Translation["BookDetails_Series"] @_book.Series</h5>
                     }
 
                     @if (!string.IsNullOrEmpty(_book.Isbn))
                     {
-                        <div class="mb-3 text-white-50">
+                        <div class="mb-3 text-white-50 small">
                             <i class="bi bi-upc-scan me-1"></i> <strong>ISBN:</strong> @_book.Isbn
                         </div>
                     }
 
                     @if (_book.Categories.Any())
                     {
-                        <div class="mb-4 d-flex gap-2 flex-wrap">
+                        <div class="mb-3 d-flex gap-2 flex-wrap">
                             @foreach(var cat in _book.Categories)
                             {
                                 <a href="/?q=@(Uri.EscapeDataString(cat))" class="text-decoration-none">
@@ -105,8 +105,8 @@ else
                     
                     @if (!string.IsNullOrWhiteSpace(_book.Description))
                     {
-                        <div class="description-box p-4 rounded mb-4" style="background-color: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);">
-                            <p class="lead mb-0" style="white-space: pre-wrap; font-size: 1.1rem; line-height: 1.6;">@_book.Description</p>
+                        <div class="description-box p-3 p-md-4 rounded mb-4" style="background-color: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);">
+                            <p class="mb-0" style="white-space: pre-wrap; font-size: 1rem; line-height: 1.6;">@_book.Description</p>
                         </div>
                     }
                     else
@@ -127,14 +127,14 @@ else
                         }
                     </div>
 
-                    <div class="actions mt-3 d-flex gap-3 flex-wrap">
+                    <div class="actions mt-3 d-flex flex-column flex-sm-row gap-3 flex-wrap">
                         @if (!_book.HasEpub && !_book.HasAudio)
                         {
-                            <RadzenButton ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Large" class="px-5 py-3 rounded-pill fw-bold" Disabled="true" Icon="block" Text="@Translation["BookDetails_FileNotAvailable"]" />
+                            <RadzenButton ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Large" class="px-4 py-3 rounded-pill fw-bold" Disabled="true" Icon="block" Text="@Translation["BookDetails_FileNotAvailable"]" />
                         }
                         else
                         {
-                            <RadzenButton ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Large" class="px-5 py-3 rounded-pill fw-bold shadow-sm" Click="@GoToRead" style="transition: transform 0.2s;" Icon="play_circle">
+                            <RadzenButton ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Large" class="px-4 py-3 rounded-pill fw-bold shadow-sm" Click="@GoToRead" style="transition: transform 0.2s;" Icon="play_circle">
                                 @if (_book.PercentageCompleted.HasValue && _book.PercentageCompleted.Value >= 100 || _book.ReadingStatus == "Read")
                                 {
                                     @Translation["Action_ReadAgain"]
@@ -163,7 +163,7 @@ else
                     </div>
 
                     <div class="mt-4 pt-4" style="border-top: 1px solid rgba(255,255,255,0.1);">
-                        <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-4 gap-3">
                             <div>
                                 <h6 class="text-white mb-0"><i class="bi bi-cloud-arrow-down me-2"></i> @Translation["BookDetails_AvailableOffline"]</h6>
                                 <small class="text-white-50">@Translation["BookDetails_AvailableOfflineDesc"]</small>
@@ -192,7 +192,7 @@ else
     .book-details-hero {
         position: relative;
         min-height: calc(100vh - 60px);
-        margin: -1.5rem; /* Negate the padding from article content to bleed to edges */
+        margin: -1.5rem;
         overflow: hidden;
         background-color: #121212;
     }
@@ -226,7 +226,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         await LoadBookAsync();
-            if (_book != null) _book.CoverCacheBuster = DateTime.UtcNow.Ticks;
+        if (_book != null) _book.CoverCacheBuster = DateTime.UtcNow.Ticks;
     }
     
     private async Task LoadBookAsync()
@@ -253,7 +253,6 @@ else
         try
         {
             await ScanService.RescanSingleBookMetadataAsync(Id);
-            // Refresh book details to show the new metadata
             await LoadBookAsync();
             if (_book != null) _book.CoverCacheBuster = DateTime.UtcNow.Ticks;
             ToastService.ShowSuccess(Translation["BookDetails_MetadataUpdated"]);
@@ -270,7 +269,6 @@ else
         }
     }
     
-    
     private async Task ToggleOfflineAsync(bool value)
     {
         try
@@ -283,8 +281,7 @@ else
         catch (Exception ex)
         {
             ToastService.ShowError($"Error: {ex.Message}");
-            // Revert state on failure
-            _book.IsAvailableOffline = !value;
+            if (_book != null) _book.IsAvailableOffline = !value;
         }
     }
 
@@ -306,11 +303,10 @@ else
             try 
             {
                 await LoadBookAsync();
-            if (_book != null) _book.CoverCacheBuster = DateTime.UtcNow.Ticks;
+                if (_book != null) _book.CoverCacheBuster = DateTime.UtcNow.Ticks;
             }
             catch
             {
-                // El libro ha sido borrado completamente de la base de datos
                 _book = null;
             }
             
@@ -338,11 +334,10 @@ else
             try 
             {
                 await LoadBookAsync();
-            if (_book != null) _book.CoverCacheBuster = DateTime.UtcNow.Ticks;
+                if (_book != null) _book.CoverCacheBuster = DateTime.UtcNow.Ticks;
             }
             catch
             {
-                // El libro ha sido borrado completamente de la base de datos
                 _book = null;
             }
             
@@ -366,7 +361,7 @@ else
     {
         var result = await DialogService.OpenAsync<BookEditModal>(Translation["EditBook_Title"], 
             new Dictionary<string, object?> { { "Book", _book } },
-            new Radzen.DialogOptions() { Width = "500px", Height = "450px" });
+            new Radzen.DialogOptions() { Width = "min(520px, 95vw)", Height = "auto", CloseDialogOnOverlayClick = true });
         
         if (result == true)
         {
@@ -375,12 +370,3 @@ else
         }
     }
 }
-
-
-
-
-
-
-
-
-

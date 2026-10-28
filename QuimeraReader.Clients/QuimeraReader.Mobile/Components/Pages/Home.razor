@@ -1,6 +1,10 @@
 @page "/"
 @using QuimeraReader.Shared.Components
 
-<h1>Tu Biblioteca Móvil</h1>
-<BookList />
+<BookList QueryParam="@Q" />
 
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Q { get; set; }
+}
