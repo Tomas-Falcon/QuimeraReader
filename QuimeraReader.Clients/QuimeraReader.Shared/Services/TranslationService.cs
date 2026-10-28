@@ -30,6 +30,27 @@ public class TranslationService : ITranslationService
     {
         _jsRuntime = jsRuntime;
         _logger = logger;
+        // Cargar el idioma por defecto de forma síncrona: los textos están disponibles desde el primer render (sin spinner ni re-render)
+        TryLoadEmbeddedSync(_currentLanguage);
+    }
+
+    private string? _loadedLanguage;
+
+    private bool TryLoadEmbeddedSync(string langCode)
+    {
+        try
+        {
+            var assembly = typeof(TranslationService).Assembly;
+            using var stream = assembly.GetManifestResourceStream($"QuimeraReader.Shared.wwwroot.Translations.{langCode}.json");
+            if (stream == null) return false;
+            using var reader = new StreamReader(stream);
+            var data = JsonSerializer.Deserialize<Dictionary<string, string>>(reader.ReadToEnd());
+            if (data == null) return false;
+            _translations = data;
+            _loadedLanguage = langCode;
+            return true;
+        }
+        catch { return false; }
     }
 
     public async Task InitializeAsync()
@@ -108,6 +129,8 @@ public class TranslationService : ITranslationService
 
     private async Task LoadLanguageInternalAsync(string langCode)
     {
+        // Si ya está cargado ese idioma no notificar: evita un re-render global del layout en el arranque
+        if (_loadedLanguage == langCode && _translations.Count > 0) return;
         try
         {
             // The cleanest, most bulletproof way to read static assets across Web and MAUI without HttpClient issues
@@ -124,6 +147,7 @@ public class TranslationService : ITranslationService
                 if (data != null)
                 {
                     _translations = data;
+                    _loadedLanguage = langCode;
                     OnTranslationsLoaded?.Invoke();
                     return;
                 }

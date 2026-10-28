@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.JSInterop;
 using QuimeraReader.Shared.Interfaces;
@@ -8,6 +8,7 @@ namespace QuimeraReader.Web.Services
     public class WebNetworkStateService : INetworkStateService
     {
         private readonly IJSRuntime _jsRuntime;
+        private bool _initialized;
         public bool IsOffline { get; private set; }
         public bool IsForceOffline { get; private set; }
 
@@ -20,6 +21,9 @@ namespace QuimeraReader.Web.Services
 
         public async Task InitializeAsync()
         {
+            if (_initialized) return;
+            _initialized = true;
+
             var isOnline = await _jsRuntime.InvokeAsync<bool>("window.quimeraNetwork.isOnline");
             IsOffline = !isOnline;
             

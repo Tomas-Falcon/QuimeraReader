@@ -37,14 +37,6 @@
     </div>
     <QuimeraReader.Shared.Components.ToastContainer />
 }
-else if (!_isLoaded)
-{
-    <div class="d-flex justify-content-center align-items-center vh-100" style="background-color: var(--bg-body); color: var(--text-color);">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Cargando...</span>
-        </div>
-    </div>
-}
 else
 {
     <RadzenLayout Style="grid-template-areas: 'rz-header rz-header' 'rz-sidebar rz-body';">
@@ -133,7 +125,6 @@ else
     private bool _sidebarExpanded = false;
     private bool _isMobile = false;
     private bool isDarkTheme = true;
-    private bool _isLoaded = false;
     private string _currentLang = "es";
     private bool HasLocalRepo => ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) != null;
 
@@ -194,21 +185,39 @@ else
             _ = PollScanStatusAsync();
         }
         
-        var worker = (QuimeraReader.Shared.Interfaces.IOfflineSyncWorker?)ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.IOfflineSyncWorker));
-        if (worker != null)
+        // En Android/Desktop el host ya ejecuta su propio bucle de sincronización (App.xaml.cs / Program.cs).
+        // Solo la Web necesita lanzarla desde aquí; se difiere para no competir con la carga inicial de la biblioteca.
+        if (OperatingSystem.IsBrowser() && !ServerConfig.NeedsConfiguration)
         {
-            _ = Task.Run(async () =>
+            var worker = (QuimeraReader.Shared.Interfaces.IOfflineSyncWorker?)ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.IOfflineSyncWorker));
+            if (worker != null)
             {
-                await Task.Delay(4000);
-                await worker.SyncNowAsync();
-            });
+                _ = DelayedWebSyncAsync(worker);
+            }
         }
     }
 
+    private async Task DelayedWebSyncAsync(QuimeraReader.Shared.Interfaces.IOfflineSyncWorker worker)
+    {
+        try
+        {
+            await Task.Delay(15000, _cts.Token);
+            await worker.SyncNowAsync();
+        }
+        catch { }
+    }
+
+    private bool _wasReadingMode;
+
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
     {
+        // El router ya re-renderiza @Body. El layout solo necesita repintarse si cambia el modo lectura,
+        // el estado del menú lateral o la pestaña activa de la barra inferior móvil.
+        bool needsRender = _isMobile && _sidebarExpanded;
         if (_isMobile) _sidebarExpanded = false;
-        InvokeAsync(StateHasChanged);
+        if (IsReadingMode != _wasReadingMode) { _wasReadingMode = IsReadingMode; needsRender = true; }
+        if (_isMobile) needsRender = true;
+        if (needsRender) InvokeAsync(StateHasChanged);
     }
 
     private void HandleTranslationsLoaded()
@@ -356,10 +365,13 @@ else
             
             var screenWidth = await JSRuntime.InvokeAsync<int>("eval", "window.innerWidth");
             _isMobile = screenWidth < 768;
-            _sidebarExpanded = !_isMobile;
+            var expanded = !_isMobile;
+            bool changed = expanded != _sidebarExpanded || !isDarkTheme;
+            _sidebarExpanded = expanded;
+            _wasReadingMode = IsReadingMode;
 
-            _isLoaded = true;
-            StateHasChanged();
+            // Un único re-render del layout solo si algo visual cambió (ya no hay spinner que bloquee @Body)
+            if (changed) StateHasChanged();
         }
     }
 

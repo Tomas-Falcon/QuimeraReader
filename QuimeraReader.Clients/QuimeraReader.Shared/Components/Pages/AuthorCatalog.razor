@@ -1,4 +1,4 @@
-﻿@page "/author/{AuthorName}"
+@page "/author/{AuthorName}"
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Components
 @inject QuimeraReader.Shared.Services.IBookService BookService
@@ -18,7 +18,7 @@
 
 <hr class="border-secondary mb-4" />
 
-<BookList QueryParam="@AuthorName" />
+<BookList FilterType="author" FilterValue="@AuthorName" />
 
 @code {
     [Parameter]

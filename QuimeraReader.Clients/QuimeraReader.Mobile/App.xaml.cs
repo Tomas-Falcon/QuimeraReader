@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using System.Threading;
 using System.Threading.Tasks;
 using System;
@@ -48,6 +48,8 @@ public partial class App : Application
         var token = _cts.Token;
 
         Task.Run(async () => {
+            // Diferir la primera sincronización para no competir con el arranque de la UI (render de la biblioteca)
+            try { await Task.Delay(TimeSpan.FromSeconds(8), token); } catch (TaskCanceledException) { return; }
             TriggerSyncFireAndForget();
 
             while (!token.IsCancellationRequested)

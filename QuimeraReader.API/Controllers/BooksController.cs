@@ -65,18 +65,24 @@ public partial class BooksController : ControllerBase
     [HttpGet("categories")]
     public async Task<IActionResult> GetCategories()
     {
-        var categories = await _dbContext.Categories
+        var raw = await _dbContext.Categories
+            .AsNoTracking()
+            .OrderBy(c => c.Name)
             .Select(c => new {
                 c.Id,
                 c.Name,
                 c.IsUserGenerated,
-                BookCount = c.Books.Count,
-                SampleCoverUrl = c.Books.Where(b => b.Book.CoverImagePath != null)
-                                        .Select(b => "api/media/books/" + b.Book.Id + "/cover")
-                                        .FirstOrDefault()
+                BookCount = c.Books.Count(),
+                SampleBookId = c.Books.Select(b => (int?)b.BookId).FirstOrDefault()
             })
-            .OrderBy(c => c.Name)
             .ToListAsync();
+        var categories = raw.Select(c => new {
+            c.Id,
+            c.Name,
+            c.IsUserGenerated,
+            c.BookCount,
+            SampleCoverUrl = c.SampleBookId.HasValue ? $"api/media/books/{c.SampleBookId.Value}/cover" : null
+        });
         return Ok(categories);
     }
 
@@ -85,25 +91,28 @@ public partial class BooksController : ControllerBase
     {
         try
         {
-            var query = _dbContext.Authors
-                .Where(a => a.Name != null)
-                .GroupBy(a => a.Name)
-                .Select(g => g.OrderBy(a => a.Id).FirstOrDefault());
-
-            var authors = await query
-                .Select(a => new {
-                    a.Id,
-                    Name = a.Name ?? "Desconocido",
-                    ProfileImageUrl = (string?)null,
-                    BookCount = a.Books.Count,
-                    SampleCoverUrl = a.Books.Where(b => b.Book.CoverImagePath != null)
-                                            .Select(b => "api/media/books/" + b.Book.Id + "/cover")
-                                            .FirstOrDefault()
-                })
+            // Authors.Name ya es UNIQUE: el GroupBy era redundante y rompía la traducción de EF Core 10 (EmptyProjectionMember)
+            var raw = await _dbContext.Authors
+                .AsNoTracking()
+                .Where(a => a.Name != null && a.Books.Any())
                 .OrderBy(a => a.Name)
                 .Skip(offset)
                 .Take(limit)
+                .Select(a => new {
+                    a.Id,
+                    a.Name,
+                    BookCount = a.Books.Count(),
+                    SampleBookId = a.Books.Select(ba => (int?)ba.BookId).FirstOrDefault()
+                })
                 .ToListAsync();
+
+            var authors = raw.Select(a => new {
+                a.Id,
+                Name = a.Name ?? "Desconocido",
+                ProfileImageUrl = (string?)null,
+                a.BookCount,
+                SampleCoverUrl = a.SampleBookId.HasValue ? $"api/media/books/{a.SampleBookId.Value}/cover" : null
+            });
 
             return Ok(authors);
         }
@@ -115,13 +124,16 @@ public partial class BooksController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null, [FromQuery] int[]? categoryIds = null, [FromQuery] string? readingStatus = null, [FromQuery] int? skip = null, [FromQuery] int? take = null, [FromQuery] bool? isAvailableOffline = null)
+    public async Task<IActionResult> GetBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null, [FromQuery] int[]? categoryIds = null, [FromQuery] string? readingStatus = null, [FromQuery] int? skip = null, [FromQuery] int? take = null, [FromQuery] bool? isAvailableOffline = null, [FromQuery] string? sortBy = null, [FromQuery] string? author = null, [FromQuery] string? category = null)
     {
         try 
         {
             var mediator = HttpContext.RequestServices.GetRequiredService<MediatR.IMediator>();
             var result = await mediator.Send(new QuimeraReader.Application.Books.Queries.GetBooks.GetBooksQuery 
             { 
+                SortBy = sortBy,
+                AuthorName = author,
+                CategoryName = category,
                 Page = page, 
                 PageSize = pageSize, 
                 Skip = skip,
@@ -186,22 +198,22 @@ public partial class BooksController : ControllerBase
     {
         // 1. Get categories from recently read books
         var readBooksCategories = await _dbContext.Books
+            .AsNoTracking()
             .Where(b => b.LastReadAt != null)
-            .Include(b => b.Categories)
             .SelectMany(b => b.Categories.Select(c => c.CategoryId))
             .Distinct()
+            .Take(50)
             .ToListAsync();
 
         var query = _dbContext.Books
-            .Where(b => !string.IsNullOrEmpty(b.EpubFilePath) || b.AudioTracks.Any())
-            .Include(b => b.Authors).ThenInclude(ba => ba.Author)
-            .Include(b => b.Categories).ThenInclude(bc => bc.Category)
-            .AsQueryable();
+            .AsNoTracking()
+            .Where(b => !string.IsNullOrEmpty(b.EpubFilePath) || b.AudioTracks.Any());
 
         // 2. Prioritize unread books from those categories
         if (readBooksCategories.Any())
         {
-            query = query.Where(b => b.LastReadAt == null && b.Categories.Any(c => readBooksCategories.Contains(c.CategoryId)));
+            query = query.Where(b => b.LastReadAt == null && b.Categories.Any(c => readBooksCategories.Contains(c.CategoryId)))
+                         .OrderByDescending(b => b.AverageRating).ThenByDescending(b => b.Id);
         }
         else
         {

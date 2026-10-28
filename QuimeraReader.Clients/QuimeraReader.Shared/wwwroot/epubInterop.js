@@ -113,6 +113,7 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
 
         return book.locations.generate(1600).then(function (locations) {
             hideLoadingSpinner();
+            if (!book || !book.locations) return locations;
 
             var savedLocations = book.locations.save();
             if (dotNetRef) {

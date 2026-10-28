@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -19,6 +19,7 @@ public class LibraryScanBackgroundService : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<LibraryScanBackgroundService> _logger;
     private readonly LibraryScanState _scanState;
+    private readonly HashSet<string> _attemptedFiles = new();
 
     public LibraryScanBackgroundService(IServiceProvider serviceProvider, ILogger<LibraryScanBackgroundService> logger, LibraryScanState scanState)
     {
@@ -83,7 +84,7 @@ public class LibraryScanBackgroundService : BackgroundService
                                 .Where(f => epubExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()) || audioExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
                                 .ToArray();
 
-        var pendingFiles = rawFiles.Where(f => !processedSources.Contains(f) && !processedAudios.Contains(f)).ToArray();
+        var pendingFiles = rawFiles.Where(f => !processedSources.Contains(f) && !processedAudios.Contains(f) && !_attemptedFiles.Contains(f)).ToArray();
 
         if (pendingFiles.Length == 0) return;
 
@@ -126,6 +127,8 @@ public class LibraryScanBackgroundService : BackgroundService
         {
             if (stoppingToken.IsCancellationRequested) break;
             _scanState.CurrentFile = Path.GetFileName(file);
+            // Recordar el archivo durante la vida del proceso: duplicados y EPUB corruptos no se reintentan en bucle
+            _attemptedFiles.Add(file);
             
             try
             {

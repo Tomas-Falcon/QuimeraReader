@@ -1,4 +1,4 @@
-﻿@page "/authors"
+@page "/authors"
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Components
 @using Radzen
@@ -26,7 +26,7 @@
                 <RadzenButton Text="Seleccionar" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Icon="check_box" />
             }
             <div class="search-box" style="flex: 1 1 250px;">
-                <RadzenTextBox Placeholder="Buscar autor..." Value="@_searchQuery" Change="OnSearchInput" class="w-100" />
+                <RadzenTextBox Placeholder="Buscar autor..." Value="@_searchQuery" @oninput="@(args => OnSearchInput(args.Value?.ToString() ?? ""))" class="w-100" />
             </div>
         </div>
     </div>
@@ -52,7 +52,7 @@
             @foreach (var author in FilteredAuthors)
             {
                 var isSelected = _selectedAuthorIds.Contains(author.Id);
-                <div class="col position-relative">
+                <div class="col position-relative" @key="author.Id">
                     @if (_selectionMode)
                     {
                         <div class="position-absolute" style="top: 10px; right: 20px; z-index: 10;">
@@ -67,7 +67,7 @@
                         <div class="author-cover position-relative" style="aspect-ratio: 1; background: #222;">
                             @if (!string.IsNullOrEmpty(author.SampleCoverUrl))
                             {
-                                <img src="@(BookService.BaseAddress + author.SampleCoverUrl)" alt="@author.Name" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.6; filter: blur(2px);" />
+                                <img src="@(BookService.BaseAddress + author.SampleCoverUrl)" alt="@author.Name" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.6; filter: blur(2px);" />
                                 <div class="position-absolute top-50 start-50 translate-middle text-center">
                                     <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-lg mx-auto" style="width: 70px; height: 70px;">
                                         <span class="fw-bold fs-3">@(author.Name.FirstOrDefault())</span>
@@ -91,6 +91,13 @@
                 </div>
             }
         </div>
+
+        @if (TotalFilteredCount > _displayCount)
+        {
+            <div class="text-center my-4">
+                <RadzenButton Text="@($"Mostrar más ({_displayCount} de {TotalFilteredCount})")" Click="@(() => _displayCount += 100)" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" />
+            </div>
+        }
     }
 </div>
 
@@ -102,13 +109,19 @@
 @code {
     private List<Author>? authors;
     private string _searchQuery = "";
+    private int _displayCount = 100;
 
     private bool _selectionMode = false;
     private HashSet<int> _selectedAuthorIds = new();
 
     private IEnumerable<Author> FilteredAuthors => authors?
         .Where(a => string.IsNullOrWhiteSpace(_searchQuery) || a.Name.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))
+        .Take(_displayCount)
         ?? Enumerable.Empty<Author>();
+
+    private int TotalFilteredCount => authors?
+        .Count(a => string.IsNullOrWhiteSpace(_searchQuery) || a.Name.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))
+        ?? 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -131,6 +144,8 @@
     private void OnSearchInput(string value)
     {
         _searchQuery = value ?? "";
+        _displayCount = 100;
+        StateHasChanged();
     }
 
     private void ToggleSelectionMode()

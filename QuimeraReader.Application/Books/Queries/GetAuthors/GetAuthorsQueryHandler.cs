@@ -26,25 +26,27 @@ public class GetAuthorsQueryHandler : IRequestHandler<GetAuthorsQuery, List<Auth
     {
         try
         {
-            var query = _dbContext.Authors
-                .Where(a => a.Name != null)
-                .GroupBy(a => a.Name)
-                .Select(g => g.OrderBy(a => a.Id).FirstOrDefault());
-
-            var authors = await query
-                .Select(a => new AuthorDto {
-                    Id = a!.Id,
-                    Name = a.Name ?? "Desconocido",
-                    ProfileImageUrl = null,
-                    BookCount = a.Books.Count,
-                    SampleCoverUrl = a.Books.Where(b => b.Book.CoverImagePath != null)
-                                            .Select(b => "api/media/books/" + b.Book.Id + "/cover")
-                                            .FirstOrDefault()
-                })
+            var raw = await _dbContext.Authors
+                .AsNoTracking()
+                .Where(a => a.Name != null && a.Books.Any())
                 .OrderBy(a => a.Name)
                 .Skip(request.Offset)
                 .Take(request.Limit)
+                .Select(a => new {
+                    a.Id,
+                    a.Name,
+                    BookCount = a.Books.Count(),
+                    SampleBookId = a.Books.Select(ba => (int?)ba.BookId).FirstOrDefault()
+                })
                 .ToListAsync(cancellationToken);
+
+            var authors = raw.Select(a => new AuthorDto {
+                Id = a.Id,
+                Name = a.Name ?? "Desconocido",
+                ProfileImageUrl = null,
+                BookCount = a.BookCount,
+                SampleCoverUrl = a.SampleBookId.HasValue ? $"api/media/books/{a.SampleBookId.Value}/cover" : null
+            }).ToList();
 
             return authors;
         }

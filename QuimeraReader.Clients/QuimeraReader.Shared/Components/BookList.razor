@@ -58,7 +58,7 @@
         </div>
     </div>
 
-    @if (string.IsNullOrWhiteSpace(_searchQuery))
+    @if (string.IsNullOrWhiteSpace(_searchQuery) && !IsCatalogPage)
     {
         @if (_readingBooks != null && _readingBooks.Any())
         {
@@ -195,6 +195,17 @@
     [Parameter]
     public string? QueryParam { get; set; }
 
+    /// <summary>"author" o "category": filtra por ese campo exacto en lugar de buscar por texto.</summary>
+    [Parameter]
+    public string? FilterType { get; set; }
+
+    [Parameter]
+    public string? FilterValue { get; set; }
+
+    private bool IsCatalogPage => !string.IsNullOrWhiteSpace(FilterType) || !string.IsNullOrWhiteSpace(QueryParam);
+    private string? _lastQueryParam;
+    private string? _lastFilterValue;
+
     private Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize<List<Book>>? _virtualizeComponent;
 
     private async ValueTask<Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderResult<List<Book>>> ProvideBookChunks(Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderRequest request)
@@ -206,17 +217,16 @@
             int skip = request.StartIndex * chunkSize;
             int take = Math.Min(request.Count * chunkSize, 48);
 
-            var result = await BookService.GetBooksAsync(1, 50, _searchQuery, _selectedCategories?.ToArray(), null, skip, take);
+            // Ordenación en servidor (antes se ordenaban solo los 48 libros del bloque en memoria)
+            string? sortBy = _selectedSort == "Título (A-Z)" ? "Title" : _selectedSort == "Autor (A-Z)" ? "Author" : null;
+            // En páginas de autor/categoría se filtra exactamente por ese campo; la caja de búsqueda sigue funcionando encima
+            string? search = _searchQuery;
+            if (!string.IsNullOrWhiteSpace(FilterValue) && search == FilterValue) search = null;
+            var result = await BookService.GetBooksAsync(1, 50, search, _selectedCategories?.ToArray(), null, skip, take,
+                sortBy: sortBy,
+                author: FilterType == "author" ? FilterValue : null,
+                category: FilterType == "category" ? FilterValue : null);
             var booksData = result.Data ?? Array.Empty<Book>();
-
-            if (_selectedSort == "Título (A-Z)")
-            {
-                booksData = booksData.OrderBy(b => b.Title).ToArray();
-            }
-            else if (_selectedSort == "Autor (A-Z)")
-            {
-                booksData = booksData.OrderBy(b => b.Authors?.FirstOrDefault() ?? "").ThenBy(b => b.Title).ToArray();
-            }
 
             var totalChunks = (int)Math.Ceiling((double)result.Total / chunkSize);
 
@@ -427,15 +437,38 @@
         {
             await InvokeAsync(async () => {
                 if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
-                StateHasChanged();
+                StateHasChanged(); // necesario: muestra/oculta las filas superiores según haya búsqueda
             });
         };
 
         _isInitialized = true;
 
-        // 2. Cargar/refrescar todas las filas y categorías en paralelo sin bloquear el renderizado inicial ni Virtualize
-        _ = LoadSecondarySectionsAsync();
+        // 2. Cargar/refrescar filas y categorías en paralelo sin bloquear Virtualize.
+        //    En páginas de autor/categoría las filas Netflix no se muestran: solo hacen falta las categorías del filtro.
+        if (IsCatalogPage)
+        {
+            _ = LoadCategoriesOnlyAsync();
+        }
+        else
+        {
+            _ = LoadSecondarySectionsAsync();
+        }
         await Task.CompletedTask;
+    }
+
+    private async Task LoadCategoriesOnlyAsync()
+    {
+        try
+        {
+            var cats = await BookService.GetCategoriesAsync();
+            var list = cats ?? Array.Empty<Category>();
+            if (!ReferenceEquals(list, _availableCategories))
+            {
+                _availableCategories = list;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch { }
     }
 
     private async Task LoadSecondarySectionsAsync()
@@ -450,42 +483,61 @@
 
             await Task.WhenAll(catsTask, recsTask, readingTask, nextToReadTask, readTask);
 
-            _availableCategories = catsTask.Result ?? Array.Empty<Category>();
-            _recommendations = recsTask.Result ?? new List<Book>();
+            var newReading = readingTask.Result?.Data?.ToList() ?? new List<Book>();
+            var newNext = nextToReadTask.Result?.Data?.ToList() ?? new List<Book>();
+            var newRead = readTask.Result?.Data?.ToList() ?? new List<Book>();
+            var newRecs = recsTask.Result ?? new List<Book>();
+            var newCats = catsTask.Result ?? Array.Empty<Category>();
 
-            _readingBooks = readingTask.Result?.Data?.ToList() ?? new List<Book>();
-            _hasMoreReading = _readingBooks.Count >= 20;
+            // Solo re-renderizar si algo cambió de verdad (evita el "titileo" al volver con caché ya pintada)
+            bool changed = !SameIds(_readingBooks, newReading) || !SameIds(_nextToReadBooks, newNext) ||
+                           !SameIds(_readBooks, newRead) || !SameIds(_recommendations, newRecs) ||
+                           _availableCategories.Count() != newCats.Count();
 
-            _nextToReadBooks = nextToReadTask.Result?.Data?.ToList() ?? new List<Book>();
-            _hasMoreNextToRead = _nextToReadBooks.Count >= 20;
+            _availableCategories = newCats;
+            _recommendations = newRecs;
+            if (_readingPage == 1) { _readingBooks = newReading; _hasMoreReading = newReading.Count >= 20; }
+            if (_nextToReadPage == 1) { _nextToReadBooks = newNext; _hasMoreNextToRead = newNext.Count >= 20; }
+            if (_readPage == 1) { _readBooks = newRead; _hasMoreRead = newRead.Count >= 20; }
 
-            _readBooks = readTask.Result?.Data?.ToList() ?? new List<Book>();
-            _hasMoreRead = _readBooks.Count >= 20;
-
-            await InvokeAsync(StateHasChanged);
+            if (changed) await InvokeAsync(StateHasChanged);
         }
         catch { }
     }
 
-    protected override async Task OnParametersSetAsync()
+    private static bool SameIds(IEnumerable<Book>? a, IEnumerable<Book>? b)
     {
-        if (!string.IsNullOrWhiteSpace(QueryParam) && QueryParam != _searchQuery)
-        {
-            _searchQuery = QueryParam;
-            if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
-        }
+        if (a == null || b == null) return a == null && b == null;
+        return a.Select(x => x.Id).SequenceEqual(b.Select(x => x.Id));
     }
 
+    protected override async Task OnParametersSetAsync()
+    {
+        // Solo reaccionar cuando el parámetro cambia de verdad: antes cada re-render del padre pisaba lo que el usuario escribía
+        bool changed = false;
+        if (QueryParam != _lastQueryParam)
+        {
+            _lastQueryParam = QueryParam;
+            if (!string.IsNullOrWhiteSpace(QueryParam)) _searchQuery = QueryParam;
+            changed = true;
+        }
+        if (FilterValue != _lastFilterValue)
+        {
+            _lastFilterValue = FilterValue;
+            changed = true;
+        }
+        if (changed && _virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
+    }
+
+    // RefreshDataAsync ya re-renderiza Virtualize: un StateHasChanged adicional provocaba doble parpadeo
     private async Task OnCategoryChanged(object value)
     {
         if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
-        StateHasChanged();
     }
 
     private async Task OnSortChanged(object value)
     {
         if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
-        StateHasChanged();
     }
 
     private void OnSearchInput(string value)

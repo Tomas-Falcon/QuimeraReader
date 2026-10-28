@@ -67,9 +67,6 @@ namespace QuimeraReader.Web.Services
                 book.LastReadAt = DateTime.UtcNow;
                 await SaveBookAsync(book);
             }
-            
-            var syncAction = new { Type = "Progress", BookId = id, Cfi = cfi, AudioPosition = audioPosition, Percentage = percentage, AudioTrackNumber = audioTrackNumber };
-            await _jsRuntime.InvokeVoidAsync("window.quimeraIndexedDb.enqueueSync", JsonSerializer.Serialize(syncAction, _jsonOptions));
         }
 
         public async Task QueueAnnotationAsync(int bookId, string cfiRange, string selectedText, string colorHex, string note)

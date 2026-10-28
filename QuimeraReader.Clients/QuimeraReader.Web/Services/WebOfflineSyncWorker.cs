@@ -162,11 +162,20 @@ namespace QuimeraReader.Web.Services
                     }
                     if (!string.IsNullOrEmpty(audioPath)) serverBook.LocalAudioPath = audioPath;
 
-                    if (serverBook.HasAudio && serverBook.IsAligned && string.IsNullOrEmpty(serverBook.SyncMapJson))
+                    var existingMap = localBook?.SyncMapJson;
+                    if (!string.IsNullOrEmpty(existingMap))
+                    {
+                        serverBook.SyncMapJson = existingMap;
+                    }
+                    else if (serverBook.HasAudio && serverBook.IsAligned)
                     {
                         try
                         {
-                            serverBook.SyncMapJson = await _httpClient.GetStringAsync($"api/Books/{serverBook.Id}/syncmap");
+                            using var syncResp = await _httpClient.GetAsync($"api/Books/{serverBook.Id}/syncmap");
+                            if (syncResp.IsSuccessStatusCode)
+                            {
+                                serverBook.SyncMapJson = await syncResp.Content.ReadAsStringAsync();
+                            }
                         }
                         catch { }
                     }

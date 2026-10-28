@@ -51,29 +51,10 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
             
             await localRepo.EnsureCreatedAsync();
 
-            // 0. SYNC LOGS: Push local logs to Server
-            try
+            // 0. LOGS: los envía MauiDbLoggerProvider (cada 10s). Aquí no se duplica para evitar bloqueos SQLite y envíos dobles.
+            if (QuimeraReader.Mobile.Logging.MauiDbLoggerProvider.Instance != null)
             {
-                var localLogs = await dbContext.ClientLogs.ToListAsync();
-                if (localLogs.Any())
-                {
-                    var logDtos = localLogs.Select(l => new QuimeraReader.Shared.Models.ClientLogDto 
-                    { 
-                        Level = l.Level, Message = l.Message, Exception = l.Exception, CreatedAt = l.CreatedAt 
-                    }).ToList();
-                    
-                    var response = await httpClient.PostAsJsonAsync("api/Logs", logDtos);
-                    if (response.IsSuccessStatusCode)
-                    {
-                        dbContext.ClientLogs.RemoveRange(localLogs);
-                        await dbContext.SaveChangesAsync();
-                        _logger.LogInformation("Sincronizados {Count} logs con el servidor.", localLogs.Count);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error syncing logs: " + ex.Message);
+                _ = QuimeraReader.Mobile.Logging.MauiDbLoggerProvider.Instance.FlushPendingLogsAsync();
             }
 
             // 1. PUSH: Local -> Server
@@ -211,15 +192,27 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
                     if (localAudio != book.AudioUrl) book.LocalAudioPath = localAudio;
                 }
 
-                try
+                // Solo los libros con audio alineado tienen SyncMap (antes se pedía para todos => cientos de 404 en los logs)
+                if (book.HasAudio && book.IsAligned)
                 {
-                    var syncMapStr = await bookService.GetSyncMapAsync(book.Id);
-                    if (!string.IsNullOrEmpty(syncMapStr))
+                    var existingLocal = localBooks.FirstOrDefault(l => l.Id == book.Id);
+                    if (!string.IsNullOrEmpty(existingLocal?.SyncMapJson))
                     {
-                        book.SyncMapJson = syncMapStr;
+                        book.SyncMapJson = existingLocal.SyncMapJson;
+                    }
+                    else
+                    {
+                        try
+                        {
+                            var syncMapStr = await bookService.GetSyncMapAsync(book.Id);
+                            if (!string.IsNullOrEmpty(syncMapStr))
+                            {
+                                book.SyncMapJson = syncMapStr;
+                            }
+                        }
+                        catch { }
                     }
                 }
-                catch { }
 
                 await localRepo.SaveBookAsync(book);
 

@@ -791,7 +791,7 @@
                 try
                 {
                     var fileInfo = new System.IO.FileInfo(audioFileUrl);
-                    if (fileInfo.Length > 0 && fileInfo.Length <= 250 * 1024 * 1024)
+                    if (fileInfo.Length > 0 && fileInfo.Length <= 25 * 1024 * 1024)
                     {
                         var bytes = await System.IO.File.ReadAllBytesAsync(audioFileUrl);
                         var mime = GetAudioMimeType(audioFileUrl);

@@ -37,7 +37,7 @@ public class Program
             var config = sp.GetRequiredService<IServerConfigService>();
             var defaultUrl = "http://localhost:5000/";
             var url = config.ServerUrl ?? defaultUrl;
-            return new HttpClient { BaseAddress = new Uri(url), Timeout = TimeSpan.FromSeconds(5) };
+            return new HttpClient { BaseAddress = new Uri(url), Timeout = TimeSpan.FromSeconds(60) };
         });
 
         // Core Shared Services
@@ -80,7 +80,7 @@ public class Program
         Task.Run(async () =>
         {
             // Initial delay before first sync
-            await Task.Delay(3000);
+            await Task.Delay(8000);
             while (true)
             {
                 try

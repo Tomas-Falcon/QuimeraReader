@@ -24,7 +24,7 @@ namespace QuimeraReader.Mobile.Logging
         {
             Instance = this;
             string dbPath = Path.Combine(FileSystem.AppDataDirectory, "quimerareader_local.db");
-            _connectionString = "Data Source=" + dbPath;
+            _connectionString = "Data Source=" + dbPath + ";Default Timeout=5";
 
             EnsureTableCreated();
             RegisterGlobalExceptionHandlers();

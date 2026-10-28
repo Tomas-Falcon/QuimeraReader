@@ -1,4 +1,4 @@
-﻿@page "/category/{CategoryName}"
+@page "/category/{CategoryName}"
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Components
 @inject QuimeraReader.Shared.Services.IBookService BookService
@@ -18,7 +18,7 @@
 
 <hr class="border-secondary mb-4" />
 
-<BookList QueryParam="@CategoryName" />
+<BookList FilterType="category" FilterValue="@CategoryName" />
 
 @code {
     [Parameter]

@@ -23,8 +23,23 @@ if (builder.Environment.IsProduction())
 }
 
 var dbPath = Environment.GetEnvironmentVariable("QUIMERA_DB_PATH") ?? "quimerareader.db";
+// Nota: sin Cache=Shared (en modo WAL provoca bloqueos SQLITE_LOCKED entre lectores y escritores)
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite($"Data Source={dbPath};Cache=Shared;Default Timeout=30;"));
+    options.UseSqlite($"Data Source={dbPath};Default Timeout=30;"));
+
+// Compresión Brotli/Gzip para los ~25 MB de .wasm/.js/.css de Blazor y las respuestas JSON
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProvider>();
+    options.Providers.Add<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProvider>();
+    options.MimeTypes = Microsoft.AspNetCore.ResponseCompression.ResponseCompressionDefaults.MimeTypes.Concat(new[]
+    {
+        "application/wasm", "application/octet-stream", "application/javascript", "text/javascript", "image/svg+xml"
+    });
+});
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProviderOptions>(o => o.Level = System.IO.Compression.CompressionLevel.Fastest);
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProviderOptions>(o => o.Level = System.IO.Compression.CompressionLevel.Fastest);
 
 // Enlazar la interfaz de Aplicación con la implementación de Infraestructura
 builder.Services.AddScoped<QuimeraReader.Application.Interfaces.IAppDbContext>(provider => 
@@ -97,7 +112,29 @@ using (var scope = app.Services.CreateScope())
         dbContext.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000;");
     }
     catch { }
+
+    // Índices que faltaban sobre Books (138k filas): estados de lectura, offline, título (escáner), etc.
+    string[] indexSql =
+    {
+        "CREATE INDEX IF NOT EXISTS IX_Books_ReadingStatus_LastReadAt ON Books (ReadingStatus, LastReadAt);",
+        "CREATE INDEX IF NOT EXISTS IX_Books_LastReadAt ON Books (LastReadAt);",
+        "CREATE INDEX IF NOT EXISTS IX_Books_IsAvailableOffline ON Books (IsAvailableOffline);",
+        "CREATE INDEX IF NOT EXISTS IX_Books_Title ON Books (Title);",
+        "CREATE INDEX IF NOT EXISTS IX_Books_SourceFilePath ON Books (SourceFilePath);",
+        "CREATE INDEX IF NOT EXISTS IX_Books_ProcessingStatus ON Books (ProcessingStatus);",
+        "CREATE INDEX IF NOT EXISTS IX_Books_AverageRating ON Books (AverageRating);",
+        "CREATE INDEX IF NOT EXISTS IX_BookAuthors_AuthorId ON BookAuthors (AuthorId);",
+        "CREATE INDEX IF NOT EXISTS IX_BookCategories_CategoryId ON BookCategories (CategoryId);",
+        "CREATE INDEX IF NOT EXISTS IX_BookAudioTracks_BookId ON BookAudioTracks (BookId);"
+    };
+    foreach (var sql in indexSql)
+    {
+        try { dbContext.Database.ExecuteSqlRaw(sql); } catch (Exception ex) { Console.WriteLine($"[Startup] No se pudo crear índice: {ex.Message}"); }
+    }
+    try { dbContext.Database.ExecuteSqlRaw("PRAGMA optimize;"); } catch { }
 }
+
+app.UseResponseCompression();
 
 // Configurar los Content Types para que la API pueda servir los archivos de Blazor WebAssembly sin dar Error 404
 var provider = new FileExtensionContentTypeProvider();
@@ -107,7 +144,15 @@ provider.Mappings[".dll"] = "application/octet-stream";
 
 app.UseStaticFiles(new StaticFileOptions
 {
-    ContentTypeProvider = provider
+    ContentTypeProvider = provider,
+    OnPrepareResponse = ctx =>
+    {
+        // index.html nunca debe cachearse (evita importmaps obsoletos tras un redeploy)
+        if (ctx.File.Name.Equals("index.html", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+        }
+    }
 }); // Servir wwwroot (Blazor WebAssembly)
 
 app.UseAuthorization();

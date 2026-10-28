@@ -11,6 +11,7 @@ namespace QuimeraReader.Desktop.Data;
 public class DesktopLocalBookRepository : ILocalBookRepository
 {
     private readonly DesktopLocalAppDbContext _dbContext;
+    private static bool _schemaInitialized;
 
     public DesktopLocalBookRepository(DesktopLocalAppDbContext dbContext)
     {
@@ -19,9 +20,9 @@ public class DesktopLocalBookRepository : ILocalBookRepository
 
     public async Task EnsureCreatedAsync()
     {
+        if (_schemaInitialized) return;
         await _dbContext.Database.EnsureCreatedAsync();
-        try { await _dbContext.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("PRAGMA busy_timeout=5000;"); } catch { }
+        try { await _dbContext.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN ReadingStatus TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN EpubLocationsCache TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN TotalPages INTEGER;"); } catch { }
@@ -34,6 +35,7 @@ public class DesktopLocalBookRepository : ILocalBookRepository
         try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS BookAuthor (BookId INTEGER, AuthorId INTEGER, Role TEXT, PRIMARY KEY(BookId, AuthorId));"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE BookAuthor ADD COLUMN Role TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS BookCategory (BookId INTEGER, CategoryId INTEGER, PRIMARY KEY(BookId, CategoryId));"); } catch { }
+        _schemaInitialized = true;
     }
 
     private Book MapToShared(QuimeraReader.Domain.Entities.Book domainBook)
@@ -87,6 +89,7 @@ public class DesktopLocalBookRepository : ILocalBookRepository
 
     public async Task<List<Book>> GetOfflineBooksAsync()
     {
+        await EnsureCreatedAsync();
         var domainBooks = await _dbContext.Books
             .Include(b => b.Authors)
             .ThenInclude(a => a.Author)
@@ -98,6 +101,7 @@ public class DesktopLocalBookRepository : ILocalBookRepository
 
     public async Task<Book?> GetBookByIdAsync(int id)
     {
+        await EnsureCreatedAsync();
         var domainBook = await _dbContext.Books
             .Include(b => b.Authors).ThenInclude(a => a.Author)
             .Include(b => b.Categories).ThenInclude(c => c.Category)

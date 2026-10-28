@@ -10,7 +10,7 @@ namespace QuimeraReader.Shared.Services;
 
 public interface IBookService
 {
-    Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null, bool? isAvailableOffline = null);
+    Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null, bool? isAvailableOffline = null, string? sortBy = null, string? author = null, string? category = null);
     Task<Book?> GetBookAsync(int id);
     Book? GetCachedBook(int id);
     List<Book>? GetCachedStatusBooks(string readingStatus);
@@ -102,7 +102,7 @@ public class BookService : IBookService
         _bookCache[b.Id] = b;
     }
 
-    public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null, bool? isAvailableOffline = null)
+    public async Task<PaginatedResult<Book>> GetBooksAsync(int page = 1, int pageSize = 50, string? search = null, int[]? categoryIds = null, string? readingStatus = null, int? skip = null, int? take = null, bool? isAvailableOffline = null, string? sortBy = null, string? author = null, string? category = null)
     {
         var network = _serviceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.INetworkStateService)) as QuimeraReader.Shared.Interfaces.INetworkStateService;
         var localRepo = _serviceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
@@ -113,7 +113,7 @@ public class BookService : IBookService
         }
 
         string catsKey = categoryIds != null && categoryIds.Length > 0 ? string.Join(",", categoryIds) : "";
-        string cacheKey = $"{page}|{pageSize}|{search ?? ""}|{catsKey}|{readingStatus ?? ""}|{skip}|{take}|{isAvailableOffline}";
+        string cacheKey = $"{page}|{pageSize}|{search ?? ""}|{catsKey}|{readingStatus ?? ""}|{skip}|{take}|{isAvailableOffline}|{sortBy}|{author}|{category}";
 
         if (_queryCache.TryGetValue(cacheKey, out var cached) && (DateTime.UtcNow - cached.Timestamp) < TimeSpan.FromSeconds(45))
         {
@@ -136,6 +136,9 @@ public class BookService : IBookService
             }
             if (!string.IsNullOrWhiteSpace(readingStatus)) url += $"&readingStatus={readingStatus}";
             if (isAvailableOffline.HasValue) url += $"&isAvailableOffline={isAvailableOffline.Value.ToString().ToLowerInvariant()}";
+            if (!string.IsNullOrWhiteSpace(sortBy)) url += $"&sortBy={Uri.EscapeDataString(sortBy)}";
+            if (!string.IsNullOrWhiteSpace(author)) url += $"&author={Uri.EscapeDataString(author)}";
+            if (!string.IsNullOrWhiteSpace(category)) url += $"&category={Uri.EscapeDataString(category)}";
 
             var response = await _httpClient.GetFromJsonAsync<PaginatedResult<Book>>(url);
             sw.Stop();
@@ -151,7 +154,8 @@ public class BookService : IBookService
                 {
                     CacheBookItem(b);
                 }
-                if (!string.IsNullOrWhiteSpace(readingStatus) && page == 1 && string.IsNullOrWhiteSpace(search))
+                // Solo las filas de portada (pageSize pequeño) alimentan la caché de filas; ReadCatalog pide 1000 y no debe contaminarla
+                if (!string.IsNullOrWhiteSpace(readingStatus) && page == 1 && pageSize <= 25 && string.IsNullOrWhiteSpace(search) && string.IsNullOrWhiteSpace(author) && string.IsNullOrWhiteSpace(category))
                 {
                     _statusRowCache[readingStatus] = result.Data.ToList();
                 }
@@ -359,8 +363,14 @@ public class BookService : IBookService
                 }
                 return string.Empty;
             }
-            _logger.LogInformation("[BookService] Descargando SyncMap para libro ID: {BookId}", id);
-            return await _httpClient.GetStringAsync($"api/Books/{id}/syncmap");
+            using var resp = await _httpClient.GetAsync($"api/Books/{id}/syncmap");
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound || resp.StatusCode == System.Net.HttpStatusCode.NoContent)
+            {
+                // El libro no tiene SyncMap (sin audio o sin alinear): no es un error
+                return string.Empty;
+            }
+            resp.EnsureSuccessStatusCode();
+            return await resp.Content.ReadAsStringAsync();
         }
         catch (Exception ex)
         {

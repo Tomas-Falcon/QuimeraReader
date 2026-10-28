@@ -304,7 +304,12 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
         settingsDict.TryGetValue("IngestionMode", out var ingestionMode);
         if (forceMove) ingestionMode = "MoveAndOrganize";
         
-        book.SourceFilePath = sourceFilePath;
+        // No sobrescribir el origen de un libro ya existente con el de un EPUB duplicado:
+        // hacerlo dejaba el archivo original "sin procesar" y provocaba un re-escaneo infinito cada 5 minutos.
+        if (book.Id == 0 || string.IsNullOrEmpty(book.SourceFilePath))
+        {
+            book.SourceFilePath = sourceFilePath;
+        }
 
         if (string.Equals(Path.GetFullPath(sourceFilePath), Path.GetFullPath(newEpubPath), StringComparison.OrdinalIgnoreCase))
         {
