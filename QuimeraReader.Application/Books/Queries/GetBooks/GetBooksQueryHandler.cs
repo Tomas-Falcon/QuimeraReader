@@ -25,7 +25,7 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
         int skip = request.Skip ?? ((page - 1) * pageSize);
         int take = request.Take ?? pageSize;
 
-        var query = _dbContext.Books.AsQueryable();
+        var query = _dbContext.Books.AsNoTracking().AsQueryable();
 
         // Ocultar libros "fantasma" que no tienen archivo asociado (ni EPUB ni Audio)
         query = query.Where(b => !string.IsNullOrEmpty(b.EpubFilePath) || b.AudioTracks.Any());
@@ -85,6 +85,7 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
         }
 
         var booksList = await query
+            .AsSplitQuery()
             .Include(b => b.Authors).ThenInclude(ba => ba.Author)
             .Include(b => b.Categories).ThenInclude(bc => bc.Category)
             .Include(b => b.Series).ThenInclude(s => s!.Universe)

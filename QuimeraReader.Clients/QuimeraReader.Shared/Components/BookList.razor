@@ -125,12 +125,12 @@
 
     <h4 class="rz-color-primary mt-2 mb-3 fw-bold">@(string.IsNullOrWhiteSpace(_searchQuery) ? TranslationService["Library_AllBooks"] : TranslationService["Library_SearchResults"])</h4>
     
-    <Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize ItemsProvider="ProvideBookChunks" Context="chunk" OverscanCount="3" @ref="_virtualizeComponent">
+    <Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize ItemsProvider="ProvideBookChunks" Context="chunk" ItemSize="330" OverscanCount="3" @ref="_virtualizeComponent">
         <ItemContent>
             <div class="row m-0 row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-4 row-cols-xl-6 g-2 g-md-4 mb-3 mb-md-4">
                 @foreach (var book in chunk)
                 {
-                    <div class="col">
+                    <div class="col" @key="book.Id">
                         <BookCard Book="book" SelectionMode="_selectionMode" IsSelected="_selectedBookIds.Contains(book.Id)" IsSelectedChanged="@(isSelected => OnBookSelectionChanged(book.Id, isSelected))" />
                     </div>
                 }
@@ -204,7 +204,7 @@
             // Usar 12 como tamaño de bloque (múltiplo común de 2, 3, 4 y 6 columnas) para no dejar nunca huecos vacíos en móvil ni tablet
             int chunkSize = 12;
             int skip = request.StartIndex * chunkSize;
-            int take = request.Count * chunkSize;
+            int take = Math.Min(request.Count * chunkSize, 48);
 
             var result = await BookService.GetBooksAsync(1, 50, _searchQuery, _selectedCategories?.ToArray(), null, skip, take);
             var booksData = result.Data ?? Array.Empty<Book>();

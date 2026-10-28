@@ -10,21 +10,18 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // Apuntar SIEMPRE a la API (puerto 5166) en vez de al servidor de desarrollo de Blazor
 var apiBaseUrl = builder.HostEnvironment.IsDevelopment() ? "http://localhost:5166/" : builder.HostEnvironment.BaseAddress;
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(apiBaseUrl), Timeout = TimeSpan.FromSeconds(25) });
 builder.Services.AddScoped<QuimeraReader.Shared.Services.IBookService, QuimeraReader.Shared.Services.BookService>();
 builder.Services.AddScoped<QuimeraReader.Shared.Services.IScanService, QuimeraReader.Shared.Services.ScanService>();
 builder.Services.AddScoped<QuimeraReader.Shared.Services.ISettingsService, QuimeraReader.Shared.Services.SettingsService>();
 builder.Services.AddScoped<QuimeraReader.Shared.Interfaces.ITranslationService, QuimeraReader.Shared.Services.TranslationService>();
 builder.Services.AddScoped<ToastService>();
-builder.Services.AddSingleton<QuimeraReader.Shared.Interfaces.INetworkStateService, QuimeraReader.Web.Services.WebNetworkStateService>();
+builder.Services.AddScoped<QuimeraReader.Shared.Interfaces.INetworkStateService, QuimeraReader.Web.Services.WebNetworkStateService>();
 builder.Services.AddScoped<QuimeraReader.Shared.Interfaces.ILocalBookRepository, QuimeraReader.Web.Services.WebLocalBookRepository>();
-builder.Services.AddSingleton<QuimeraReader.Shared.Interfaces.IOfflineSyncWorker, QuimeraReader.Web.Services.WebOfflineSyncWorker>();
+builder.Services.AddScoped<QuimeraReader.Shared.Interfaces.IOfflineSyncWorker, QuimeraReader.Web.Services.WebOfflineSyncWorker>();
 builder.Services.AddScoped<IServerConfigService, QuimeraReader.Web.Services.WebServerConfigService>();
 builder.Services.AddRadzenComponents();
 
 var host = builder.Build();
-
-var syncWorker = host.Services.GetRequiredService<QuimeraReader.Shared.Interfaces.IOfflineSyncWorker>() as QuimeraReader.Web.Services.WebOfflineSyncWorker;
-syncWorker?.Start();
 
 await host.RunAsync();
