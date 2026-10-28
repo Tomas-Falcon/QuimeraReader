@@ -231,7 +231,7 @@ public partial class BooksController : ControllerBase
                 CurrentAudioPosition = b.CurrentAudioPosition,
                 PercentageCompleted = b.PercentageCompleted,
                 ReadingStatus = b.ReadingStatus,
-                EpubLocationsCache = b.EpubLocationsCache,
+                EpubLocationsCache = (string?)null,
                 TotalPages = b.TotalPages
             })
             .ToListAsync();

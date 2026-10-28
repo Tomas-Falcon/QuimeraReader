@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Json;
+using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using QuimeraReader.Shared.Models;
 
@@ -18,6 +18,8 @@ public class SettingsService : ISettingsService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<SettingsService> _logger;
+    private static Dictionary<string, string>? _cachedSettings;
+    private static DateTime _settingsCacheTime = DateTime.MinValue;
 
     public SettingsService(HttpClient httpClient, ILogger<SettingsService> logger)
     {
@@ -27,16 +29,27 @@ public class SettingsService : ISettingsService
 
     public async Task<Dictionary<string, string>> GetSettingsAsync()
     {
+        if (_cachedSettings != null && (DateTime.UtcNow - _settingsCacheTime) < TimeSpan.FromMinutes(2))
+        {
+            return _cachedSettings;
+        }
+
         try
         {
             _logger.LogInformation("[SettingsService] Obteniendo configuraciones del servidor.");
             var settings = await _httpClient.GetFromJsonAsync<Dictionary<string, string>>("api/Settings");
-            return settings ?? new Dictionary<string, string>();
+            if (settings != null && settings.Count > 0)
+            {
+                _cachedSettings = settings;
+                _settingsCacheTime = DateTime.UtcNow;
+                return settings;
+            }
+            return _cachedSettings ?? new Dictionary<string, string>();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[SettingsService] Error obteniendo configuraciones.");
-            return new Dictionary<string, string>();
+            return _cachedSettings ?? new Dictionary<string, string>();
         }
     }
 
@@ -47,6 +60,10 @@ public class SettingsService : ISettingsService
             _logger.LogInformation("[SettingsService] Guardando configuración: {Key}", setting.Key);
             var response = await _httpClient.PostAsJsonAsync("api/Settings", setting);
             response.EnsureSuccessStatusCode();
+            if (_cachedSettings != null && !string.IsNullOrEmpty(setting.Key))
+            {
+                _cachedSettings[setting.Key] = setting.Value ?? "";
+            }
         }
         catch (Exception ex)
         {
@@ -113,4 +130,3 @@ public class SettingsService : ISettingsService
         }
     }
 }
-

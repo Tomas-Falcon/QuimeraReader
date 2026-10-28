@@ -49,6 +49,7 @@
             var localRepo = ServiceProvider.GetService(typeof(ILocalBookRepository)) as ILocalBookRepository;
             if (localRepo != null)
             {
+                await localRepo.EnsureCreatedAsync();
                 var offlineBooks = await localRepo.GetOfflineBooksAsync();
                 _books = offlineBooks?.ToList() ?? new List<Book>();
             }

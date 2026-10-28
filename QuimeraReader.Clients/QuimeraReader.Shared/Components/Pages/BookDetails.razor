@@ -231,9 +231,26 @@ else
     
     private async Task LoadBookAsync()
     {
-        _isLoading = true;
-        _book = await BookService.GetBookAsync(Id);
-        if (_book == null)
+        // Si ya tenemos el libro en la caché en memoria (porque el usuario acaba de tocar su tarjeta en BookList),
+        // mostrarlo de forma instantánea (< 5ms) sin bloquear con "Cargando detalles..." y refrescar en segundo plano
+        var cached = BookService.GetCachedBook(Id);
+        if (cached != null)
+        {
+            _book = cached;
+            _isLoading = false;
+            StateHasChanged();
+        }
+        else
+        {
+            _isLoading = true;
+        }
+
+        var freshBook = await BookService.GetBookAsync(Id);
+        if (freshBook != null)
+        {
+            _book = freshBook;
+        }
+        else if (_book == null)
         {
             var localRepo = ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
             if (localRepo != null)

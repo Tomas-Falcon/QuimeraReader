@@ -1,4 +1,4 @@
-﻿@page "/categories"
+@page "/categories"
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Components
 @using Radzen
@@ -111,6 +111,8 @@
     {
         try
         {
+            var cached = BookService.GetCachedCategories();
+            if (cached != null) { categories = cached.ToList(); StateHasChanged(); }
             var result = await BookService.GetCategoriesAsync();
             categories = result.ToList();
         }

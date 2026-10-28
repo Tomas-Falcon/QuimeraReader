@@ -197,7 +197,11 @@ else
         var worker = (QuimeraReader.Shared.Interfaces.IOfflineSyncWorker?)ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.IOfflineSyncWorker));
         if (worker != null)
         {
-            _ = worker.SyncNowAsync();
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(4000);
+                await worker.SyncNowAsync();
+            });
         }
     }
 

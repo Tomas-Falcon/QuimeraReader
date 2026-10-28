@@ -388,25 +388,39 @@
     private IEnumerable<int> _selectedCategories = new List<int>();
     private bool _isInitialized = false;
 
-    protected override bool ShouldRender() => _isInitialized;
-
     protected override async Task OnInitializedAsync()
     {
         if (_isInitialized) return;
-
-        try
-        {
-            _availableCategories = await BookService.GetCategoriesAsync();
-        }
-        catch { }
         _objRef = DotNetObjectReference.Create(this);
-        
-        try
+
+        // 1. Pintar de forma instantánea desde la caché en memoria si venimos de vuelta desde otra pantalla
+        var cachedCats = BookService.GetCachedCategories();
+        if (cachedCats != null) _availableCategories = cachedCats;
+
+        var cachedRecs = BookService.GetCachedRecommendations();
+        if (cachedRecs != null) _recommendations = cachedRecs;
+
+        var cachedReading = BookService.GetCachedStatusBooks("Reading");
+        if (cachedReading != null)
         {
-            _recommendations = await BookService.GetRecommendationsAsync();
+            _readingBooks = cachedReading.ToList();
+            _hasMoreReading = _readingBooks.Count >= 20;
         }
-        catch { }
-        
+
+        var cachedNext = BookService.GetCachedStatusBooks("NextToRead");
+        if (cachedNext != null)
+        {
+            _nextToReadBooks = cachedNext.ToList();
+            _hasMoreNextToRead = _nextToReadBooks.Count >= 20;
+        }
+
+        var cachedRead = BookService.GetCachedStatusBooks("Read");
+        if (cachedRead != null)
+        {
+            _readBooks = cachedRead.ToList();
+            _hasMoreRead = _readBooks.Count >= 20;
+        }
+
         _debounceTimer = new System.Timers.Timer(400);
         _debounceTimer.AutoReset = false;
         _debounceTimer.Elapsed += async (sender, args) =>
@@ -416,27 +430,41 @@
                 StateHasChanged();
             });
         };
-        
+
+        _isInitialized = true;
+
+        // 2. Cargar/refrescar todas las filas y categorías en paralelo sin bloquear el renderizado inicial ni Virtualize
+        _ = LoadSecondarySectionsAsync();
+        await Task.CompletedTask;
+    }
+
+    private async Task LoadSecondarySectionsAsync()
+    {
         try
         {
+            var catsTask = BookService.GetCategoriesAsync();
+            var recsTask = BookService.GetRecommendationsAsync();
             var readingTask = BookService.GetBooksAsync(1, 20, "", readingStatus: "Reading");
             var nextToReadTask = BookService.GetBooksAsync(1, 20, "", readingStatus: "NextToRead");
             var readTask = BookService.GetBooksAsync(1, 20, "", readingStatus: "Read");
-            
-            await Task.WhenAll(readingTask, nextToReadTask, readTask);
-            
+
+            await Task.WhenAll(catsTask, recsTask, readingTask, nextToReadTask, readTask);
+
+            _availableCategories = catsTask.Result ?? Array.Empty<Category>();
+            _recommendations = recsTask.Result ?? new List<Book>();
+
             _readingBooks = readingTask.Result?.Data?.ToList() ?? new List<Book>();
-            _hasMoreReading = readingTask.Result?.Data?.Length >= 20;
+            _hasMoreReading = _readingBooks.Count >= 20;
 
             _nextToReadBooks = nextToReadTask.Result?.Data?.ToList() ?? new List<Book>();
-            _hasMoreNextToRead = nextToReadTask.Result?.Data?.Length >= 20;
+            _hasMoreNextToRead = _nextToReadBooks.Count >= 20;
 
             _readBooks = readTask.Result?.Data?.ToList() ?? new List<Book>();
-            _hasMoreRead = readTask.Result?.Data?.Length >= 20;
+            _hasMoreRead = _readBooks.Count >= 20;
+
+            await InvokeAsync(StateHasChanged);
         }
         catch { }
-
-        _isInitialized = true;
     }
 
     protected override async Task OnParametersSetAsync()

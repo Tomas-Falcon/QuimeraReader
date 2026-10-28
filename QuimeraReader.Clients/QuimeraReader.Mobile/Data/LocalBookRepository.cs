@@ -11,6 +11,7 @@ namespace QuimeraReader.Mobile.Data;
 public class LocalBookRepository : ILocalBookRepository
 {
     private readonly LocalAppDbContext _dbContext;
+    private static bool _schemaInitialized;
 
     public LocalBookRepository(LocalAppDbContext dbContext)
     {
@@ -19,6 +20,7 @@ public class LocalBookRepository : ILocalBookRepository
 
     public async Task EnsureCreatedAsync()
     {
+        if (_schemaInitialized) return;
         await _dbContext.Database.EnsureCreatedAsync();
         try { await _dbContext.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN ReadingStatus TEXT;"); } catch { }
@@ -34,6 +36,7 @@ public class LocalBookRepository : ILocalBookRepository
         try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS BookAuthor (BookId INTEGER, AuthorId INTEGER, Role TEXT, PRIMARY KEY(BookId, AuthorId));"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE BookAuthor ADD COLUMN Role TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS BookCategory (BookId INTEGER, CategoryId INTEGER, PRIMARY KEY(BookId, CategoryId));"); } catch { }
+        _schemaInitialized = true;
     }
 
     private Book MapToShared(QuimeraReader.Domain.Entities.Book? domainBook)
@@ -98,6 +101,7 @@ public class LocalBookRepository : ILocalBookRepository
 
     public async Task<List<Book>> GetOfflineBooksAsync()
     {
+        await EnsureCreatedAsync();
         var domainBooks = await _dbContext.Books
             .Include(b => b.Authors).ThenInclude(a => a.Author)
             .Include(b => b.Categories).ThenInclude(c => c.Category)
@@ -109,6 +113,7 @@ public class LocalBookRepository : ILocalBookRepository
 
     public async Task<Book?> GetBookByIdAsync(int id)
     {
+        await EnsureCreatedAsync();
         var domainBook = await _dbContext.Books
             .Include(b => b.Authors).ThenInclude(a => a.Author)
             .Include(b => b.Categories).ThenInclude(c => c.Category)

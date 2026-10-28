@@ -116,7 +116,7 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
             CurrentAudioTrackNumber = b.CurrentAudioTrackNumber,
             PercentageCompleted = b.PercentageCompleted,
             ReadingStatus = b.ReadingStatus,
-            EpubLocationsCache = b.EpubLocationsCache,
+            EpubLocationsCache = null,
             TotalPages = b.TotalPages
         }).ToList();
 

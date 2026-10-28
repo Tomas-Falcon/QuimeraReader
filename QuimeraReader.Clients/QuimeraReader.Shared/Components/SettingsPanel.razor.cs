@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
+using System.Net.Http.Json;
 using QuimeraReader.Shared.Models;
 using QuimeraReader.Shared.Services;
 
@@ -13,10 +15,12 @@ public partial class SettingsPanel : ComponentBase
     [Inject] public IServerConfigService ServerConfig { get; set; } = default!;
     [Inject] public NavigationManager NavManager { get; set; } = default!;
     [Inject] public HttpClient HttpClient { get; set; } = default!;
+    [Inject] public ILogger<SettingsPanel> Logger { get; set; } = default!;
 
     private bool _isLoading = true;
     private bool _isSaving = false;
     private bool _isTestingClientConnection = false;
+    private bool _isSendingLogs = false;
     private string _message = string.Empty;
     private string _clientServerUrl = string.Empty;
     private bool _isSuccess = false;
@@ -87,13 +91,20 @@ public partial class SettingsPanel : ComponentBase
 
     protected override async Task OnInitializedAsync()
     {
+        if (ServerConfig?.ServerUrl != null)
+        {
+            _clientServerUrl = ServerConfig.ServerUrl;
+        }
+
+        // En móvil, mostrar las preferencias del cliente de inmediato sin esperar al servidor
+        if (IsMobileClient)
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+
         try
         {
-            if (ServerConfig?.ServerUrl != null)
-            {
-                _clientServerUrl = ServerConfig.ServerUrl;
-            }
-
             var settings = await SettingsService.GetSettingsAsync();
             if (settings.TryGetValue("IncomingScanFolder", out var incoming)) _libraryRootPath = incoming;
             if (settings.TryGetValue("LibraryRootPath", out var outgoing)) _outgoingLibraryPath = outgoing;
@@ -106,18 +117,64 @@ public partial class SettingsPanel : ComponentBase
             if (settings.TryGetValue("WhisperMode", out var wMode)) _whisperMode = wMode;
             if (settings.TryGetValue("OpenAIEndpoint", out var wEndpoint)) _openAiEndpoint = wEndpoint;
 
-            _isWhisperDownloaded = await SettingsService.CheckWhisperModelStatusAsync();
+            if (ShowServerAdminTabs)
+            {
+                _isWhisperDownloaded = await SettingsService.CheckWhisperModelStatusAsync();
+            }
         }
         catch (Exception ex)
         {
-            ShowMessage("Error cargando ajustes: " + ex.Message, false);
+            if (!IsMobileClient)
+            {
+                ShowMessage("Error cargando ajustes: " + ex.Message, false);
+            }
         }
         finally
         {
             _isLoading = false;
+            StateHasChanged();
         }
 
         _ = PollStatusAsync();
+    }
+
+    private async Task SendDiagnosticLogAsync()
+    {
+        _isSendingLogs = true;
+        StateHasChanged();
+
+        try
+        {
+            Logger.LogInformation("Reporte de diagnóstico manual enviado desde el cliente móvil. ServerUrl={Url}", _clientServerUrl);
+            var payload = new List<ClientLogDto>
+            {
+                new ClientLogDto
+                {
+                    Level = "Information",
+                    Message = $"[DiagnosticReport] Ping manual desde Ajustes del Cliente Android (ServerUrl={_clientServerUrl}, ForceOffline={NetworkStateService.IsForceOffline})",
+                    CreatedAt = DateTime.UtcNow
+                }
+            };
+            var response = await HttpClient.PostAsJsonAsync("api/Logs", payload);
+            if (response.IsSuccessStatusCode)
+            {
+                ToastService.ShowSuccess("Logs enviados correctamente al servidor (/api/Logs).");
+            }
+            else
+            {
+                ToastService.ShowError($"El servidor respondió con código {(int)response.StatusCode}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al enviar reporte de diagnóstico manual.");
+            ToastService.ShowError("No se pudo conectar al servidor para enviar los logs; se enviarán en segundo plano.");
+        }
+        finally
+        {
+            _isSendingLogs = false;
+            StateHasChanged();
+        }
     }
 
     private async Task PollStatusAsync()
@@ -127,8 +184,11 @@ public partial class SettingsPanel : ComponentBase
             while (!_cts.Token.IsCancellationRequested)
             {
                 await Task.Delay(2000, _cts.Token);
-                _scanStatus = await ScanService.GetScanStatusAsync();
-                StateHasChanged();
+                if (ShowServerAdminTabs && !NetworkStateService.IsOffline)
+                {
+                    _scanStatus = await ScanService.GetScanStatusAsync();
+                    StateHasChanged();
+                }
             }
         }
         catch { }
@@ -196,7 +256,7 @@ public partial class SettingsPanel : ComponentBase
         bool canConnect = false;
         try
         {
-            using var testClient = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
+            using var testClient = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
             var pingUri = new Uri(testUri, "api/Books?page=1&pageSize=1");
             using var response = await testClient.GetAsync(pingUri);
             if (response.IsSuccessStatusCode)
