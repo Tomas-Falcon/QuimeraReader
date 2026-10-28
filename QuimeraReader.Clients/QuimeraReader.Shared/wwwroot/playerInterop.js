@@ -1,20 +1,32 @@
 export function initializePlayer(audioElement, dotNetReference) {
     if (!audioElement) return;
 
+    const notifyDuration = () => {
+        if (dotNetReference && typeof audioElement.duration === 'number' && !isNaN(audioElement.duration) && isFinite(audioElement.duration)) {
+            dotNetReference.invokeMethodAsync('OnDurationChanged', audioElement.duration).catch(() => {});
+        }
+    };
+
+    audioElement.addEventListener('loadedmetadata', notifyDuration);
+    audioElement.addEventListener('durationchange', notifyDuration);
+    if (audioElement.readyState >= 1) {
+        notifyDuration();
+    }
+
     audioElement.addEventListener('timeupdate', () => {
-        dotNetReference.invokeMethodAsync('OnTimeUpdate', audioElement.currentTime);
+        dotNetReference.invokeMethodAsync('OnTimeUpdate', audioElement.currentTime).catch(() => {});
     });
 
     audioElement.addEventListener('play', () => {
-        dotNetReference.invokeMethodAsync('OnPlayStateChanged', true);
+        dotNetReference.invokeMethodAsync('OnPlayStateChanged', true).catch(() => {});
     });
 
     audioElement.addEventListener('pause', () => {
-        dotNetReference.invokeMethodAsync('OnPlayStateChanged', false);
+        dotNetReference.invokeMethodAsync('OnPlayStateChanged', false).catch(() => {});
     });
 
     audioElement.addEventListener('ended', () => {
-        dotNetReference.invokeMethodAsync('OnAudioEnded');
+        dotNetReference.invokeMethodAsync('OnAudioEnded').catch(() => {});
     });
 }
 
@@ -29,6 +41,21 @@ export function playAudio(audioElement) {
 
 export function pauseAudio(audioElement) {
     if (audioElement) audioElement.pause();
+}
+
+export function togglePlayPause(audioElement) {
+    if (!audioElement) return;
+    if (audioElement.paused) {
+        playAudio(audioElement);
+    } else {
+        pauseAudio(audioElement);
+    }
+}
+
+export function setPlaybackRate(audioElement, rate) {
+    if (!audioElement || typeof rate !== 'number' || rate <= 0) return;
+    audioElement.playbackRate = rate;
+    audioElement.defaultPlaybackRate = rate;
 }
 
 export function seekAudio(audioElement, time) {

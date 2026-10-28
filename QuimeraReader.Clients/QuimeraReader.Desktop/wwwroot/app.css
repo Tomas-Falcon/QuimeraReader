@@ -1,6 +1,7 @@
-﻿
+
 :root {
     --bg-main: #f4f4f5;
+    --bg-body: #f4f4f5;
     --bg-card: #ffffff;
     --bg-input: #ffffff;
     --bg-hover: #e4e4e7;
@@ -17,6 +18,7 @@
 
 [data-theme="dark"] {
     --bg-main: #09090b;
+    --bg-body: #09090b;
     --bg-card: #18181b;
     --bg-input: #09090b;
     --bg-hover: #27272a;
@@ -859,12 +861,12 @@ main {
 
 
 
- [ d a t a - b s - t h e m e = " d a r k " ]   . f o r m - c o n t r o l : : p l a c e h o l d e r   { 
-         c o l o r :   # a 0 a a b 2 ;   / *   M a y o r   c o n t r a s t e   q u e   e l   d e f a u l t   d e   B o o t s t r a p   * / 
-         o p a c i t y :   1 ; 
- } 
-  
- /* Radzen Overrides */
+[data-bs-theme="dark"] .form-control::placeholder {
+    color: #a0aab2; /* Mayor contraste que el default de Bootstrap */
+    opacity: 1;
+}
+
+/* Radzen Overrides */
 [data-theme="dark"], :root {
     --rz-base-background-color: var(--bg-main);
     --rz-panel-background-color: var(--bg-card);
@@ -918,4 +920,78 @@ main { min-width: 0 !important; overflow-x: hidden !important; width: 100%; }
 /* Safe area padding for mobile OS status bar */
 .pt-safe {
     padding-top: env(safe-area-inset-top);
+}
+.pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Mobile Bottom Navigation Bar */
+.mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    min-height: 60px;
+    padding-bottom: env(safe-area-inset-bottom);
+    background-color: rgba(24, 24, 27, 0.96);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border-color);
+    z-index: 1050;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-height: 52px;
+    color: var(--text-muted);
+    text-decoration: none !important;
+    font-size: 0.72rem;
+    font-weight: 500;
+    gap: 2px;
+    transition: color 0.2s ease, transform 0.15s ease;
+    padding: 6px 4px;
+}
+
+.mobile-nav-item i {
+    font-size: 1.25rem;
+    line-height: 1.1;
+}
+
+.mobile-nav-item.active,
+.mobile-nav-item:active {
+    color: var(--rz-primary, #00f0ff);
+    font-weight: 600;
+}
+
+@media (max-width: 767.98px) {
+    .pb-mobile-nav {
+        padding-bottom: calc(74px + env(safe-area-inset-bottom)) !important;
+    }
+
+    .playlist-drawer {
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        top: auto !important;
+        width: 100% !important;
+        border-radius: 16px 16px 0 0 !important;
+        padding-bottom: env(safe-area-inset-bottom) !important;
+    }
+}
+
+@media (min-width: 768px) {
+    .playlist-drawer {
+        position: absolute !important;
+        top: 56px !important;
+        right: 12px !important;
+        width: min(360px, calc(100vw - 24px)) !important;
+        border-radius: 12px !important;
+    }
 }

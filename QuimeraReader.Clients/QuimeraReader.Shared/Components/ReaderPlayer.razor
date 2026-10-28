@@ -111,14 +111,15 @@
 
             @if (_showPlaylist && Book.AudioTracks != null)
             {
-                <RadzenCard class="position-absolute" Style="top: 56px; right: 12px; width: min(350px, calc(100vw - 24px)); max-height: calc(100vh - 140px); overflow-y: auto; z-index: 100; padding: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+                <div class="position-fixed top-0 start-0 w-100 h-100 d-md-none" style="background: rgba(0,0,0,0.55); z-index: 99;" @onclick="TogglePlaylist"></div>
+                <RadzenCard class="playlist-drawer" Style="z-index: 100; padding: 0; box-shadow: 0 4px 20px rgba(0,0,0,0.65);">
                     <div class="p-3 d-flex justify-content-between align-items-center" style="background: var(--rz-primary); border-bottom: 1px solid var(--rz-border-color);">
-                        <h6 class="mb-0 text-white" style="margin: 0;">@TranslationService["ReaderPlayer_Playlist"]</h6>
-                        <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" Size="ButtonSize.ExtraSmall" Click="TogglePlaylist" />
+                        <h6 class="mb-0 text-dark fw-bold" style="margin: 0;"><i class="bi bi-music-note-list me-2"></i>@TranslationService["ReaderPlayer_Playlist"] (@Book.AudioTracks.Count)</h6>
+                        <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Dark" Variant="Variant.Text" Size="ButtonSize.ExtraSmall" Click="TogglePlaylist" />
                     </div>
-                    <RadzenDataList Data="@Book.AudioTracks.OrderBy(t => t.TrackNumber)" TItem="AudioTrackDto" Style="max-height: 100%;">
+                    <RadzenDataList Data="@Book.AudioTracks.OrderBy(t => t.TrackNumber)" TItem="AudioTrackDto" Style="max-height: 55vh; overflow-y: auto;">
                         <Template Context="track">
-                            <div class="d-flex align-items-center justify-content-between p-2" style="cursor: pointer; background: @(track.TrackNumber == _currentTrackNumber ? "var(--rz-secondary-lighter)" : "transparent");" @onclick="() => ChangeTrackAsync(track.TrackNumber)">
+                            <div class="d-flex align-items-center justify-content-between p-2 px-3" style="cursor: pointer; min-height: 44px; background: @(track.TrackNumber == _currentTrackNumber ? "rgba(0, 240, 255, 0.14)" : "transparent");" @onclick="() => ChangeTrackAsync(track.TrackNumber)">
                                 <span class="text-truncate" style="flex: 1; font-weight: @(track.TrackNumber == _currentTrackNumber ? "bold" : "normal");">
                                     <RadzenIcon Icon="@(track.TrackNumber == _currentTrackNumber ? "play_circle" : "audiotrack")" class="me-2" />
                                     @(string.IsNullOrWhiteSpace(track.FileName) ? $"{TranslationService["ReaderPlayer_Track"]} {track.TrackNumber}" : track.FileName)
@@ -189,6 +190,40 @@
                 }
             </div>
 
+            @if (_showQuickSelectionPill && !_showAnnotationDialog)
+            {
+                <div class="quick-selection-pill position-fixed d-flex align-items-center flex-wrap justify-content-center gap-2"
+                     style="bottom: @(Book.HasAudio && !_isImmersiveMode ? "92px" : "48px"); left: 50%; transform: translateX(-50%); background: rgba(24, 24, 27, 0.96); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 8px 14px; border-radius: 999px; box-shadow: 0 10px 30px rgba(0,0,0,0.65); z-index: 9999; max-width: calc(100vw - 16px); border: 1px solid rgba(255,255,255,0.18);">
+                    <button class="btn btn-sm rounded-circle p-0" style="width: 30px; height: 30px; background-color: #ffeb3b; border: 2px solid rgba(255,255,255,0.4);" @onclick="@(() => QuickAnnotateAsync("#ffeb3b"))" title="Resaltar en amarillo (1 toque)"></button>
+                    <button class="btn btn-sm rounded-circle p-0" style="width: 30px; height: 30px; background-color: #4caf50; border: 2px solid rgba(255,255,255,0.4);" @onclick="@(() => QuickAnnotateAsync("#4caf50"))" title="Resaltar en verde (1 toque)"></button>
+                    <button class="btn btn-sm rounded-circle p-0" style="width: 30px; height: 30px; background-color: #2196f3; border: 2px solid rgba(255,255,255,0.4);" @onclick="@(() => QuickAnnotateAsync("#2196f3"))" title="Resaltar en azul (1 toque)"></button>
+                    <button class="btn btn-sm rounded-circle p-0" style="width: 30px; height: 30px; background-color: #f44336; border: 2px solid rgba(255,255,255,0.4);" @onclick="@(() => QuickAnnotateAsync("#f44336"))" title="Resaltar en rojo (1 toque)"></button>
+                    <button class="btn btn-sm rounded-circle p-0 d-flex align-items-center justify-content-center" style="width: 30px; height: 30px; background-color: rgba(255,255,255,0.08); border: 1.5px dashed #38bdf8; color: white;" @onclick="@(() => QuickAnnotateAsync(""))" title="Solo subrayado (1 toque)">
+                        <i class="bi bi-type-underline"></i>
+                    </button>
+
+                    <div class="vr bg-secondary opacity-50 mx-1" style="height: 22px;"></div>
+
+                    <button class="btn btn-sm btn-outline-light rounded-pill px-2 py-1 d-flex align-items-center gap-1" style="font-size: 0.78rem;" @onclick="OpenFullNoteDialog" title="Añadir nota escrita">
+                        <i class="bi bi-chat-left-text"></i> <span>Nota</span>
+                    </button>
+
+                    @if (Book.HasAudio && _segments != null && _segments.Any())
+                    {
+                        <button class="btn btn-sm btn-info text-dark fw-semibold rounded-pill px-2 py-1 d-flex align-items-center gap-1" style="font-size: 0.78rem;" @onclick="PlayFromSelectionAsync" title="Reproducir audiolibro desde esta frase">
+                            <i class="bi bi-play-fill"></i> <span>Audio</span>
+                        </button>
+                        <button class="btn btn-sm btn-outline-warning rounded-circle p-0 d-flex align-items-center justify-content-center" style="width: 30px; height: 30px;" @onclick="@(() => SetAudioBookmarkAsync(false))" title="Fijar marca de audio aquí">
+                            <i class="bi bi-pin-angle-fill"></i>
+                        </button>
+                    }
+
+                    <button class="btn btn-sm btn-link text-white-50 p-1 ms-1" @onclick="CloseAnnotationDialogAsync" title="Cerrar selección">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            }
+
             @if (_showAnnotationDialog)
             {
                 <div class="annotation-dialog position-fixed" style="bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--bg-card); padding: 15px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 9999; width: 92%; max-width: 420px; border: 1px solid rgba(255,255,255,0.15);">
@@ -242,14 +277,47 @@
 
             @if (Book.HasAudio)
             {
-                <div class="player-controls @(_isImmersiveMode ? "d-none" : "d-flex") align-items-center gap-2" style="background: var(--bg-card); padding: 8px 12px; border-top: 1px solid var(--border-color);">
-                    <button class="btn btn-sm btn-outline-light flex-shrink-0" @onclick="SkipBackward" title="Retroceder 15s">
-                        <i class="bi bi-arrow-counterclockwise"></i> 15s
-                    </button>
-                    <audio @ref="_audioElement" src="@GetCurrentTrackUrl()" controls class="native-audio flex-grow-1" style="height: 40px;" />
-                    <button class="btn btn-sm btn-outline-light flex-shrink-0" @onclick="SkipForward" title="Avanzar 30s">
-                        30s <i class="bi bi-arrow-clockwise"></i>
-                    </button>
+                <audio @ref="_audioElement" src="@GetCurrentTrackUrl()" class="d-none" preload="metadata" />
+                <div class="player-controls @(_isImmersiveMode ? "d-none" : "d-flex") flex-column gap-1" style="background: var(--bg-card); padding: 8px 14px; border-top: 1px solid var(--border-color);">
+                    <div class="d-flex align-items-center gap-2 w-100">
+                        <span class="text-white-50 small font-monospace" style="min-width: 42px; font-size: 0.75rem;">@FormatTime(_currentTime)</span>
+                        <input type="range"
+                               class="form-range flex-grow-1 m-0"
+                               min="0"
+                               max="@(Math.Max(1, Math.Round(_audioDuration, 0)).ToString(CultureInfo.InvariantCulture))"
+                               step="1"
+                               value="@Math.Round(_currentTime, 0).ToString(CultureInfo.InvariantCulture)"
+                               @onchange="OnAudioSeekChange" />
+                        <span class="text-white-50 small font-monospace text-end" style="min-width: 42px; font-size: 0.75rem;">@FormatTime(_audioDuration)</span>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between w-100">
+                        <button class="btn btn-sm btn-outline-secondary text-white-50 px-2 py-1" style="min-width: 52px; font-size: 0.78rem; font-weight: 600;" @onclick="CyclePlaybackRateAsync" title="Velocidad de reproducción">
+                            @(_playbackRate.ToString("0.##", CultureInfo.InvariantCulture))x
+                        </button>
+
+                        <div class="d-flex align-items-center gap-3">
+                            <button class="btn btn-sm btn-outline-light rounded-pill px-2" @onclick="SkipBackward" title="Retroceder 15s">
+                                <i class="bi bi-arrow-counterclockwise"></i> 15s
+                            </button>
+                            <button class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center p-0 shadow-sm" style="width: 42px; height: 42px;" @onclick="ToggleAudioPlayPauseAsync" title="@(_isPlaying ? "Pausar" : "Reproducir")">
+                                <i class="bi @(_isPlaying ? "bi-pause-fill" : "bi-play-fill") fs-4"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-light rounded-pill px-2" @onclick="SkipForward" title="Avanzar 30s">
+                                30s <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+
+                        @if (Book.AudioTracks != null && Book.AudioTracks.Count > 1)
+                        {
+                            <button class="btn btn-sm @(_showPlaylist ? "btn-primary" : "btn-outline-secondary text-white-50") px-2 py-1" style="min-width: 52px; font-size: 0.78rem;" @onclick="TogglePlaylist" title="Cambiar pista de audio">
+                                <i class="bi bi-music-note-list"></i> @_currentTrackNumber/@Book.AudioTracks.Count
+                            </button>
+                        }
+                        else
+                        {
+                            <div style="min-width: 52px;"></div>
+                        }
+                    </div>
                 </div>
             }
         </div>
@@ -289,7 +357,7 @@
     [JSInvokable]
     public async Task OnCenterTap()
     {
-        if (_showAnnotationDialog) return;
+        if (_showAnnotationDialog || _showQuickSelectionPill) return;
         await ToggleImmersiveModeAsync();
     }
 
@@ -671,7 +739,11 @@
         if (Book != null) Book.CurrentAudioTrackNumber = trackNumber;
         StateHasChanged();
         await Task.Delay(80);
-        if (_jsModule != null) await _jsModule.InvokeVoidAsync("playAudio", _audioElement);
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("setPlaybackRate", _audioElement, _playbackRate);
+            await _jsModule.InvokeVoidAsync("playAudio", _audioElement);
+        }
         _ = BookService.UpdatePositionAsync(BookId, epubCfi: Book?.CurrentEpubCfi, audioPosition: 0, percentage: Book?.PercentageCompleted, audioTrackNumber: _currentTrackNumber);
     }
 
@@ -772,7 +844,7 @@
         {
             _playerInitialized = true;
 
-            // Cargar preferencias de lectura guardadas (Tema y Tamaño de fuente)
+            // Cargar preferencias de lectura guardadas (Tema, Tamaño de fuente y Velocidad de audio)
             try
             {
                 var savedTheme = await JS.InvokeAsync<string?>("window.localStorage.getItem", "quimera_reader_theme");
@@ -783,6 +855,12 @@
                 {
                     _fontSize = parsedSize;
                 }
+
+                var savedSpeed = await JS.InvokeAsync<string?>("window.localStorage.getItem", "quimera_reader_playbackrate");
+                if (double.TryParse(savedSpeed, NumberStyles.Any, CultureInfo.InvariantCulture, out double parsedSpeed) && parsedSpeed >= 0.5 && parsedSpeed <= 3.0)
+                {
+                    _playbackRate = parsedSpeed;
+                }
             }
             catch { }
             
@@ -791,6 +869,7 @@
                 _jsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/QuimeraReader.Shared/playerInterop.js");
                 _dotNetRef = DotNetObjectReference.Create(this);
                 await _jsModule.InvokeVoidAsync("initializePlayer", _audioElement, _dotNetRef);
+                await _jsModule.InvokeVoidAsync("setPlaybackRate", _audioElement, _playbackRate);
 
                 if (Book.CurrentAudioPosition.HasValue && Book.CurrentAudioPosition.Value > 0)
                 {
@@ -941,6 +1020,7 @@
     }
 
     private List<QuimeraReader.Shared.Models.AnnotationDto>? _bookAnnotations;
+    private bool _showQuickSelectionPill = false;
     private bool _showAnnotationDialog = false;
     private int? _editingAnnotationId = null;
     private string _selectedCfi = "";
@@ -956,8 +1036,24 @@
         _selectedColor = "#ffeb3b";
         _annotationNote = "";
         _editingAnnotationId = null;
+        _showQuickSelectionPill = true;
+        _showAnnotationDialog = false;
+        StateHasChanged();
+    }
+
+    private void OpenFullNoteDialog()
+    {
+        _showQuickSelectionPill = false;
         _showAnnotationDialog = true;
         StateHasChanged();
+    }
+
+    private async Task QuickAnnotateAsync(string color)
+    {
+        _selectedColor = color;
+        _annotationNote = "";
+        _showQuickSelectionPill = false;
+        await SaveAnnotationAsync();
     }
 
     [JSInvokable]
@@ -973,6 +1069,7 @@
                 _selectedColor = match.ColorHex ?? "";
                 _annotationNote = match.Note ?? "";
                 _editingAnnotationId = match.Id;
+                _showQuickSelectionPill = false;
                 _showAnnotationDialog = true;
                 StateHasChanged();
             }
@@ -981,6 +1078,7 @@
 
     private async Task CloseAnnotationDialogAsync()
     {
+        _showQuickSelectionPill = false;
         _showAnnotationDialog = false;
         _editingAnnotationId = null;
         if (_epubJsModule != null)
@@ -992,6 +1090,7 @@
 
     private async Task SetAudioBookmarkAsync(bool autoPlay = false)
     {
+        _showQuickSelectionPill = false;
         _showAnnotationDialog = false;
         if (_epubJsModule != null)
         {
@@ -1375,6 +1474,62 @@
         
         [JsonPropertyName("text")]
         public string Text { get; set; } = string.Empty;
+    }
+
+    private double _audioDuration = 0;
+    private double _playbackRate = 1.0;
+    private static readonly double[] _playbackRates = new[] { 0.75, 1.0, 1.25, 1.5, 1.75, 2.0 };
+
+    [JSInvokable]
+    public void OnDurationChanged(double duration)
+    {
+        if (duration > 0 && !double.IsNaN(duration) && !double.IsInfinity(duration))
+        {
+            _audioDuration = duration;
+            StateHasChanged();
+        }
+    }
+
+    private static string FormatTime(double totalSeconds)
+    {
+        if (totalSeconds <= 0 || double.IsNaN(totalSeconds) || double.IsInfinity(totalSeconds))
+            return "00:00";
+        var ts = TimeSpan.FromSeconds(totalSeconds);
+        return ts.TotalHours >= 1
+            ? $"{(int)ts.TotalHours}:{ts.Minutes:D2}:{ts.Seconds:D2}"
+            : $"{ts.Minutes:D2}:{ts.Seconds:D2}";
+    }
+
+    private async Task ToggleAudioPlayPauseAsync()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("togglePlayPause", _audioElement);
+        }
+    }
+
+    private async Task CyclePlaybackRateAsync()
+    {
+        int idx = Array.FindIndex(_playbackRates, r => Math.Abs(r - _playbackRate) < 0.01);
+        _playbackRate = _playbackRates[(idx + 1) % _playbackRates.Length];
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("setPlaybackRate", _audioElement, _playbackRate);
+        }
+        try { await JS.InvokeVoidAsync("window.localStorage.setItem", "quimera_reader_playbackrate", _playbackRate.ToString(CultureInfo.InvariantCulture)); } catch { }
+        StateHasChanged();
+    }
+
+    private async Task OnAudioSeekChange(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out double targetSec))
+        {
+            _currentTime = Math.Max(0, targetSec);
+            if (_jsModule != null)
+            {
+                await _jsModule.InvokeVoidAsync("seekAudio", _audioElement, _currentTime);
+            }
+        }
     }
 
     private async Task SkipBackward()

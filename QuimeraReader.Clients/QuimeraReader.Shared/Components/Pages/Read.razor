@@ -1,6 +1,12 @@
 @page "/read/{BookId:int}"
 @using QuimeraReader.Shared.Components
+@namespace QuimeraReader.Shared.Components.Pages
 
 <PageTitle>Lector - QuimeraReader</PageTitle>
 
 <ReaderPlayer BookId="@BookId" />
+
+@code {
+    [Parameter]
+    public int BookId { get; set; }
+}

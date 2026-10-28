@@ -20,7 +20,7 @@
     {
         <RadzenTabs>
             <Tabs>
-                @if (ServerConfig.GetType().Name.Contains("Mobile"))
+                @if (IsMobileClient)
                 {
                     <RadzenTabsItem Text="@TranslationService["Settings_ClientApp"]" Icon="devices">
                         <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
@@ -51,7 +51,7 @@
                             <RadzenSwitch Value="@NetworkStateService.IsForceOffline" Change="@OnForceOfflineChanged" />
                         </div>
 
-                        <div class="mb-2">
+                        <div class="@(IsMobileClient ? "mb-4 pb-3 border-bottom border-secondary" : "mb-2")">
                             <RadzenLabel Text="Idioma de la interfaz" class="fw-bold mb-2 d-block" />
                             <RadzenDropDown Value="@TranslationService.CurrentLanguage"
                                             Data="@_languageOptions"
@@ -61,32 +61,48 @@
                                             class="w-100 bg-secondary text-light border-0"
                                             Style="max-width: 320px;" />
                         </div>
+
+                        @if (IsMobileClient)
+                        {
+                            <div class="d-flex justify-content-between align-items-center gap-3 pt-1">
+                                <div>
+                                    <h6 class="text-light fw-bold mb-1"><i class="bi bi-shield-lock me-2 text-info"></i> Administración Avanzada del Servidor</h6>
+                                    <p class="text-white-50 small mb-0">Muestra carpetas del servidor, claves de IA/Whisper, tareas de escaneo y control del contenedor Docker.</p>
+                                </div>
+                                <RadzenSwitch @bind-Value="_showAdvancedServerSettings" />
+                            </div>
+                        }
                     </RadzenCard>
 
-                    <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
-                        <h4 class="text-primary"><RadzenIcon Icon="folder" /> @TranslationService["Settings_ServerFolders"]</h4>
-                        <p class="text-white-50 small mb-4">@TranslationService["Settings_ServerFoldersDesc"]</p>
+                    @if (ShowServerAdminTabs)
+                    {
+                        <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
+                            <h4 class="text-primary"><RadzenIcon Icon="folder" /> @TranslationService["Settings_ServerFolders"]</h4>
+                            <p class="text-white-50 small mb-4">@TranslationService["Settings_ServerFoldersDesc"]</p>
 
-                        <div class="mb-4">
-                            <RadzenLabel Text="@TranslationService["Settings_SourceDirectory"]" class="fw-bold mb-2 d-block" />
-                            <RadzenTextBox @bind-Value="_libraryRootPath" class="w-100 bg-secondary text-light border-0" />
-                            <div class="form-text text-white-50 mt-1">@TranslationService["Settings_SourceDirectoryDesc"]</div>
-                        </div>
+                            <div class="mb-4">
+                                <RadzenLabel Text="@TranslationService["Settings_SourceDirectory"]" class="fw-bold mb-2 d-block" />
+                                <RadzenTextBox @bind-Value="_libraryRootPath" class="w-100 bg-secondary text-light border-0" />
+                                <div class="form-text text-white-50 mt-1">@TranslationService["Settings_SourceDirectoryDesc"]</div>
+                            </div>
 
-                        <div class="mb-4">
-                            <RadzenLabel Text="@TranslationService["Settings_OutputDirectory"]" class="fw-bold mb-2 d-block" />
-                            <RadzenTextBox @bind-Value="_outgoingLibraryPath" class="w-100 bg-secondary text-light border-0" />
-                            <div class="form-text text-white-50 mt-1">@TranslationService["Settings_OutputDirectoryDesc"]</div>
-                        </div>
+                            <div class="mb-4">
+                                <RadzenLabel Text="@TranslationService["Settings_OutputDirectory"]" class="fw-bold mb-2 d-block" />
+                                <RadzenTextBox @bind-Value="_outgoingLibraryPath" class="w-100 bg-secondary text-light border-0" />
+                                <div class="form-text text-white-50 mt-1">@TranslationService["Settings_OutputDirectoryDesc"]</div>
+                            </div>
 
-                        <div class="mb-2">
-                            <RadzenLabel Text="@TranslationService["Settings_ImportMode"]" class="fw-bold mb-2 d-block" />
-                            <RadzenDropDown @bind-Value="_ingestionMode" Data="@_ingestionModes" TextProperty="Text" ValueProperty="Value" class="w-100 bg-secondary text-light border-0" />
-                            <div class="form-text text-white-50 mt-1">@TranslationService["Settings_ImportModeDesc"]</div>
-                        </div>
-                    </RadzenCard>
+                            <div class="mb-2">
+                                <RadzenLabel Text="@TranslationService["Settings_ImportMode"]" class="fw-bold mb-2 d-block" />
+                                <RadzenDropDown @bind-Value="_ingestionMode" Data="@_ingestionModes" TextProperty="Text" ValueProperty="Value" class="w-100 bg-secondary text-light border-0" />
+                                <div class="form-text text-white-50 mt-1">@TranslationService["Settings_ImportModeDesc"]</div>
+                            </div>
+                        </RadzenCard>
+                    }
                 </RadzenTabsItem>
 
+                @if (ShowServerAdminTabs)
+                {
                 <RadzenTabsItem Text="@TranslationService["Settings_IntegrationsAPI"]" Icon="api">
                     <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
                         <h4 class="text-primary"><RadzenIcon Icon="smart_toy" /> @TranslationService["Settings_AIAndTranscription"]</h4>
@@ -218,12 +234,16 @@
                         </div>
                     </RadzenCard>
                 </RadzenTabsItem>
+                }
             </Tabs>
         </RadzenTabs>
 
-        <div class="d-flex justify-content-end mt-4">
-            <RadzenButton Text="@TranslationService["Settings_SaveAllChanges"]" Icon="save" Click="SaveSettingsAsync" IsBusy="@_isSaving" ButtonStyle="Radzen.ButtonStyle.Success" Size="Radzen.ButtonSize.Large" class="px-5 shadow" />
-        </div>
+        @if (ShowServerAdminTabs)
+        {
+            <div class="d-flex justify-content-end mt-4">
+                <RadzenButton Text="@TranslationService["Settings_SaveAllChanges"]" Icon="save" Click="SaveSettingsAsync" IsBusy="@_isSaving" ButtonStyle="Radzen.ButtonStyle.Success" Size="Radzen.ButtonSize.Large" class="px-5 shadow" />
+            </div>
+        }
     }
 </div>
 

@@ -20,6 +20,8 @@ public class DesktopLocalBookRepository : ILocalBookRepository
     public async Task EnsureCreatedAsync()
     {
         await _dbContext.Database.EnsureCreatedAsync();
+        try { await _dbContext.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;"); } catch { }
+        try { await _dbContext.Database.ExecuteSqlRawAsync("PRAGMA busy_timeout=5000;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN ReadingStatus TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN EpubLocationsCache TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN TotalPages INTEGER;"); } catch { }
@@ -190,7 +192,7 @@ public class DesktopLocalBookRepository : ILocalBookRepository
         }
     }
 
-    public async Task UpdateProgressAsync(int id, string cfi, double? audioPosition, double? percentage)
+    public async Task UpdateProgressAsync(int id, string cfi, double? audioPosition, double? percentage, int? audioTrackNumber = null)
     {
         var book = await _dbContext.Books.FindAsync(id);
         if (book != null)
@@ -198,6 +200,7 @@ public class DesktopLocalBookRepository : ILocalBookRepository
             if (!string.IsNullOrEmpty(cfi)) book.CurrentEpubCfi = cfi;
             if (percentage.HasValue) book.PercentageCompleted = percentage.Value;
             if (audioPosition.HasValue) book.CurrentAudioPosition = audioPosition.Value;
+            if (audioTrackNumber.HasValue) book.CurrentAudioTrackNumber = audioTrackNumber.Value;
             book.LastReadAt = System.DateTime.UtcNow;
             await _dbContext.SaveChangesAsync();
         }

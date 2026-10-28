@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Net.Http.Json;
 using System.Collections.Generic;
@@ -19,6 +20,7 @@ public class DesktopOfflineSyncWorker : IOfflineSyncWorker
     private readonly ILogger<DesktopOfflineSyncWorker> _logger;
     private readonly INetworkStateService _networkState;
     private readonly IServiceProvider _serviceProvider;
+    private readonly SemaphoreSlim _syncLock = new(1, 1);
     private bool _isSyncing;
 
     public DesktopOfflineSyncWorker(ILogger<DesktopOfflineSyncWorker> logger, INetworkStateService networkState, IServiceProvider serviceProvider)
@@ -32,7 +34,8 @@ public class DesktopOfflineSyncWorker : IOfflineSyncWorker
 
     public async Task SyncNowAsync()
     {
-        if (_isSyncing || _networkState.IsOffline) return;
+        if (_networkState.IsOffline) return;
+        if (!await _syncLock.WaitAsync(0)) return;
 
         try
         {
@@ -110,12 +113,11 @@ public class DesktopOfflineSyncWorker : IOfflineSyncWorker
                 {
                     bool shouldPush = false;
                     
-                    if (localBook.PercentageCompleted > (serverBook.PercentageCompleted ?? 0))
+                    if (localBook.LastReadAt.HasValue && (!serverBook.LastReadAt.HasValue || localBook.LastReadAt.Value > serverBook.LastReadAt.Value))
                     {
                         shouldPush = true;
                     }
-                    else if (localBook.PercentageCompleted == serverBook.PercentageCompleted && 
-                            (localBook.LastReadAt > serverBook.LastReadAt || (localBook.LastReadAt != null && serverBook.LastReadAt == null)))
+                    else if (!serverBook.LastReadAt.HasValue && localBook.PercentageCompleted > (serverBook.PercentageCompleted ?? 0))
                     {
                         shouldPush = true;
                     }
@@ -232,6 +234,7 @@ public class DesktopOfflineSyncWorker : IOfflineSyncWorker
         finally
         {
             _isSyncing = false;
+            _syncLock.Release();
         }
     }
 
@@ -241,21 +244,41 @@ public class DesktopOfflineSyncWorker : IOfflineSyncWorker
         if (serverPath.StartsWith(DesktopStorage.AppDataDirectory)) return serverPath;
 
         var localPath = Path.Combine(DesktopStorage.AppDataDirectory, localFileName);
-        if (File.Exists(localPath)) return localPath; 
+        if (File.Exists(localPath))
+        {
+            var existingInfo = new FileInfo(localPath);
+            if (existingInfo.Length > 0) return localPath;
+            try { File.Delete(localPath); } catch { }
+        }
 
+        var tempPath = localPath + ".tmp";
         try
         {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
             using var response = await httpClient.GetAsync(serverPath, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
             if (response.IsSuccessStatusCode)
             {
-                using var fs = new FileStream(localPath, FileMode.Create);
-                await response.Content.CopyToAsync(fs);
-                return localPath;
+                await using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    await response.Content.CopyToAsync(fs);
+                    await fs.FlushAsync();
+                }
+
+                var tempInfo = new FileInfo(tempPath);
+                if (tempInfo.Length > 0)
+                {
+                    File.Move(tempPath, localPath, overwrite: true);
+                    return localPath;
+                }
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error descargando archivo {Path}", serverPath);
+        }
+        finally
+        {
+            try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
         }
         return serverPath; 
     }

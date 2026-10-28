@@ -1,11 +1,18 @@
-﻿@page "/"
+@page "/"
 @using QuimeraReader.Shared.Components
+@namespace QuimeraReader.Shared.Components.Pages
 
 <PageTitle>QuimeraReader - Inicio</PageTitle>
 
-<div class="home-header mb-4 mt-2">
+<div class="home-header mb-4 mt-2 d-none d-md-block">
     <h1>Tu Biblioteca</h1>
     <p class="text-muted">Explora tus libros, continúa leyendo donde lo dejaste y descubre nuevas recomendaciones.</p>
 </div>
 
 <BookList QueryParam="@Q" />
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? Q { get; set; }
+}

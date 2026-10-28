@@ -890,6 +890,24 @@ main {
     
     --rz-border-color: var(--border-color);
     --rz-border-radius: 8px;
+    
+    /* Contrast Fixes */
+    --rz-dialog-background-color: var(--bg-card);
+    --rz-dropdown-background-color: var(--bg-input);
+    --rz-dropdown-item-background-color: var(--bg-input);
+    --rz-dropdown-item-color: var(--text-main);
+    --rz-dropdown-item-hover-background-color: var(--bg-hover);
+    --rz-dropdown-item-hover-color: var(--text-main);
+    --rz-header-background-color: var(--bg-card);
+    --rz-sidebar-background-color: var(--bg-card);
+}
+
+[data-theme="light"] {
+    --rz-primary: #0d6efd;
+    --rz-primary-light: rgba(13, 110, 253, 0.2);
+    --rz-primary-dark: #0a58ca;
+    --rz-text-color: #212529;
+    --rz-secondary-text-color: #6c757d;
 }
 
 main { min-width: 0 !important; overflow-x: hidden !important; width: 100%; }
@@ -954,5 +972,26 @@ main { min-width: 0 !important; overflow-x: hidden !important; width: 100%; }
 @media (max-width: 767.98px) {
     .pb-mobile-nav {
         padding-bottom: calc(74px + env(safe-area-inset-bottom)) !important;
+    }
+
+    .playlist-drawer {
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        top: auto !important;
+        width: 100% !important;
+        border-radius: 16px 16px 0 0 !important;
+        padding-bottom: env(safe-area-inset-bottom) !important;
+    }
+}
+
+@media (min-width: 768px) {
+    .playlist-drawer {
+        position: absolute !important;
+        top: 56px !important;
+        right: 12px !important;
+        width: min(360px, calc(100vw - 24px)) !important;
+        border-radius: 12px !important;
     }
 }

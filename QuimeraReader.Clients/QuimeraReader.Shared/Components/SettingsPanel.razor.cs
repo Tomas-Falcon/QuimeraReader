@@ -36,6 +36,10 @@ public partial class SettingsPanel : ComponentBase
     private string _openAiEndpoint = "https://api.openai.com/v1/";
     private bool _isDownloadingWhisper = false;
     private bool _isWhisperDownloaded = false;
+    private bool _showAdvancedServerSettings = false;
+
+    private bool IsMobileClient => ServerConfig?.GetType().Name.Contains("Mobile", StringComparison.OrdinalIgnoreCase) == true;
+    private bool ShowServerAdminTabs => !IsMobileClient || _showAdvancedServerSettings;
 
     private class OptionItem
     {

@@ -973,4 +973,25 @@ main { min-width: 0 !important; overflow-x: hidden !important; width: 100%; }
     .pb-mobile-nav {
         padding-bottom: calc(74px + env(safe-area-inset-bottom)) !important;
     }
+
+    .playlist-drawer {
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        top: auto !important;
+        width: 100% !important;
+        border-radius: 16px 16px 0 0 !important;
+        padding-bottom: env(safe-area-inset-bottom) !important;
+    }
+}
+
+@media (min-width: 768px) {
+    .playlist-drawer {
+        position: absolute !important;
+        top: 56px !important;
+        right: 12px !important;
+        width: min(360px, calc(100vw - 24px)) !important;
+        border-radius: 12px !important;
+    }
 }
