@@ -37,4 +37,6 @@ public class DesktopServerConfigService : IServerConfigService
     {
         DesktopPreferences.Set(ApiKeyKey, apiKey?.Trim() ?? "");
     }
+
+    public bool UseNativeMediaProxy => false;
 }

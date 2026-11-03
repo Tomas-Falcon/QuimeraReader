@@ -5,6 +5,9 @@ public partial class MainPage : ContentPage
     public MainPage()
     {
         InitializeComponent();
+#if ANDROID
+        blazorWebView.WebResourceRequested += QuimeraReader.Mobile.Services.MediaProxyInterceptor.OnWebResourceRequested;
+#endif
     }
 
     protected override bool OnBackButtonPressed()

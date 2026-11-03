@@ -795,6 +795,13 @@
                 _currentTime = Book.CurrentAudioPosition.Value;
             }
 
+            // Si la pista guardada ya no existe (pistas borradas/reasignadas) se empieza por la primera en vez de pedir un 404
+            if (Book.AudioTracks != null && Book.AudioTracks.Count > 0 && !Book.AudioTracks.Any(t => t.TrackNumber == _currentTrackNumber))
+            {
+                _currentTrackNumber = Book.AudioTracks.Min(t => t.TrackNumber);
+                _currentTime = 0;
+            }
+
             var audioFileUrl = await TryGetLocalFileUrlAsync("audio");
             if (!string.IsNullOrEmpty(audioFileUrl) && (audioFileUrl.StartsWith("blob:") || audioFileUrl.StartsWith("data:")))
             {

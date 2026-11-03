@@ -24,4 +24,7 @@ public class MobileServerConfigService : IServerConfigService
         if (string.IsNullOrWhiteSpace(apiKey)) Preferences.Default.Remove(ApiKeyKey);
         else Preferences.Default.Set(ApiKeyKey, apiKey.Trim());
     }
+
+    // Solo Android: es donde se ha verificado el bloqueo y donde el interceptor se ejecuta fuera del hilo de UI
+    public bool UseNativeMediaProxy => OperatingSystem.IsAndroid();
 }

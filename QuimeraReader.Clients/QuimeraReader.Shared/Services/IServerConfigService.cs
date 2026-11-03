@@ -11,4 +11,10 @@ public interface IServerConfigService
     /// </summary>
     string? ApiKey { get; }
     void SaveApiKey(string? apiKey);
+
+    /// <summary>
+    /// true si los medios (portadas, audio, EPUB) deben pedirse a través de <see cref="MediaProxy"/> en lugar de
+    /// cargarse directamente desde el servidor (necesario en MAUI Android con servidores http://).
+    /// </summary>
+    bool UseNativeMediaProxy { get; }
 }

@@ -85,6 +85,13 @@ public class BookService : IBookService
         bool isAbsolute = url.StartsWith("http", StringComparison.OrdinalIgnoreCase) || url.StartsWith("data:") || url.StartsWith("blob:");
         var resolved = isAbsolute ? url : $"{baseAddress}/{url.TrimStart('/')}";
 
+        // MAUI Android: los recursos del servidor se piden por una ruta del propio origen que el host intercepta
+        // (añade la API key en cabecera, así que no hace falta access_token en la URL)
+        if (_serverConfig.UseNativeMediaProxy && baseAddress.Length > 0 && resolved.StartsWith(baseAddress + "/", StringComparison.OrdinalIgnoreCase))
+        {
+            return MediaProxy.PathPrefix + resolved.Substring(baseAddress.Length + 1);
+        }
+
         // Solo se añade el token a URLs del propio servidor (no a portadas externas, data: ni blob:)
         var apiKey = _serverConfig.ApiKey;
         if (string.IsNullOrEmpty(apiKey) || baseAddress.Length == 0 || !resolved.StartsWith(baseAddress, StringComparison.OrdinalIgnoreCase)) return resolved;
