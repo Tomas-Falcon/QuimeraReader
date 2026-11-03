@@ -717,6 +717,22 @@
         StateHasChanged();
     }
 
+    // La copia offline es opcional: si la base local falla (p. ej. esquema roto) se sigue leyendo desde el servidor
+    private async Task<string?> TryGetLocalFileUrlAsync(string fileType)
+    {
+        var localRepo = ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
+        if (localRepo == null) return null;
+        try
+        {
+            return await localRepo.GetBookFileUrlAsync(BookId, fileType);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Reader] No se pudo consultar la copia local ({fileType}): {ex.Message}");
+            return null;
+        }
+    }
+
     private string GetCurrentTrackUrl()
     {
         if (!string.IsNullOrEmpty(_audioSourceUrl) && (_audioSourceUrl.StartsWith("blob:") || _audioSourceUrl.StartsWith("data:")))
@@ -779,8 +795,7 @@
                 _currentTime = Book.CurrentAudioPosition.Value;
             }
 
-            var localRepo = ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
-            var audioFileUrl = localRepo != null ? await localRepo.GetBookFileUrlAsync(BookId, "audio") : null;
+            var audioFileUrl = await TryGetLocalFileUrlAsync("audio");
             if (!string.IsNullOrEmpty(audioFileUrl) && (audioFileUrl.StartsWith("blob:") || audioFileUrl.StartsWith("data:")))
             {
                 _audioSourceUrl = audioFileUrl;
@@ -890,8 +905,7 @@
                     if (approx > 0) initialPct = approx * 100.0;
                 }
 
-                var localRepo = ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) as QuimeraReader.Shared.Interfaces.ILocalBookRepository;
-                var epubFileUrl = localRepo != null ? await localRepo.GetBookFileUrlAsync(BookId, "epub") : null;
+                var epubFileUrl = await TryGetLocalFileUrlAsync("epub");
                 
                 if (!string.IsNullOrEmpty(epubFileUrl) && (epubFileUrl.StartsWith("blob:") || System.IO.File.Exists(epubFileUrl)))
                 {

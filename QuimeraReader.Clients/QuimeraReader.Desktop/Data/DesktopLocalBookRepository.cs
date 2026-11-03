@@ -18,10 +18,23 @@ public class DesktopLocalBookRepository : ILocalBookRepository
         _dbContext = dbContext;
     }
 
+    /// <summary>
+    /// Crea las tablas que falten aunque el archivo ya exista (EnsureCreated() no hace nada si el .db ya existe,
+    /// p. ej. creado antes por otro componente o por una versión anterior con menos tablas).
+    /// </summary>
+    private async Task CreateMissingTablesAsync()
+    {
+        var script = _dbContext.Database.GenerateCreateScript();
+        script = System.Text.RegularExpressions.Regex.Replace(script, "CREATE TABLE \"", "CREATE TABLE IF NOT EXISTS \"");
+        script = System.Text.RegularExpressions.Regex.Replace(script, "CREATE (UNIQUE )?INDEX \"", "CREATE $1INDEX IF NOT EXISTS \"");
+        // ExecuteSqlRaw interpreta {n} como parámetros: se escapan las llaves por si el DDL las contuviera
+        await _dbContext.Database.ExecuteSqlRawAsync(script.Replace("{", "{{").Replace("}", "}}"));
+    }
+
     public async Task EnsureCreatedAsync()
     {
         if (_schemaInitialized) return;
-        await _dbContext.Database.EnsureCreatedAsync();
+        await CreateMissingTablesAsync();
         try { await _dbContext.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN ReadingStatus TEXT;"); } catch { }
         try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN EpubLocationsCache TEXT;"); } catch { }
