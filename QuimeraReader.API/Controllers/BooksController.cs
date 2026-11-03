@@ -72,7 +72,7 @@ public class BooksController : ControllerBase
                 c.IsUserGenerated,
                 BookCount = c.Books.Count(),
                 // Muestra: un libro que tenga portada (antes el primero cualquiera y muchas miniaturas daban 404)
-                SampleBookId = c.Books.Where(bc => bc.Book.CoverImagePath != null && bc.Book.CoverImagePath != "").Select(bc => (int?)bc.BookId).FirstOrDefault()
+                SampleBookId = c.Books.Where(bc => bc.Book.CoverImagePath != null && bc.Book.CoverImagePath != "").OrderByDescending(bc => bc.BookId).Select(bc => (int?)bc.BookId).FirstOrDefault()
             })
             .ToListAsync();
         var categories = raw.Select(c => new {
@@ -121,6 +121,7 @@ public class BooksController : ControllerBase
                     // Muestra: un libro que tenga portada (antes el primero cualquiera, y muchas miniaturas daban 404)
                     SampleBookId = a.Books
                         .Where(ba => ba.Book.CoverImagePath != null && ba.Book.CoverImagePath != "")
+                        .OrderByDescending(ba => ba.BookId) // los más recientes: las portadas rotas se concentran en importaciones antiguas
                         .Select(ba => (int?)ba.BookId).FirstOrDefault()
                 })
                 .ToListAsync();
