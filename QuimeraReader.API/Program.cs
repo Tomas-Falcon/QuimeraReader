@@ -71,6 +71,7 @@ builder.Services.AddScoped<QuimeraReader.Application.Interfaces.IAudioMatchingSe
 builder.Services.AddScoped<DeepLibraryScannerService>();
 builder.Services.AddScoped<MediaPackagerService>();
 builder.Services.AddScoped<QuimeraReader.Infrastructure.Services.HardcoverSyncService>();
+builder.Services.AddScoped<QuimeraReader.Application.Interfaces.ISearchIndex, SqliteSearchIndex>();
 
 // Registrar los Background Services
 builder.Services.AddHostedService<LibraryScanBackgroundService>();
@@ -167,6 +168,23 @@ using (var scope = app.Services.CreateScope())
     }
     try { dbContext.Database.ExecuteSqlRaw("PRAGMA optimize;"); } catch { }
 }
+// Índices de búsqueda (FTS5): se crean/reconstruyen en segundo plano para no retrasar el arranque
+// (la primera vez indexa toda la biblioteca; después solo si están descuadrados con Books/Authors)
+_ = Task.Run(async () =>
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        await SqliteSearchIndex.EnsureUpToDateAsync(db);
+        app.Logger.LogInformation("Índices de búsqueda listos en {Ms} ms", sw.ElapsedMilliseconds);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "No se pudieron preparar los índices de búsqueda");
+    }
+});
 
 app.UseResponseCompression();
 

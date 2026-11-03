@@ -17,7 +17,7 @@ public interface IBookService
     List<Book>? GetCachedRecommendations();
     IEnumerable<Category>? GetCachedCategories();
     Task<IEnumerable<Category>> GetCategoriesAsync(bool forceRefresh = false);
-    Task<IEnumerable<Author>> GetAuthorsAsync(bool forceRefresh = false);
+    Task<IEnumerable<Author>> GetAuthorsAsync(string? search = null, int offset = 0, int limit = 100);
     Task<string> GetSyncMapAsync(int id);
     Task<Book> UploadEpubAsync(Stream fileStream, string fileName);
     Task UpdatePositionAsync(int bookId, string? epubCfi = null, double? audioPosition = null, double? percentage = null, int? audioTrackNumber = null);
@@ -350,9 +350,11 @@ public class BookService : IBookService
         return _categoriesCache ?? Enumerable.Empty<Category>();
     }
 
-    public async Task<IEnumerable<Author>> GetAuthorsAsync(bool forceRefresh = false)
+    public async Task<IEnumerable<Author>> GetAuthorsAsync(string? search = null, int offset = 0, int limit = 100)
     {
-        if (!forceRefresh && _authorsCache != null && (DateTime.UtcNow - _authorsCacheTime) < TimeSpan.FromMinutes(3))
+        // Sin búsqueda, la primera página se cachea unos minutos (es lo que se ve al entrar en Autores)
+        bool cacheable = string.IsNullOrWhiteSpace(search) && offset == 0;
+        if (cacheable && _authorsCache != null && _authorsCache.Count == limit && (DateTime.UtcNow - _authorsCacheTime) < TimeSpan.FromMinutes(3))
         {
             return _authorsCache;
         }
@@ -361,20 +363,23 @@ public class BookService : IBookService
         {
             if (!_networkState.IsOffline)
             {
-                var list = (await _httpClient.GetFromJsonAsync<IEnumerable<Author>>("api/Books/authors"))?.ToList() ?? new List<Author>();
-                if (list.Count > 0)
+                // La búsqueda se hace en el servidor: hay decenas de miles de autores y no caben en el cliente
+                var url = $"api/Books/authors?offset={offset}&limit={limit}";
+                if (!string.IsNullOrWhiteSpace(search)) url += $"&search={Uri.EscapeDataString(search.Trim())}";
+                var list = (await _httpClient.GetFromJsonAsync<IEnumerable<Author>>(url))?.ToList() ?? new List<Author>();
+                if (cacheable)
                 {
                     _authorsCache = list;
                     _authorsCacheTime = DateTime.UtcNow;
-                    return list;
                 }
+                return list;
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[BookService] Error obteniendo autores.");
         }
-        return _authorsCache ?? Enumerable.Empty<Author>();
+        return cacheable && _authorsCache != null ? _authorsCache : Enumerable.Empty<Author>();
     }
 
     public async Task<string> GetSyncMapAsync(int id)

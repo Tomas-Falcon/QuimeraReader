@@ -17,7 +17,7 @@ public class GetBooksQueryHandlerTests
     {
         // Arrange
         using var context = TestDbContextFactory.CreateInMemoryDbContext();
-        var handler = new GetBooksQueryHandler(context);
+        var handler = new GetBooksQueryHandler(context, new Moq.Mock<QuimeraReader.Application.Interfaces.ISearchIndex>().Object);
 
         // Libro válido con EPUB
         context.Books.Add(new Book
@@ -63,7 +63,7 @@ public class GetBooksQueryHandlerTests
     {
         // Arrange
         using var context = TestDbContextFactory.CreateInMemoryDbContext();
-        var handler = new GetBooksQueryHandler(context);
+        var handler = new GetBooksQueryHandler(context, new Moq.Mock<QuimeraReader.Application.Interfaces.ISearchIndex>().Object);
 
         context.Books.AddRange(
             new Book { Id = 1, Title = "Libro En Lectura", EpubFilePath = "/books/b1.epub", ReadingStatus = "Reading" },

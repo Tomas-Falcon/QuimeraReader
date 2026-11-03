@@ -92,10 +92,10 @@
             }
         </div>
 
-        @if (TotalFilteredCount > _displayCount)
+        @if (_hasMore)
         {
             <div class="text-center my-4">
-                <RadzenButton Text="@($"Mostrar más ({_displayCount} de {TotalFilteredCount})")" Click="@(() => _displayCount += 100)" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" />
+                <RadzenButton Text="Mostrar más" Click="LoadMoreAsync" IsBusy="@_isLoadingMore" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" />
             </div>
         }
     }
@@ -107,44 +107,70 @@
 </style>
 
 @code {
+    // Los autores (decenas de miles) se piden al servidor por páginas y la búsqueda también se hace allí:
+    // antes se descargaban los 5000 primeros por orden alfabético y solo se podía buscar entre ellos.
+    private const int PageSize = 100;
     private List<Author>? authors;
     private string _searchQuery = "";
-    private int _displayCount = 100;
+    private bool _hasMore = false;
+    private bool _isLoadingMore = false;
+    private int _searchVersion = 0;
+    private CancellationTokenSource? _searchDebounce;
 
     private bool _selectionMode = false;
     private HashSet<int> _selectedAuthorIds = new();
 
-    private IEnumerable<Author> FilteredAuthors => authors?
-        .Where(a => string.IsNullOrWhiteSpace(_searchQuery) || a.Name.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))
-        .Take(_displayCount)
-        ?? Enumerable.Empty<Author>();
-
-    private int TotalFilteredCount => authors?
-        .Count(a => string.IsNullOrWhiteSpace(_searchQuery) || a.Name.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))
-        ?? 0;
+    private IEnumerable<Author> FilteredAuthors => authors ?? Enumerable.Empty<Author>();
 
     protected override async Task OnInitializedAsync()
     {
         await LoadDataAsync();
     }
-    
+
     private async Task LoadDataAsync()
     {
+        int version = ++_searchVersion;
         try
         {
-            var result = await BookService.GetAuthorsAsync();
-            authors = result.ToList();
+            var result = (await BookService.GetAuthorsAsync(_searchQuery, 0, PageSize)).ToList();
+            if (version != _searchVersion) return; // llegó la respuesta de una búsqueda anterior
+            authors = result;
+            _hasMore = result.Count == PageSize;
         }
-        catch (Exception ex)
+        catch
         {
-            authors = new List<Author>();
+            if (version == _searchVersion) authors = new List<Author>();
         }
     }
 
-    private void OnSearchInput(string value)
+    private async Task LoadMoreAsync()
+    {
+        if (_isLoadingMore || authors == null) return;
+        _isLoadingMore = true;
+        int version = _searchVersion;
+        try
+        {
+            var more = (await BookService.GetAuthorsAsync(_searchQuery, authors.Count, PageSize)).ToList();
+            if (version != _searchVersion) return;
+            var known = authors.Select(a => a.Id).ToHashSet();
+            authors.AddRange(more.Where(a => known.Add(a.Id)));
+            _hasMore = more.Count == PageSize;
+        }
+        finally
+        {
+            _isLoadingMore = false;
+        }
+    }
+
+    private async Task OnSearchInput(string value)
     {
         _searchQuery = value ?? "";
-        _displayCount = 100;
+        // Esperar a que el usuario deje de escribir para no lanzar una petición por tecla
+        _searchDebounce?.Cancel();
+        _searchDebounce = new CancellationTokenSource();
+        var token = _searchDebounce.Token;
+        try { await Task.Delay(300, token); } catch (TaskCanceledException) { return; }
+        await LoadDataAsync();
         StateHasChanged();
     }
 

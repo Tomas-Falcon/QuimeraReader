@@ -71,7 +71,8 @@ public class BooksController : ControllerBase
                 c.Name,
                 c.IsUserGenerated,
                 BookCount = c.Books.Count(),
-                SampleBookId = c.Books.Select(b => (int?)b.BookId).FirstOrDefault()
+                // Muestra: un libro que tenga portada (antes el primero cualquiera y muchas miniaturas daban 404)
+                SampleBookId = c.Books.Where(bc => bc.Book.CoverImagePath != null && bc.Book.CoverImagePath != "").Select(bc => (int?)bc.BookId).FirstOrDefault()
             })
             .ToListAsync();
         var categories = raw.Select(c => new {
@@ -85,24 +86,54 @@ public class BooksController : ControllerBase
     }
 
     [HttpGet("authors")]
-    public async Task<IActionResult> GetAuthors([FromQuery] int limit = 5000, [FromQuery] int offset = 0)
+    public async Task<IActionResult> GetAuthors([FromServices] QuimeraReader.Application.Interfaces.ISearchIndex searchIndex,
+        [FromQuery] string? search = null, [FromQuery] int limit = 5000, [FromQuery] int offset = 0)
     {
         try
         {
-            // Authors.Name ya es UNIQUE: el GroupBy era redundante y rompía la traducción de EF Core 10 (EmptyProjectionMember)
-            var raw = await _dbContext.Authors
-                .AsNoTracking()
-                .Where(a => a.Name != null && a.Books.Any())
-                .OrderBy(a => a.Name)
-                .Skip(offset)
-                .Take(limit)
+            limit = Math.Clamp(limit, 1, 5000);
+            offset = Math.Max(0, offset);
+
+            var baseQuery = _dbContext.Authors.AsNoTracking().Where(a => a.Name != null && a.Books.Any());
+            List<int>? pageIds = null;
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                // Búsqueda en servidor con el índice (sin tildes, palabras en cualquier orden, por relevancia).
+                // Antes el cliente descargaba los 5000 primeros por orden alfabético y buscaba solo entre ellos.
+                var ftsQuery = QuimeraReader.Application.Common.SearchQueryBuilder.Build(search);
+                if (ftsQuery == null) return Ok(Array.Empty<object>());
+                var ranked = await searchIndex.SearchAuthorIdsAsync(ftsQuery, Math.Min(offset + limit, 5000));
+                pageIds = ranked.Skip(offset).Take(limit).ToList();
+                baseQuery = baseQuery.Where(a => pageIds.Contains(a.Id));
+            }
+            else
+            {
+                // Authors.Name ya es UNIQUE: el GroupBy era redundante y rompía la traducción de EF Core 10 (EmptyProjectionMember)
+                baseQuery = baseQuery.OrderBy(a => a.Name).Skip(offset).Take(limit);
+            }
+
+            var raw = await baseQuery
                 .Select(a => new {
                     a.Id,
                     a.Name,
                     BookCount = a.Books.Count(),
-                    SampleBookId = a.Books.Select(ba => (int?)ba.BookId).FirstOrDefault()
+                    // Muestra: un libro que tenga portada (antes el primero cualquiera, y muchas miniaturas daban 404)
+                    SampleBookId = a.Books
+                        .Where(ba => ba.Book.CoverImagePath != null && ba.Book.CoverImagePath != "")
+                        .Select(ba => (int?)ba.BookId).FirstOrDefault()
                 })
                 .ToListAsync();
+
+            if (pageIds != null)
+            {
+                var position = pageIds.Select((id, idx) => (id, idx)).ToDictionary(x => x.id, x => x.idx);
+                raw = raw.OrderBy(a => position[a.Id]).ToList();
+            }
+            else
+            {
+                raw = raw.OrderBy(a => a.Name).ToList();
+            }
 
             var authors = raw.Select(a => new {
                 a.Id,

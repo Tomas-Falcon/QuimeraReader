@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Application.Interfaces;
+using QuimeraReader.Application.Common;
 using QuimeraReader.Application.Books.DTOs;
 using System;
 using System.Collections.Concurrent;
@@ -15,14 +16,19 @@ namespace QuimeraReader.Application.Books.Queries.GetBooks;
 public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedListDto<BookDto>>
 {
     private readonly IAppDbContext _dbContext;
+    private readonly ISearchIndex _searchIndex;
+
+    // Máximo de resultados de búsqueda que se ordenan por relevancia (más allá nadie hace scroll)
+    private const int MaxSearchResults = 5000;
 
     // Caché corta del COUNT(*) por combinación de filtros: con 138k libros, contar en cada chunk de <Virtualize> era el mayor coste.
     private static readonly ConcurrentDictionary<string, (int Count, DateTime At)> _countCache = new();
     private static readonly TimeSpan CountCacheTtl = TimeSpan.FromSeconds(60);
 
-    public GetBooksQueryHandler(IAppDbContext dbContext)
+    public GetBooksQueryHandler(IAppDbContext dbContext, ISearchIndex searchIndex)
     {
         _dbContext = dbContext;
+        _searchIndex = searchIndex;
     }
 
     /// <summary>Invalida la caché de totales (llamar al añadir/borrar libros si se necesita inmediatez).</summary>
@@ -58,40 +64,16 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
             query = query.Where(b => b.Categories.Any(c => c.Category != null && c.Category.Name == categoryName));
         }
 
+        // Búsqueda: índice FTS sobre título + autores + saga (sin tildes, palabras en cualquier orden), ids por relevancia
+        List<int>? rankedSearchIds = null;
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var s = request.Search.Trim();
-            var like = $"%{s}%";
-
-            // Resolver primero autores/categorías coincidentes (tablas pequeñas e indexadas) para no escanear 138k libros con LOWER()+EXISTS
-            var matchingAuthorIds = await _dbContext.Authors.AsNoTracking()
-                .Where(a => EF.Functions.Like(a.Name, like))
-                .Select(a => a.Id).Take(500)
-                .ToListAsync(cancellationToken);
-            var matchingCategoryIds = await _dbContext.Categories.AsNoTracking()
-                .Where(c => EF.Functions.Like(c.Name, like))
-                .Select(c => c.Id).Take(200)
-                .ToListAsync(cancellationToken);
-
-            // Sanitizar caracteres especiales de FTS5 (como ":", "-", "\"", "(", ")") para evitar SqliteException
-            var safeFtsTokens = Regex.Replace(s, @"[^\p{L}\p{N}\s]", " ")
-                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-            if (safeFtsTokens.Length > 0)
-            {
-                var ftsSearch = string.Join(" ", safeFtsTokens.Select(t => $"\"{t}\"*"));
-                var ftsIds = _dbContext.Books.FromSqlInterpolated($"SELECT b.* FROM Books b INNER JOIN BooksFTS fts ON b.Id = fts.rowid WHERE BooksFTS MATCH {ftsSearch}").Select(f => f.Id);
-
-                query = query.Where(b => ftsIds.Contains(b.Id) ||
-                                         b.Authors.Any(a => matchingAuthorIds.Contains(a.AuthorId)) ||
-                                         b.Categories.Any(c => matchingCategoryIds.Contains(c.CategoryId)));
-            }
-            else
-            {
-                query = query.Where(b => EF.Functions.Like(b.Title, like) ||
-                                         b.Authors.Any(a => matchingAuthorIds.Contains(a.AuthorId)) ||
-                                         b.Categories.Any(c => matchingCategoryIds.Contains(c.CategoryId)));
-            }
+            var ftsQuery = SearchQueryBuilder.Build(request.Search);
+            rankedSearchIds = ftsQuery == null
+                ? new List<int>()
+                : (await _searchIndex.SearchBookIdsAsync(ftsQuery, MaxSearchResults, cancellationToken)).ToList();
+            var searchIds = rankedSearchIds;
+            query = query.Where(b => searchIds.Contains(b.Id));
         }
 
         if (request.CategoryIds != null && request.CategoryIds.Any())
@@ -139,7 +121,19 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
         }
 
         // Fase 1: solo IDs paginados (consulta ligera)
-        var pagedIds = await ordered.Select(b => b.Id).Skip(skip).Take(take).ToListAsync(cancellationToken);
+        List<int> pagedIds;
+        if (rankedSearchIds != null && string.IsNullOrWhiteSpace(request.SortBy))
+        {
+            // Búsqueda sin orden explícito: orden de relevancia del índice, respetando el resto de filtros
+            var matching = (await query.Select(b => b.Id).ToListAsync(cancellationToken)).ToHashSet();
+            var relevant = rankedSearchIds.Where(matching.Contains).ToList();
+            totalBooks = relevant.Count;
+            pagedIds = relevant.Skip(skip).Take(take).ToList();
+        }
+        else
+        {
+            pagedIds = await ordered.Select(b => b.Id).Skip(skip).Take(take).ToListAsync(cancellationToken);
+        }
         if (pagedIds.Count == 0)
         {
             return new PaginatedListDto<BookDto> { Total = totalBooks, Page = page, PageSize = pageSize, Data = new List<BookDto>() };
