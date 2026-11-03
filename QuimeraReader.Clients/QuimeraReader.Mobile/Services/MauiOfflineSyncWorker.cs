@@ -93,30 +93,19 @@ public class MauiOfflineSyncWorker : IOfflineSyncWorker
 
                 if (serverBook != null)
                 {
-                    // Sincronizar si el progreso local es más reciente (LastReadAt) o está más adelantado
-                    bool shouldPush = false;
-                    if (localBook.LastReadAt.HasValue && (!serverBook.LastReadAt.HasValue || localBook.LastReadAt.Value > serverBook.LastReadAt.Value))
-                    {
-                        shouldPush = true;
-                    }
-                    else if ((localBook.PercentageCompleted ?? 0) > (serverBook.PercentageCompleted ?? 0))
-                    {
-                        shouldPush = true;
-                    }
-
-                    if (shouldPush)
+                    // Solo se sube el progreso local si se leyó después que el del servidor (antes también se subía
+                    // si el porcentaje era mayor, y pisaba lecturas más recientes hechas en otro dispositivo)
+                    if (ProgressSync.ShouldPushLocalProgress(localBook, serverBook))
                     {
                         try
                         {
-                            await bookService.UpdatePositionAsync(
-                                bookId: localBook.Id, 
-                                epubCfi: localBook.CurrentEpubCfi, 
-                                audioPosition: localBook.CurrentAudioPosition, 
-                                percentage: localBook.PercentageCompleted,
-                                audioTrackNumber: localBook.CurrentAudioTrackNumber
-                            );
+                            if (!await ProgressSync.PushLocalProgressAsync(httpClient, localBook))
+                            {
+                                _logger.LogInformation("El servidor tiene un progreso más reciente para el libro {Id}; no se sube el local", localBook.Id);
+                                continue;
+                            }
                             _logger.LogInformation("Push completado para libro {Id}", localBook.Id);
-                            
+
                             serverBook.CurrentEpubCfi = localBook.CurrentEpubCfi;
                             serverBook.CurrentAudioPosition = localBook.CurrentAudioPosition;
                             serverBook.CurrentAudioTrackNumber = localBook.CurrentAudioTrackNumber;

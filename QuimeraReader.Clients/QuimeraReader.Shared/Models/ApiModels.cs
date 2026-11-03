@@ -56,6 +56,8 @@ public class UpdatePositionRequest
     public int? CurrentAudioTrackNumber { get; set; }
     public System.Collections.Generic.List<AudioTrackDto> AudioTracks { get; set; } = new();
     public double? PercentageCompleted { get; set; }
+    // Hora real de lectura (UTC) para que el servidor no acepte progreso más antiguo que el que ya tiene
+    public DateTime? ReadAt { get; set; }
     public string? ReadingStatus { get; set; }
     public string? SyncMapJson { get; set; }
     public string? EpubLocationsCache { get; set; }

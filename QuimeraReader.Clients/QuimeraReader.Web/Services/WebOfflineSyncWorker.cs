@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using QuimeraReader.Shared.Interfaces;
 using QuimeraReader.Shared.Models;
+using QuimeraReader.Shared.Services;
 
 namespace QuimeraReader.Web.Services
 {
@@ -105,23 +106,12 @@ namespace QuimeraReader.Web.Services
                     // Comparar progreso por LastReadAt y PercentageCompleted antes de decidir dirección de sincronización
                     if (localBook != null)
                     {
-                        bool localIsNewer = localBook.LastReadAt.HasValue &&
-                                            (!serverBook.LastReadAt.HasValue || localBook.LastReadAt.Value > serverBook.LastReadAt.Value);
-                        bool localIsFurther = (localBook.PercentageCompleted ?? 0) > (serverBook.PercentageCompleted ?? 0);
-
-                        if (localIsNewer || localIsFurther)
+                        // Solo gana el progreso local si se leyó después (el porcentaje no cuenta: retroceder también es válido)
+                        if (ProgressSync.ShouldPushLocalProgress(localBook, serverBook))
                         {
                             try
                             {
-                                var payload = new
-                                {
-                                    CurrentEpubCfi = localBook.CurrentEpubCfi,
-                                    PercentageCompleted = localBook.PercentageCompleted,
-                                    CurrentAudioPosition = localBook.CurrentAudioPosition,
-                                    CurrentAudioTrackNumber = localBook.CurrentAudioTrackNumber
-                                };
-                                var posResp = await _httpClient.PostAsJsonAsync($"api/Books/{localBook.Id}/positions", payload);
-                                if (posResp.IsSuccessStatusCode)
+                                if (await ProgressSync.PushLocalProgressAsync(_httpClient, localBook))
                                 {
                                     serverBook.CurrentEpubCfi = localBook.CurrentEpubCfi;
                                     serverBook.PercentageCompleted = localBook.PercentageCompleted;

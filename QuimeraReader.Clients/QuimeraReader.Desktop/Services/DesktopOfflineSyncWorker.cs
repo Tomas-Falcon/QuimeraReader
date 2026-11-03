@@ -111,28 +111,15 @@ public class DesktopOfflineSyncWorker : IOfflineSyncWorker
 
                 if (serverBook != null)
                 {
-                    bool shouldPush = false;
-                    
-                    if (localBook.LastReadAt.HasValue && (!serverBook.LastReadAt.HasValue || localBook.LastReadAt.Value > serverBook.LastReadAt.Value))
-                    {
-                        shouldPush = true;
-                    }
-                    else if (!serverBook.LastReadAt.HasValue && localBook.PercentageCompleted > (serverBook.PercentageCompleted ?? 0))
-                    {
-                        shouldPush = true;
-                    }
-
-                    if (shouldPush)
+                    if (ProgressSync.ShouldPushLocalProgress(localBook, serverBook))
                     {
                         try
                         {
-                            await bookService.UpdatePositionAsync(
-                                bookId: localBook.Id, 
-                                epubCfi: localBook.CurrentEpubCfi, 
-                                audioPosition: localBook.CurrentAudioPosition, 
-                                percentage: localBook.PercentageCompleted,
-                                audioTrackNumber: localBook.CurrentAudioTrackNumber
-                            );
+                            if (!await ProgressSync.PushLocalProgressAsync(httpClient, localBook))
+                            {
+                                _logger.LogInformation("El servidor tiene un progreso más reciente para el libro {Id}; no se sube el local", localBook.Id);
+                                continue;
+                            }
                             _logger.LogInformation("Push completado para libro {Id}", localBook.Id);
                             
                             serverBook.CurrentEpubCfi = localBook.CurrentEpubCfi;

@@ -620,6 +620,8 @@ public class BooksController : ControllerBase
         public double? CurrentAudioPosition { get; set; }
         public int? CurrentAudioTrackNumber { get; set; }
         public double? PercentageCompleted { get; set; }
+        // Cuándo se leyó (UTC). Lo envían las sincronizaciones offline; sin valor = lectura en directo (ahora)
+        public DateTime? ReadAt { get; set; }
     }
 
     [HttpPost("{bookId}/positions")]
@@ -628,7 +630,15 @@ public class BooksController : ControllerBase
         var book = await _dbContext.Books.Include(b => b.AudioTracks).FirstOrDefaultAsync(b => b.Id == bookId);
         if (book == null) return NotFound();
 
-        book.LastReadAt = DateTime.UtcNow;
+        // Un progreso leído antes que el ya guardado (p. ej. sincronización offline tardía) no pisa el más reciente
+        var readAt = ReadingProgressPolicy.ResolveReadAt(request.ReadAt, DateTime.UtcNow);
+        if (ReadingProgressPolicy.IsStale(book.LastReadAt, readAt))
+        {
+            _logger.LogInformation("Progreso descartado para el libro {BookId}: leído {ReadAt:o}, el guardado es de {LastReadAt:o}", bookId, readAt, book.LastReadAt);
+            return Ok(new { Applied = false });
+        }
+
+        book.LastReadAt = readAt;
         if (book.ReadingStatus != "Read") book.ReadingStatus = "Reading";
         if (request.CurrentEpubCfi != null) book.CurrentEpubCfi = request.CurrentEpubCfi;
         if (request.CurrentAudioPosition.HasValue) book.CurrentAudioPosition = request.CurrentAudioPosition;
@@ -644,7 +654,7 @@ public class BooksController : ControllerBase
         }
 
         await _dbContext.SaveChangesAsync();
-        return Ok();
+        return Ok(new { Applied = true });
     }
 
     [HttpPost("sync-batch")]
