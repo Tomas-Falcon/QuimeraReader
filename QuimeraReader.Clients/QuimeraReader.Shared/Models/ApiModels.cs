@@ -12,6 +12,9 @@ public record Book
     public List<string> Categories { get; init; } = new();
     public string? Series { get; init; }
     public string? Universe { get; init; }
+    public int? SeriesId { get; init; }
+    public double? SeriesVolume { get; init; }
+    public int? UniverseId { get; init; }
     
     public bool HasCover { get; init; }
     public bool IsAvailableOffline { get; set; }
@@ -150,3 +153,64 @@ public class ManagedAudioDto
 }
 
 
+
+// Sagas y universos
+public class SeriesSummary
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int? UniverseId { get; set; }
+    public string? UniverseName { get; set; }
+    public int BookCount { get; set; }
+    public List<string> Authors { get; set; } = new();
+    public string? SampleCoverUrl { get; set; }
+}
+
+public class SeriesBook
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public double? SeriesVolume { get; set; }
+    public List<string> Authors { get; set; } = new();
+    public bool HasCover { get; set; }
+    public bool HasEpub { get; set; }
+    public bool HasAudio { get; set; }
+    public double? PercentageCompleted { get; set; }
+    public string? ReadingStatus { get; set; }
+    public string CoverUrl => $"api/media/books/{Id}/cover";
+}
+
+public class SeriesDetail
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int? UniverseId { get; set; }
+    public string? UniverseName { get; set; }
+    public List<SeriesBook> Books { get; set; } = new();
+}
+
+public class UniverseSummary
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public int SeriesCount { get; set; }
+    public int BookCount { get; set; }
+    public List<string> SeriesNames { get; set; } = new();
+    public string? SampleCoverUrl { get; set; }
+}
+
+public class UniverseDetail
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public List<SeriesDetail> Series { get; set; } = new();
+    public List<SeriesBook> StandaloneBooks { get; set; } = new();
+}
+
+public class UniverseSuggestion
+{
+    public string Author { get; set; } = string.Empty;
+    public List<SeriesSummary> Series { get; set; } = new();
+}

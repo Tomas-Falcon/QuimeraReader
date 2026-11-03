@@ -1,3 +1,4 @@
+using QuimeraReader.Application.Common;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -155,6 +156,18 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
             {
                 _logger.LogInformation("Categorías extraídas del EPUB para '{Title}': {Categories}", 
                     book.Title, string.Join(", ", book.Categories.Select(c => c.Category?.Name)));
+            }
+        }
+
+        // Saga declarada en el propio EPUB (calibre:series / belongs-to-collection). Antes no se leía y
+        // ningún proveedor la rellenaba, así que nunca se creaban sagas.
+        if (epubBook.Schema?.Package?.Metadata?.MetaItems != null)
+        {
+            var seriesInfo = EpubSeriesParser.Parse(epubBook.Schema.Package.Metadata.MetaItems
+                .Select(m => new EpubMeta(m.Name, m.Content, m.Id, m.Refines, m.Property)));
+            if (seriesInfo != null && await SeriesAssigner.ApplyAsync(_dbContext, book, seriesInfo))
+            {
+                _logger.LogInformation("Saga extraída del EPUB para '{Title}': {Series} #{Volume}", book.Title, seriesInfo.Name, seriesInfo.Volume);
             }
         }
 

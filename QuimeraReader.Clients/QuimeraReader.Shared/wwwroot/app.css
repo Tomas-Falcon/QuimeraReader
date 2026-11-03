@@ -1045,3 +1045,65 @@ body .rz-body {
     color: var(--text-main);
     border-color: var(--border-color);
 }
+
+/* Títulos de página con el color del tema (con el tema claro algunos salían en blanco, p. ej. "Explorador de Géneros") */
+.library-container h2:not([class*="rz-color"]),
+.library-container h3:not([class*="rz-color"]) {
+    color: var(--text-main);
+}
+
+/* Sagas y universos */
+.collection-card {
+    background: var(--bg-card);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    height: 100%;
+}
+
+.collection-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
+.collection-card .collection-cover {
+    aspect-ratio: 2 / 3;
+    background: var(--bg-main);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.collection-card .collection-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.collection-card .collection-meta {
+    font-size: 0.8rem;
+    color: color-mix(in srgb, var(--text-main) 60%, transparent);
+}
+
+.volume-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: var(--rz-primary, #0d6efd);
+    color: #fff;
+    border-radius: 999px;
+    padding: 2px 9px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    z-index: 2;
+}
+
+.collection-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 14px;
+}

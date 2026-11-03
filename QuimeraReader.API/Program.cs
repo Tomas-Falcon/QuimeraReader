@@ -77,6 +77,7 @@ builder.Services.AddScoped<QuimeraReader.Application.Interfaces.ISearchIndex, Sq
 builder.Services.AddHostedService<LibraryScanBackgroundService>();
 builder.Services.AddHostedService<AudioAlignmentBackgroundService>();
 builder.Services.AddHostedService<MaintenanceBackgroundService>();
+builder.Services.AddHostedService<SeriesBackfillBackgroundService>();
 
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(QuimeraReader.Application.Interfaces.IAppDbContext).Assembly));
 

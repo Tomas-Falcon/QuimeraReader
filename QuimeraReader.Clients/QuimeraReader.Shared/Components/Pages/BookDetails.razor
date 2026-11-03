@@ -55,12 +55,29 @@ else
                     
                     @if (_book.Authors.Any())
                     {
-                        <h4 class="text-white-50 mb-3 fs-5">@string.Join(", ", _book.Authors)</h4>
+                        <h4 class="text-white-50 mb-3 fs-5">
+                            @for (int i = 0; i < _book.Authors.Count; i++)
+                            {
+                                var author = _book.Authors[i];
+                                <a href="@($"author/{Uri.EscapeDataString(author)}")" class="text-reset text-decoration-none" style="border-bottom: 1px dotted currentColor;">@author</a>@(i < _book.Authors.Count - 1 ? ", " : "")
+                            }
+                        </h4>
                     }
 
-                    @if (!string.IsNullOrEmpty(_book.Series))
+                    @if (!string.IsNullOrEmpty(_book.Series) || !string.IsNullOrEmpty(_book.Universe))
                     {
-                        <h5 class="text-warning mb-3 fs-6"><i class="bi bi-collection"></i> @Translation["BookDetails_Series"] @_book.Series</h5>
+                        <div class="mb-3 d-flex flex-wrap gap-3 fs-6">
+                            @if (!string.IsNullOrEmpty(_book.Series))
+                            {
+                                <a href="@($"series/{_book.SeriesId}")" class="text-warning text-decoration-none">
+                                    <i class="bi bi-collection"></i> @Translation["BookDetails_Series"] @_book.Series@(_book.SeriesVolume.HasValue ? $" · #{QuimeraReader.Shared.Components.CollectionBookTile.FormatVolume(_book.SeriesVolume.Value)}" : "")
+                                </a>
+                            }
+                            @if (!string.IsNullOrEmpty(_book.Universe))
+                            {
+                                <a href="@($"universe/{_book.UniverseId}")" class="text-info text-decoration-none"><i class="bi bi-globe2"></i> @_book.Universe</a>
+                            }
+                        </div>
                     }
 
                     @if (!string.IsNullOrEmpty(_book.Isbn))
@@ -75,7 +92,7 @@ else
                         <div class="mb-3 d-flex gap-2 flex-wrap">
                             @foreach(var cat in _book.Categories)
                             {
-                                <a href="/?q=@(Uri.EscapeDataString(cat))" class="text-decoration-none">
+                                <a href="@($"category/{Uri.EscapeDataString(cat)}")" class="text-decoration-none">
                                     <RadzenBadge BadgeStyle="BadgeStyle.Secondary" class="rounded-pill px-3 py-2 text-white">@cat</RadzenBadge>
                                 </a>
                             }

@@ -1,0 +1,39 @@
+@* Libro dentro de una saga o universo: portada, número de volumen y título *@
+@inject IBookService BookService
+@inject NavigationManager NavManager
+
+<div class="collection-card position-relative" @onclick="@(() => NavManager.NavigateTo($"/book/{Book.Id}"))">
+    @if (ShowVolume && Book.SeriesVolume.HasValue)
+    {
+        <span class="volume-badge">#@FormatVolume(Book.SeriesVolume.Value)</span>
+    }
+    <div class="collection-cover">
+        @if (Book.HasCover)
+        {
+            <img src="@BookService.GetMediaUrl(Book.CoverUrl)" alt="@Book.Title" loading="lazy" />
+        }
+        else
+        {
+            <i class="bi bi-book fs-1 opacity-50"></i>
+        }
+    </div>
+    <div class="p-2">
+        <div class="fw-semibold text-truncate" title="@Book.Title">@Book.Title</div>
+        <div class="collection-meta text-truncate">@string.Join(", ", Book.Authors)</div>
+        @if (Book.PercentageCompleted is > 0)
+        {
+            <div class="progress mt-1" style="height: 3px;">
+                <div class="progress-bar" style="width: @(Math.Min(100, Book.PercentageCompleted.Value).ToString(System.Globalization.CultureInfo.InvariantCulture))%"></div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SeriesBook Book { get; set; } = default!;
+    [Parameter] public bool ShowVolume { get; set; } = true;
+
+    // 1.0 -> "1", 1.5 -> "1.5"
+    public static string FormatVolume(double volume) =>
+        volume.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+}

@@ -59,6 +59,7 @@ public static class MauiProgram
         builder.Services.AddScoped<QuimeraReader.Shared.Services.IScanService, QuimeraReader.Shared.Services.ScanService>();
         builder.Services.AddScoped<QuimeraReader.Shared.Interfaces.ITranslationService, QuimeraReader.Shared.Services.TranslationService>();
         builder.Services.AddScoped<QuimeraReader.Shared.Services.ToastService>();
+        builder.Services.AddScoped<QuimeraReader.Shared.Services.CollectionsService>();
 
         builder.Services.AddDbContext<QuimeraReader.Mobile.Data.LocalAppDbContext>();
         builder.Services.AddScoped<QuimeraReader.Shared.Interfaces.ILocalBookRepository, QuimeraReader.Mobile.Data.LocalBookRepository>();

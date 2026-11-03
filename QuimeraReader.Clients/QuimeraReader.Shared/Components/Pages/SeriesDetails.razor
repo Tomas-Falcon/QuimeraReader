@@ -1,0 +1,129 @@
+@page "/series/{Id:int}"
+@inject CollectionsService Collections
+@inject NavigationManager NavManager
+@inject ToastService ToastService
+
+<PageTitle>@(_series?.Name ?? "Saga")</PageTitle>
+
+<div class="library-container">
+    <button class="btn btn-link px-0 mb-2" @onclick="@(() => NavManager.NavigateTo("/series"))"><i class="bi bi-arrow-left me-1"></i> Sagas</button>
+
+    @if (_series == null)
+    {
+        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    }
+    else
+    {
+        <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mb-4">
+            <div>
+                <h2 class="mb-1">@_series.Name</h2>
+                <div class="collection-meta">
+                    @_series.Books.Count @(_series.Books.Count == 1 ? "libro" : "libros") · @string.Join(", ", _series.Books.SelectMany(b => b.Authors).Distinct().Take(3))
+                </div>
+            </div>
+
+            @* Universo de la saga: verlo, cambiarlo, quitarlo o crear uno nuevo *@
+            <div class="d-flex flex-wrap align-items-center gap-2" style="min-width: 0;">
+                @if (_series.UniverseId.HasValue)
+                {
+                    <button class="btn btn-sm btn-outline-primary" @onclick="@(() => NavManager.NavigateTo($"/universe/{_series.UniverseId}"))">
+                        <i class="bi bi-globe2 me-1"></i> @_series.UniverseName
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => AssignAsync(null))" title="Quitar del universo"><i class="bi bi-x-lg"></i></button>
+                }
+                else if (!_choosingUniverse)
+                {
+                    <button class="btn btn-sm btn-outline-primary" @onclick="StartChoosingAsync"><i class="bi bi-globe2 me-1"></i> Añadir a un universo</button>
+                }
+
+                @if (_choosingUniverse)
+                {
+                    <select class="form-select form-select-sm" style="width: auto;" @bind="_selectedUniverseId">
+                        <option value="0">Elegir universo…</option>
+                        @foreach (var u in _universes)
+                        {
+                            <option value="@u.Id">@u.Name</option>
+                        }
+                    </select>
+                    <button class="btn btn-sm btn-primary" disabled="@(_selectedUniverseId == 0)" @onclick="@(() => AssignAsync(_selectedUniverseId))">Añadir</button>
+                    <span class="collection-meta">o</span>
+                    <input class="form-control form-control-sm" style="width: 180px;" placeholder="Nuevo universo" @bind="_newUniverseName" />
+                    <button class="btn btn-sm btn-outline-primary" disabled="@string.IsNullOrWhiteSpace(_newUniverseName)" @onclick="CreateAndAssignAsync">Crear</button>
+                    <button class="btn btn-sm btn-link" @onclick="@(() => _choosingUniverse = false)">Cancelar</button>
+                }
+            </div>
+        </div>
+
+        <div class="collection-row">
+            @foreach (var book in _series.Books)
+            {
+                <CollectionBookTile Book="book" @key="book.Id" />
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private SeriesDetail? _series;
+    private bool _choosingUniverse;
+    private List<UniverseSummary> _universes = new();
+    private int _selectedUniverseId;
+    private string _newUniverseName = "";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _series = null;
+        _choosingUniverse = false;
+        try
+        {
+            _series = await Collections.GetSeriesByIdAsync(Id);
+        }
+        catch
+        {
+            ToastService.ShowError("No se pudo cargar la saga.");
+        }
+    }
+
+    private async Task StartChoosingAsync()
+    {
+        _universes = await Collections.GetUniversesAsync();
+        _selectedUniverseId = 0;
+        _newUniverseName = "";
+        _choosingUniverse = true;
+    }
+
+    private async Task AssignAsync(int? universeId)
+    {
+        try
+        {
+            await Collections.AssignSeriesToUniverseAsync(Id, universeId);
+            _choosingUniverse = false;
+            _series = await Collections.GetSeriesByIdAsync(Id);
+        }
+        catch
+        {
+            ToastService.ShowError("No se pudo cambiar el universo.");
+        }
+    }
+
+    private async Task CreateAndAssignAsync()
+    {
+        try
+        {
+            await Collections.CreateUniverseAsync(_newUniverseName, new[] { Id });
+            ToastService.ShowSuccess($"Universo \"{_newUniverseName.Trim()}\" creado.");
+            _choosingUniverse = false;
+            _series = await Collections.GetSeriesByIdAsync(Id);
+        }
+        catch (InvalidOperationException ex)
+        {
+            ToastService.ShowError(ex.Message);
+        }
+        catch
+        {
+            ToastService.ShowError("No se pudo crear el universo.");
+        }
+    }
+}

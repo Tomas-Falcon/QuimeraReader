@@ -149,6 +149,22 @@ public class AppDbContext : DbContext, IAppDbContext
             .WithMany(c => c.Books)
             .HasForeignKey(bc => bc.CategoryId);
 
+        // Borrar un universo no borra nada más: sus sagas y libros sueltos quedan sin universo
+        modelBuilder.Entity<Series>()
+            .HasOne(s => s.Universe)
+            .WithMany(u => u.Series)
+            .HasForeignKey(s => s.UniverseId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Book>()
+            .HasOne(b => b.Universe)
+            .WithMany(u => u.Books)
+            .HasForeignKey(b => b.UniverseId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Las sagas se buscan por nombre al importar
+        modelBuilder.Entity<Series>().HasIndex(s => s.Name);
+
         // SystemSettings configuration
         modelBuilder.Entity<SystemSetting>()
             .HasKey(s => s.Key);

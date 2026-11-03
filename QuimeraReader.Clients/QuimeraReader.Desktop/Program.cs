@@ -48,6 +48,7 @@ public class Program
         appBuilder.Services.AddScoped<IScanService, ScanService>();
         appBuilder.Services.AddScoped<ITranslationService, TranslationService>();
         appBuilder.Services.AddScoped<ToastService>();
+        appBuilder.Services.AddScoped<CollectionsService>();
 
         // Local SQLite Database and Offline Sync
         appBuilder.Services.AddDbContext<DesktopLocalAppDbContext>();

@@ -110,9 +110,14 @@ namespace QuimeraReader.Infrastructure.Migrations
                     b.Property<int?>("TotalPages")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("UniverseId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("SeriesId");
+
+                    b.HasIndex("UniverseId");
 
                     b.ToTable("Books");
                 });
@@ -278,6 +283,8 @@ namespace QuimeraReader.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Name");
+
                     b.HasIndex("UniverseId");
 
                     b.ToTable("Series");
@@ -367,7 +374,14 @@ namespace QuimeraReader.Infrastructure.Migrations
                         .WithMany("Books")
                         .HasForeignKey("SeriesId");
 
+                    b.HasOne("QuimeraReader.Domain.Entities.Universe", "Universe")
+                        .WithMany("Books")
+                        .HasForeignKey("UniverseId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Series");
+
+                    b.Navigation("Universe");
                 });
 
             modelBuilder.Entity("QuimeraReader.Domain.Entities.BookAnnotation", b =>
@@ -445,7 +459,8 @@ namespace QuimeraReader.Infrastructure.Migrations
                 {
                     b.HasOne("QuimeraReader.Domain.Entities.Universe", "Universe")
                         .WithMany("Series")
-                        .HasForeignKey("UniverseId");
+                        .HasForeignKey("UniverseId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Universe");
                 });
@@ -496,6 +511,8 @@ namespace QuimeraReader.Infrastructure.Migrations
 
             modelBuilder.Entity("QuimeraReader.Domain.Entities.Universe", b =>
                 {
+                    b.Navigation("Books");
+
                     b.Navigation("Series");
                 });
 #pragma warning restore 612, 618

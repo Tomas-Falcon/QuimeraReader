@@ -1,0 +1,218 @@
+@page "/universe/{Id:int}"
+@inject CollectionsService Collections
+@inject IBookService BookService
+@inject NavigationManager NavManager
+@inject ToastService ToastService
+@inject Radzen.DialogService DialogService
+
+<PageTitle>@(_universe?.Name ?? "Universo")</PageTitle>
+
+<div class="library-container">
+    <button class="btn btn-link px-0 mb-2" @onclick="@(() => NavManager.NavigateTo("/universes"))"><i class="bi bi-arrow-left me-1"></i> Universos</button>
+
+    @if (_universe == null)
+    {
+        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    }
+    else
+    {
+        <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mb-4">
+            @if (_editing)
+            {
+                <div class="d-flex flex-column gap-2 flex-grow-1" style="max-width: 520px;">
+                    <input class="form-control" @bind="_editName" />
+                    <textarea class="form-control" rows="2" placeholder="Descripción (opcional)" @bind="_editDescription"></textarea>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-primary" @onclick="SaveAsync">Guardar</button>
+                        <button class="btn btn-sm btn-link" @onclick="@(() => _editing = false)">Cancelar</button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div>
+                    <h2 class="mb-1"><i class="bi bi-globe2 text-primary me-2"></i>@_universe.Name</h2>
+                    @if (!string.IsNullOrWhiteSpace(_universe.Description))
+                    {
+                        <p class="collection-meta mb-1">@_universe.Description</p>
+                    }
+                    <div class="collection-meta">@_universe.Series.Count @(_universe.Series.Count == 1 ? "saga" : "sagas") · @(_universe.Series.Sum(s => s.Books.Count) + _universe.StandaloneBooks.Count) libros</div>
+                </div>
+                <div class="d-flex gap-2 align-items-start">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="StartEditing"><i class="bi bi-pencil me-1"></i> Editar</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="DeleteAsync"><i class="bi bi-trash me-1"></i> Borrar</button>
+                </div>
+            }
+        </div>
+
+        @foreach (var series in _universe.Series)
+        {
+            <div class="mb-4" @key="series.Id">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h4 class="rz-color-primary fw-bold mb-0" style="cursor: pointer;" @onclick="@(() => NavManager.NavigateTo($"/series/{series.Id}"))">@series.Name</h4>
+                    <button class="btn btn-sm btn-link text-danger" @onclick="@(() => RemoveSeriesAsync(series.Id))"><i class="bi bi-x-lg me-1"></i> Quitar saga</button>
+                </div>
+                <div class="collection-row">
+                    @foreach (var book in series.Books)
+                    {
+                        <CollectionBookTile Book="book" @key="book.Id" />
+                    }
+                </div>
+            </div>
+        }
+
+        @if (_universe.StandaloneBooks.Count > 0)
+        {
+            <h4 class="rz-color-primary fw-bold mb-2">Libros sueltos</h4>
+            <div class="collection-row mb-4">
+                @foreach (var book in _universe.StandaloneBooks)
+                {
+                    <div class="position-relative" @key="book.Id">
+                        <CollectionBookTile Book="book" ShowVolume="false" />
+                        <button class="btn btn-sm btn-danger position-absolute" style="top: 6px; right: 6px; z-index: 3;" title="Quitar del universo"
+                                @onclick="@(() => RemoveBookAsync(book.Id))" @onclick:stopPropagation="true"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                }
+            </div>
+        }
+
+        @* Añadir sagas (sin universo) y libros sueltos *@
+        <div class="row g-3 mt-2">
+            <div class="col-12 col-lg-6">
+                <div class="collection-card p-3" style="cursor: default;">
+                    <div class="fw-semibold mb-2"><i class="bi bi-collection me-1"></i> Añadir saga</div>
+                    <input class="form-control form-control-sm mb-2" placeholder="Buscar saga sin universo..." value="@_seriesSearch" @oninput="@(e => SearchSeriesAsync(e.Value?.ToString() ?? ""))" />
+                    @foreach (var s in _seriesResults)
+                    {
+                        <div class="d-flex justify-content-between align-items-center py-1" @key="s.Id">
+                            <span class="text-truncate">@s.Name <span class="collection-meta">· @s.BookCount libros · @string.Join(", ", s.Authors)</span></span>
+                            <button class="btn btn-sm btn-outline-primary" @onclick="@(() => AddSeriesAsync(s.Id))">Añadir</button>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <div class="collection-card p-3" style="cursor: default;">
+                    <div class="fw-semibold mb-2"><i class="bi bi-book me-1"></i> Añadir libro suelto</div>
+                    <input class="form-control form-control-sm mb-2" placeholder="Buscar libro por título o autor..." value="@_bookSearch" @oninput="@(e => SearchBooksAsync(e.Value?.ToString() ?? ""))" />
+                    @foreach (var b in _bookResults)
+                    {
+                        <div class="d-flex justify-content-between align-items-center py-1" @key="b.Id">
+                            <span class="text-truncate">@b.Title <span class="collection-meta">· @string.Join(", ", b.Authors)@(string.IsNullOrEmpty(b.Series) ? "" : $" · saga {b.Series}")</span></span>
+                            <button class="btn btn-sm btn-outline-primary" @onclick="@(() => AddBookAsync(b.Id))">Añadir</button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private UniverseDetail? _universe;
+    private bool _editing;
+    private string _editName = "";
+    private string? _editDescription;
+    private string _seriesSearch = "";
+    private List<SeriesSummary> _seriesResults = new();
+    private string _bookSearch = "";
+    private List<Book> _bookResults = new();
+    private CancellationTokenSource? _seriesDebounce;
+    private CancellationTokenSource? _bookDebounce;
+
+    protected override async Task OnParametersSetAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        try
+        {
+            _universe = await Collections.GetUniverseAsync(Id);
+        }
+        catch
+        {
+            ToastService.ShowError("No se pudo cargar el universo.");
+        }
+    }
+
+    private void StartEditing()
+    {
+        _editName = _universe!.Name;
+        _editDescription = _universe.Description;
+        _editing = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            await Collections.UpdateUniverseAsync(Id, _editName, _editDescription);
+            _editing = false;
+            await ReloadAsync();
+        }
+        catch (InvalidOperationException ex) { ToastService.ShowError(ex.Message); }
+        catch { ToastService.ShowError("No se pudo guardar."); }
+    }
+
+    private async Task DeleteAsync()
+    {
+        var confirmed = await DialogService.Confirm(
+            "Se borra solo el universo: sus sagas y libros siguen en la biblioteca, simplemente sin universo.",
+            $"¿Borrar \"{_universe!.Name}\"?",
+            new Radzen.ConfirmOptions { OkButtonText = "Borrar universo", CancelButtonText = "Cancelar" });
+        if (confirmed != true) return;
+
+        await Collections.DeleteUniverseAsync(Id);
+        NavManager.NavigateTo("/universes");
+    }
+
+    private async Task RemoveSeriesAsync(int seriesId)
+    {
+        await Collections.AssignSeriesToUniverseAsync(seriesId, null);
+        await ReloadAsync();
+    }
+
+    private async Task AddSeriesAsync(int seriesId)
+    {
+        await Collections.AssignSeriesToUniverseAsync(seriesId, Id);
+        _seriesResults.RemoveAll(s => s.Id == seriesId);
+        await ReloadAsync();
+    }
+
+    private async Task RemoveBookAsync(int bookId)
+    {
+        await Collections.RemoveBookFromUniverseAsync(Id, bookId);
+        await ReloadAsync();
+    }
+
+    private async Task AddBookAsync(int bookId)
+    {
+        await Collections.AddBookToUniverseAsync(Id, bookId);
+        _bookResults.RemoveAll(b => b.Id == bookId);
+        await ReloadAsync();
+    }
+
+    private async Task SearchSeriesAsync(string value)
+    {
+        _seriesSearch = value;
+        _seriesDebounce?.Cancel();
+        _seriesDebounce = new CancellationTokenSource();
+        try { await Task.Delay(300, _seriesDebounce.Token); } catch (TaskCanceledException) { return; }
+        _seriesResults = string.IsNullOrWhiteSpace(value) ? new() : await Collections.GetSeriesAsync(value, 0, 10, withoutUniverse: true);
+        StateHasChanged();
+    }
+
+    private async Task SearchBooksAsync(string value)
+    {
+        _bookSearch = value;
+        _bookDebounce?.Cancel();
+        _bookDebounce = new CancellationTokenSource();
+        try { await Task.Delay(300, _bookDebounce.Token); } catch (TaskCanceledException) { return; }
+        if (string.IsNullOrWhiteSpace(value)) { _bookResults = new(); StateHasChanged(); return; }
+        var result = await BookService.GetBooksAsync(1, 10, value);
+        // Los libros de una saga entran al universo con su saga; aquí solo tienen sentido los sueltos
+        _bookResults = (result.Data ?? Array.Empty<Book>()).Where(b => string.IsNullOrEmpty(b.Series)).ToList();
+        StateHasChanged();
+    }
+}

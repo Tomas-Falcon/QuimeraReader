@@ -7,4 +7,5 @@ public class Universe
     public string? Description { get; set; }
     
     public ICollection<Series> Series { get; set; } = new List<Series>();
+    public ICollection<Book> Books { get; set; } = new List<Book>();
 }

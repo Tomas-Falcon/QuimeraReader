@@ -8,6 +8,8 @@
             <RadzenPanelMenuItem Text="@TranslationService["Nav_Library"]" Icon="library_books" Path="" />
             <RadzenPanelMenuItem Text="@TranslationService["Nav_Authors"]" Icon="people" Path="authors" />
             <RadzenPanelMenuItem Text="@TranslationService["Nav_Genres"]" Icon="local_offer" Path="categories" />
+            <RadzenPanelMenuItem Text="@TranslationService["Nav_Series"]" Icon="collections_bookmark" Path="series" />
+            <RadzenPanelMenuItem Text="@TranslationService["Nav_Universes"]" Icon="public" Path="universes" />
             <RadzenPanelMenuItem Text="@TranslationService["Nav_ReadBooks"]" Icon="check_circle" Path="read-books" />
             @if (ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalBookRepository)) != null)
             {

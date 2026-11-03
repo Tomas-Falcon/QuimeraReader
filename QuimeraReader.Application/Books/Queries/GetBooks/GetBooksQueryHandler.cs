@@ -153,7 +153,7 @@ public class GetBooksQueryHandler : IRequestHandler<GetBooksQuery, PaginatedList
                 Authors = b.Authors.Where(a => a.Author != null).Select(a => a.Author!.Name).ToList(),
                 Categories = b.Categories.Where(c => c.Category != null).Select(c => c.Category!.Name).ToList(),
                 Series = b.Series != null ? b.Series.Name : null,
-                Universe = b.Series != null && b.Series.Universe != null ? b.Series.Universe.Name : null,
+                Universe = b.Series != null && b.Series.Universe != null ? b.Series.Universe.Name : (b.Universe != null ? b.Universe.Name : null),
                 IsAvailableOffline = b.IsAvailableOffline,
                 HasCover = b.CoverImagePath != null && b.CoverImagePath != "",
                 HasEpub = b.EpubFilePath != null && b.EpubFilePath != "",

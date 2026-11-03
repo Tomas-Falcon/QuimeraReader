@@ -30,6 +30,11 @@ public class Book
     public Series? Series { get; set; }
     public double? SeriesVolume { get; set; } // Puede ser 1.5, etc.
 
+    // Universo de un libro suelto (sin saga) p. ej. "Animales fantásticos" en el mundo de Harry Potter.
+    // Los libros de una saga heredan el universo de la saga (Series.UniverseId).
+    public int? UniverseId { get; set; }
+    public Universe? Universe { get; set; }
+
     // Metadata Tracking
     public bool IsMetadataComplete { get; set; } = false;
     

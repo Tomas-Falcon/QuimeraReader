@@ -188,7 +188,8 @@ public class BooksController : ControllerBase
         var book = await _dbContext.Books
             .Include(b => b.Authors).ThenInclude(ba => ba.Author)
             .Include(b => b.Categories).ThenInclude(bc => bc.Category)
-            .Include(b => b.Series)
+            .Include(b => b.Series).ThenInclude(s => s!.Universe)
+            .Include(b => b.Universe)
             .Include(b => b.AudioTracks)
             .FirstOrDefaultAsync(b => b.Id == id);
 
@@ -205,7 +206,11 @@ public class BooksController : ControllerBase
             Authors = book.Authors.Where(a => a.Author != null).Select(a => a.Author!.Name).ToList(),
             Categories = book.Categories.Where(c => c.Category != null).Select(c => c.Category!.Name).ToList(),
             Series = book.Series != null ? book.Series.Name : null,
-            Universe = book.Series != null && book.Series.Universe != null ? book.Series.Universe.Name : null,
+            SeriesId = book.SeriesId,
+            SeriesVolume = book.SeriesVolume,
+            // Universo efectivo: el de su saga o, si es un libro suelto, el suyo propio
+            Universe = book.Series?.Universe?.Name ?? book.Universe?.Name,
+            UniverseId = book.Series?.UniverseId ?? book.UniverseId,
             HasCover = !string.IsNullOrEmpty(book.CoverImagePath),
             IsAvailableOffline = book.IsAvailableOffline,
             HasEpub = !string.IsNullOrEmpty(book.EpubFilePath),
