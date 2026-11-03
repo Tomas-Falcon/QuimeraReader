@@ -149,6 +149,7 @@
   "AudioManagement_ColumnFile": "Archivo",
   "AudioManagement_ColumnStatus": "Estado",
   "AudioManagement_ColumnBook": "Libro Asociado",
+  "AudioManagement_ColumnListen": "Escuchar",
   "AudioManagement_ColumnActions": "Acciones",
   "AudioManagement_StatusMatched": "Asignado",
   "AudioManagement_StatusUnmatched": "Huérfano",

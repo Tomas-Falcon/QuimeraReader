@@ -155,6 +155,7 @@
   "AudioManagement_ColumnFile": "File",
   "AudioManagement_ColumnStatus": "Status",
   "AudioManagement_ColumnBook": "Associated Book",
+  "AudioManagement_ColumnListen": "Listen",
   "AudioManagement_ColumnActions": "Actions",
   "AudioManagement_StatusMatched": "Assigned",
   "AudioManagement_StatusUnmatched": "Orphan",

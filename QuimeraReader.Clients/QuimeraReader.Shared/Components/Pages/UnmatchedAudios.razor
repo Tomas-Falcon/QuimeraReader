@@ -6,6 +6,7 @@
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @inject Radzen.DialogService DialogService
 @inject ToastService ToastService
+@inject IBookService BookService
 
 <RadzenCard class="m-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -47,6 +48,12 @@
                         </Template>
                     </RadzenDataGridColumn>
                     <RadzenDataGridColumn TItem="ManagedAudioDto" Property="BookTitle" Title="@TranslationService["AudioManagement_ColumnBook"]" />
+                    <RadzenDataGridColumn TItem="ManagedAudioDto" Title="@TranslationService["AudioManagement_ColumnListen"]" Width="260px" Sortable="false">
+                        <Template Context="audio">
+                            @* preload="none": no descarga nada hasta pulsar play. Es una escucha previa: no guarda progreso de lectura *@
+                            <audio controls preload="none" src="@BookService.GetMediaUrl(GetStreamPath(audio))" style="height: 32px; width: 240px;"></audio>
+                        </Template>
+                    </RadzenDataGridColumn>
                     <RadzenDataGridColumn TItem="ManagedAudioDto" Title="@TranslationService["AudioManagement_ColumnActions"]" Width="200px" TextAlign="TextAlign.Center">
                         <Template Context="audio">
                             @if (!audio.IsMatched)

@@ -24,6 +24,11 @@ public partial class UnmatchedAudios : ComponentBase
     private List<ManagedAudioDto> _audios = new();
     private List<ManagedAudioDto> _filteredAudios = new();
 
+    // Huérfanos: endpoint propio; asignados: por Id de pista (sin pasar por el lector ni guardar posición)
+    private static string GetStreamPath(ManagedAudioDto audio) => audio.IsMatched
+        ? $"api/media/audio-tracks/{audio.Id}"
+        : $"api/books/unmatched-audios/{audio.Id}/stream";
+
     protected override async Task OnInitializedAsync()
     {
         _filterOptions = new List<FilterOption>
@@ -207,4 +212,4 @@ public partial class UnmatchedAudios : ComponentBase
             }
         }
     }
-}
+}

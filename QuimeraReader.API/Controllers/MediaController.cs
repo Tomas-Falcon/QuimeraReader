@@ -119,6 +119,19 @@ public class MediaController : ControllerBase
         return PhysicalFile(resolvedPath, mimeType, enableRangeProcessing: true);
     }
 
+    // Escucha previa de una pista ya asignada por su Id (pantalla "Administrar Audios"): no toca el progreso del libro
+    [HttpGet("audio-tracks/{trackId}")]
+    public async Task<IActionResult> GetAudioTrackById(int trackId)
+    {
+        var track = await _dbContext.BookAudioTracks.AsNoTracking().FirstOrDefaultAsync(t => t.Id == trackId);
+        if (track == null) return NotFound();
+
+        var resolvedPath = await GetResolvedPathAsync(track.FilePath);
+        if (resolvedPath == null) return NotFound();
+
+        return PhysicalFile(resolvedPath, GetMimeType(resolvedPath), enableRangeProcessing: true);
+    }
+
     [HttpGet("books/{id}/audio")]
     public async Task<IActionResult> GetAudio(int id)
     {
