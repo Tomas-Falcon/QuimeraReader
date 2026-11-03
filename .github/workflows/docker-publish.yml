@@ -30,7 +30,8 @@ jobs:
         id: version_step
         shell: bash
         run: |
-          RAW_VER=$(git describe --tags --abbrev=7 --always 2>/dev/null || echo "1.0.6")
+          # Solo tags de versión (v*): el tag rodante dev-latest de los clientes generaría "dev-latest-1-gXXXX", inválido para NuGet
+          RAW_VER=$(git describe --tags --match 'v[0-9]*' --abbrev=7 2>/dev/null || echo "1.0.6")
           # Remove leading 'v' if present for clean semantic versioning
           CLEAN_VER=${RAW_VER#v}
           echo "VERSION=${CLEAN_VER}" >> $GITHUB_OUTPUT
