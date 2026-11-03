@@ -33,6 +33,12 @@
                                 <div class="form-text text-white-50 mt-1">@TranslationService["Settings_ServerUrlPlaceholder"]</div>
                             </div>
                             
+                            <div class="mb-4">
+                                <RadzenLabel Text="@TranslationService["Settings_AccessKey"]" class="fw-bold mb-2 d-block" />
+                                <RadzenPassword @bind-Value="_clientApiKey" class="w-100 bg-secondary text-light border-0" AutoComplete="false" />
+                                <div class="form-text text-white-50 mt-1">@TranslationService["Settings_AccessKeyHelp"]</div>
+                            </div>
+                            
                             <RadzenButton Text="@TranslationService["Settings_ApplyConnection"]" Icon="save" Click="SaveClientConfig" IsBusy="@_isTestingClientConnection" BusyText="@TranslationService["Settings_Connecting"]" ButtonStyle="Radzen.ButtonStyle.Primary" />
                         </RadzenCard>
                     </RadzenTabsItem>

@@ -19,4 +19,12 @@ public class WebServerConfigService : IServerConfigService
     {
         // No-op en web
     }
+
+    // La web se autentica con la cookie HttpOnly que fija /api/auth/login: la clave no se guarda en el navegador
+    public string? ApiKey => null;
+
+    public void SaveApiKey(string? apiKey)
+    {
+        // No-op en web
+    }
 }

@@ -83,7 +83,7 @@ public class AudioMatchingService : QuimeraReader.Application.Interfaces.IAudioM
             var processInfo = new ProcessStartInfo
             {
                 FileName = "ffmpeg",
-                Arguments = $"-i \"{audioFilePath}\" -t 900 -ar 16000 -ac 1 -c:a pcm_s16le -y \"{tempWavFile}\"",
+                ArgumentList = { "-nostdin", "-i", audioFilePath, "-t", "900", "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", "-y", tempWavFile },
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,

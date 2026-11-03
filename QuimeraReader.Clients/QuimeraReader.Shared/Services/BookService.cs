@@ -38,6 +38,12 @@ public interface IBookService
     Task SaveEpubLocationsAsync(int bookId, string locationsJson);
     void InvalidateCache();
     string BaseAddress { get; }
+
+    /// <summary>
+    /// URL absoluta para recursos que carga el navegador/WebView directamente (img, audio, epub.js).
+    /// Si el cliente usa API key (MAUI/Desktop) se añade como access_token, porque esas peticiones no llevan cabeceras.
+    /// </summary>
+    string GetMediaUrl(string? url);
 }
 
 public class BookService : IBookService
@@ -46,6 +52,7 @@ public class BookService : IBookService
     private readonly ILogger<BookService> _logger;
     private readonly INetworkStateService _networkState;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IServerConfigService _serverConfig;
 
     private static readonly ConcurrentDictionary<int, Book> _bookCache = new();
     private static readonly ConcurrentDictionary<string, (PaginatedResult<Book> Result, DateTime Timestamp)> _queryCache = new();
@@ -57,17 +64,34 @@ public class BookService : IBookService
     private static List<Book>? _recommendationsCache;
     private static DateTime _recommendationsCacheTime = DateTime.MinValue;
 
-    public BookService(HttpClient httpClient, ILogger<BookService> logger, INetworkStateService networkState, IServiceProvider serviceProvider)
+    public BookService(HttpClient httpClient, ILogger<BookService> logger, INetworkStateService networkState, IServiceProvider serviceProvider, IServerConfigService serverConfig)
     {
         _httpClient = httpClient;
         _logger = logger;
         _networkState = networkState;
         _serviceProvider = serviceProvider;
+        _serverConfig = serverConfig;
     }
 
     private ILocalBookRepository? GetLocalRepo() => _serviceProvider.GetService<ILocalBookRepository>();
 
     public string BaseAddress => _httpClient.BaseAddress?.ToString() ?? "";
+
+    public string GetMediaUrl(string? url)
+    {
+        if (string.IsNullOrEmpty(url)) return string.Empty;
+
+        var baseAddress = BaseAddress.TrimEnd('/');
+        bool isAbsolute = url.StartsWith("http", StringComparison.OrdinalIgnoreCase) || url.StartsWith("data:") || url.StartsWith("blob:");
+        var resolved = isAbsolute ? url : $"{baseAddress}/{url.TrimStart('/')}";
+
+        // Solo se añade el token a URLs del propio servidor (no a portadas externas, data: ni blob:)
+        var apiKey = _serverConfig.ApiKey;
+        if (string.IsNullOrEmpty(apiKey) || baseAddress.Length == 0 || !resolved.StartsWith(baseAddress, StringComparison.OrdinalIgnoreCase)) return resolved;
+
+        var separator = resolved.Contains('?') ? "&" : "?";
+        return $"{resolved}{separator}access_token={Uri.EscapeDataString(apiKey)}";
+    }
 
     public Book? GetCachedBook(int id) => _bookCache.TryGetValue(id, out var b) ? b : null;
 

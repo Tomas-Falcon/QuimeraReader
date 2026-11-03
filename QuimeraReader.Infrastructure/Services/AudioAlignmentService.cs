@@ -72,7 +72,8 @@ public class AudioAlignmentService
                     var processInfo = new ProcessStartInfo
                     {
                         FileName = "ffmpeg",
-                        Arguments = $"-i \"{audioFilePath}\" -ar 16000 -ac 1 -c:a pcm_s16le -y \"{tempWavFile}\"",
+                        // ArgumentList escapa cada argumento: un nombre de archivo con comillas no puede inyectar opciones de FFmpeg
+                        ArgumentList = { "-nostdin", "-i", audioFilePath, "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", "-y", tempWavFile },
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
@@ -88,6 +89,12 @@ public class AudioAlignmentService
                         var stdErrTask = process.StandardError.ReadToEndAsync(cancellationToken);
                         await process.WaitForExitAsync(cancellationToken);
                         await Task.WhenAll(stdOutTask, stdErrTask);
+
+                        if (process.ExitCode != 0)
+                        {
+                            var lastError = (await stdErrTask).Split('\n', StringSplitOptions.RemoveEmptyEntries).LastOrDefault()?.Trim();
+                            return new SyncMapResult { Success = false, ErrorMessage = $"FFmpeg falló al convertir la pista {trackNumber} (código {process.ExitCode}): {lastError}" };
+                        }
                     }
 
                     if (!File.Exists(tempWavFile) || new FileInfo(tempWavFile).Length < 1024)

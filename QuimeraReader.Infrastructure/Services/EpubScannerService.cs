@@ -606,7 +606,7 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
 
     private string GetSafeFilename(string filename)
     {
-        return string.Join("_", filename.Split(Path.GetInvalidFileNameChars()));
+        return QuimeraReader.Application.Common.LibraryPathUtils.SafeFileName(filename, "Unknown");
     }
 }
 

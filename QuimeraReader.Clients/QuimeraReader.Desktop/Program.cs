@@ -37,7 +37,9 @@ public class Program
             var config = sp.GetRequiredService<IServerConfigService>();
             var defaultUrl = "http://localhost:5000/";
             var url = config.ServerUrl ?? defaultUrl;
-            return new HttpClient { BaseAddress = new Uri(url), Timeout = TimeSpan.FromSeconds(60) };
+            var client = new HttpClient { BaseAddress = new Uri(url), Timeout = TimeSpan.FromSeconds(60) };
+            if (!string.IsNullOrEmpty(config.ApiKey)) client.DefaultRequestHeaders.Add("X-Api-Key", config.ApiKey);
+            return client;
         });
 
         // Core Shared Services

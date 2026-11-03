@@ -43,6 +43,7 @@ namespace QuimeraReader.API.Controllers
         }
 
         [HttpPost]
+        [RequestSizeLimit(1024 * 1024)]
         public IActionResult ReceiveLogs([FromBody] List<ClientLogDto> logs)
         {
             if (logs == null || logs.Count == 0) return Ok();

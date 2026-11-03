@@ -44,9 +44,6 @@ RUN mkdir -p /media /library /config
 # Copiar el binario del backend
 COPY --from=build-api /app/api .
 
-# Copiar el script de actualizacion
-COPY update_container.sh /app/update_container.sh
-RUN chmod +x /app/update_container.sh
 
 # Copiar el frontend dentro de la carpeta wwwroot del backend
 COPY --from=build-web /app/web/wwwroot ./wwwroot

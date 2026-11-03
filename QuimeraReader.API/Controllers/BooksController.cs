@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Infrastructure;
 using QuimeraReader.Infrastructure.Services;
 using QuimeraReader.Domain.Entities;
+using QuimeraReader.Application.Common;
 using System.Threading.Tasks;
 using System.Linq;
 using System.IO;
@@ -119,7 +120,7 @@ public partial class BooksController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error al cargar autores");
-            return StatusCode(500, new { Error = ex.Message });
+            return StatusCode(500, new { Error = "Error al cargar autores." });
         }
     }
 
@@ -148,7 +149,7 @@ public partial class BooksController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error al cargar libros");
-            return StatusCode(500, new { Error = ex.Message });
+            return StatusCode(500, new { Error = "Error al cargar libros." });
         }
     }
 
@@ -405,7 +406,8 @@ public partial class BooksController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, $"Error interno: {ex.Message}");
+            _logger.LogError(ex, "Error actualizando metadatos del libro {BookId}", id);
+            return StatusCode(500, "Error interno al actualizar metadatos.");
         }
     }
 
@@ -421,7 +423,7 @@ public partial class BooksController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error crítico durante MergeDuplicates");
-            return StatusCode(500, new { Message = "Error interno durante la fusión", Details = ex.Message, Inner = ex.InnerException?.Message });
+            return StatusCode(500, new { Message = "Error interno durante la fusión" });
         }
     }
 
@@ -464,8 +466,10 @@ public partial class BooksController : ControllerBase
         if (!file.FileName.EndsWith(".epub", StringComparison.OrdinalIgnoreCase) && !isAudio)
             return BadRequest("Solo se permiten archivos .epub o audios compatibles (.mp3, .m4b, .m4a, .wav).");
 
+        // El nombre lo envía el cliente: nunca se usa tal cual para construir rutas
+        string safeFileName = LibraryPathUtils.SafeFileName(file.FileName);
         string baseTemp = Path.GetTempFileName();
-        string tempPath = baseTemp + Path.GetExtension(file.FileName);
+        string tempPath = baseTemp + Path.GetExtension(safeFileName);
         
         try
         {
@@ -486,11 +490,18 @@ public partial class BooksController : ControllerBase
                         string outDir = await GetBookOutputDirAsync(matchedBook, _dbContext);
                         if (!string.IsNullOrEmpty(outDir))
                         {
-                            string newAudioPath = Path.Combine(outDir, Path.GetFileNameWithoutExtension(matchedBook.EpubFilePath) + "_audio" + Path.GetExtension(file.FileName));
-                            System.IO.File.Move(tempPath, newAudioPath, true);
-                            matchedBook.AudioTracks.Clear();
-                            matchedBook.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = 1 });
+                            // Se añade como pista nueva: antes se vaciaban las pistas existentes y se sobrescribía el archivo anterior
+                            Directory.CreateDirectory(outDir);
+                            int nextTrack = matchedBook.AudioTracks.Any() ? matchedBook.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
+                            string baseName = !string.IsNullOrEmpty(matchedBook.EpubFilePath)
+                                ? Path.GetFileNameWithoutExtension(matchedBook.EpubFilePath)
+                                : matchedBook.Title;
+                            string newAudioPath = LibraryPathUtils.GetUniqueFilePath(outDir, $"{baseName}_track{nextTrack}{Path.GetExtension(safeFileName)}");
+                            System.IO.File.Move(tempPath, newAudioPath);
+                            matchedBook.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack, FileName = safeFileName });
+                            matchedBook.ProcessingStatus = "PENDING_SYNC";
                             await _dbContext.SaveChangesAsync();
+                            await _queue.EnqueueAsync(matchedBook.Id);
                             return Ok(new { Message = "Audio emparejado con libro existente: " + matchedBook.Title });
                         }
                     }
@@ -501,16 +512,16 @@ public partial class BooksController : ControllerBase
 
                 string orphansDir = Path.Combine(libraryRoot, "Orphans");
                 Directory.CreateDirectory(orphansDir);
-                string orphanPath = Path.Combine(orphansDir, file.FileName);
-                System.IO.File.Move(tempPath, orphanPath, true);
-                _dbContext.UnmatchedAudioTracks.Add(new UnmatchedAudioTrack { OriginalFileName = file.FileName, PhysicalPath = orphanPath, FileSizeBytes = file.Length, UploadedAt = DateTime.UtcNow });
+                string orphanPath = LibraryPathUtils.GetUniqueFilePath(orphansDir, safeFileName);
+                System.IO.File.Move(tempPath, orphanPath);
+                _dbContext.UnmatchedAudioTracks.Add(new UnmatchedAudioTrack { OriginalFileName = safeFileName, PhysicalPath = orphanPath, FileSizeBytes = file.Length, UploadedAt = DateTime.UtcNow });
                 await _dbContext.SaveChangesAsync();
                 return Ok(new { Message = "El audio fue guardado como huérfano porque no se encontró coincidencia." });
             }
 
             var scannerService = HttpContext.RequestServices.GetRequiredService<QuimeraReader.Infrastructure.Services.EpubScannerService>();
             
-            var book = await scannerService.ScanEpubAsync(tempPath, "GoogleBooks", file.FileName, forceMove: true);
+            var book = await scannerService.ScanEpubAsync(tempPath, "GoogleBooks", safeFileName, forceMove: true);
             
             if (book.Id == 0)
             {
@@ -532,7 +543,7 @@ public partial class BooksController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error en UploadEpub");
-            return StatusCode(500, $"Error interno: {ex.Message}");
+            return StatusCode(500, "Error interno al procesar el archivo.");
         }
         finally
         {
@@ -568,8 +579,8 @@ public partial class BooksController : ControllerBase
         else return BadRequest("El libro no tiene una ruta física establecida.");
 
         int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
-        string safeTitle = string.Join("_", book.Title.Split(Path.GetInvalidFileNameChars()));
-        string newAudioPath = Path.Combine(bookDir, $"{safeTitle} track {nextTrack}{ext}");
+        string safeTitle = LibraryPathUtils.SafeFileName(book.Title, "audio");
+        string newAudioPath = LibraryPathUtils.GetUniqueFilePath(bookDir, $"{safeTitle} track {nextTrack}{ext}");
 
         try
         {
@@ -578,7 +589,7 @@ public partial class BooksController : ControllerBase
                 await file.CopyToAsync(stream);
             }
 
-            book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack, FileName = file.FileName });
+            book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack, FileName = LibraryPathUtils.SafeFileName(file.FileName) });
             await _dbContext.SaveChangesAsync();
             return Ok(new { Message = "Audio añadido correctamente." });
         }
@@ -779,15 +790,15 @@ public partial class BooksController : ControllerBase
             string originalFileName = track.FileName ?? System.IO.Path.GetFileName(track.FilePath);
             string baseName = !string.IsNullOrEmpty(targetBook.EpubFilePath) 
                 ? System.IO.Path.GetFileNameWithoutExtension(targetBook.EpubFilePath) 
-                : string.Join("_", targetBook.Title.Split(System.IO.Path.GetInvalidFileNameChars()));
+                : LibraryPathUtils.SafeFileName(targetBook.Title, "audio");
                 
-            string newAudioPath = System.IO.Path.Combine(outDir, baseName + $"_track{nextTrack}" + System.IO.Path.GetExtension(originalFileName));
+            string newAudioPath = LibraryPathUtils.GetUniqueFilePath(outDir, baseName + $"_track{nextTrack}" + Path.GetExtension(originalFileName));
             
             if (System.IO.File.Exists(track.FilePath))
             {
                 // Crear el directorio si no existe
                 if (!System.IO.Directory.Exists(outDir)) System.IO.Directory.CreateDirectory(outDir);
-                System.IO.File.Move(track.FilePath, newAudioPath, true);
+                System.IO.File.Move(track.FilePath, newAudioPath);
                 track.FilePath = newAudioPath;
             }
         }
@@ -1094,11 +1105,12 @@ public partial class BooksController : ControllerBase
         {
             string baseName = !string.IsNullOrEmpty(book.EpubFilePath)
                 ? Path.GetFileNameWithoutExtension(book.EpubFilePath)
-                : string.Join("_", book.Title.Split(Path.GetInvalidFileNameChars()));
-            newAudioPath = Path.Combine(outDir, baseName + $"_track{nextTrack}" + Path.GetExtension(audio.OriginalFileName));
+                : LibraryPathUtils.SafeFileName(book.Title, "audio");
+            newAudioPath = LibraryPathUtils.GetUniqueFilePath(outDir, baseName + $"_track{nextTrack}" + Path.GetExtension(audio.OriginalFileName));
+            Directory.CreateDirectory(outDir);
             if (System.IO.File.Exists(audio.PhysicalPath))
             {
-                System.IO.File.Move(audio.PhysicalPath, newAudioPath, true);
+                System.IO.File.Move(audio.PhysicalPath, newAudioPath);
             }
         }
         
@@ -1156,11 +1168,12 @@ public partial class BooksController : ControllerBase
                             {
                                 string baseName = !string.IsNullOrEmpty(book.EpubFilePath)
                     ? Path.GetFileNameWithoutExtension(book.EpubFilePath)
-                    : string.Join("_", book.Title.Split(Path.GetInvalidFileNameChars()));
-                newAudioPath = Path.Combine(outDir, baseName + $"_track{nextTrack}" + Path.GetExtension(audio.OriginalFileName));
+                    : LibraryPathUtils.SafeFileName(book.Title, "audio");
+                newAudioPath = LibraryPathUtils.GetUniqueFilePath(outDir, baseName + $"_track{nextTrack}" + Path.GetExtension(audio.OriginalFileName));
+                                Directory.CreateDirectory(outDir);
                                 if (System.IO.File.Exists(audio.PhysicalPath))
                                 {
-                                    System.IO.File.Move(audio.PhysicalPath, newAudioPath, true);
+                                    System.IO.File.Move(audio.PhysicalPath, newAudioPath);
                                 }
                             }
                             
@@ -1187,8 +1200,8 @@ public partial class BooksController : ControllerBase
     {
         if (!string.IsNullOrEmpty(book.CoverImagePath)) return System.IO.Path.GetDirectoryName(book.CoverImagePath)!;
         if (book.AudioTracks != null && book.AudioTracks.Any()) return System.IO.Path.GetDirectoryName(book.AudioTracks.First().FilePath)!;
-        string safeAuthor = string.Join("_", (book.Authors?.FirstOrDefault()?.Author?.Name ?? "Unknown Author").Split(System.IO.Path.GetInvalidFileNameChars()));
-        string safeTitle = string.Join("_", book.Title.Split(System.IO.Path.GetInvalidFileNameChars()));
+        string safeAuthor = LibraryPathUtils.SafeFileName(book.Authors?.FirstOrDefault()?.Author?.Name, "Unknown Author");
+        string safeTitle = LibraryPathUtils.SafeFileName(book.Title, "Unknown Book");
         var settingsDict = await db.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
         settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
         if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "Library");

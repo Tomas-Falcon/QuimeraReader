@@ -17,7 +17,7 @@ public class MediaPackagerService
             {
                 FileName = "ffmpeg",
                 // Convert to mp3 with reasonable quality for voice (approx 64-96 kbps VBR)
-                Arguments = $"-i \"{sourcePath}\" -c:a libmp3lame -q:a 5 -map 0:a:0 -y \"{destPath}\"",
+                ArgumentList = { "-nostdin", "-i", sourcePath, "-c:a", "libmp3lame", "-q:a", "5", "-map", "0:a:0", "-y", destPath },
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,

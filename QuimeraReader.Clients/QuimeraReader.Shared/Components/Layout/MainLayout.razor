@@ -11,6 +11,8 @@
 @inject QuimeraReader.Shared.Services.IScanService ScanService
 @inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject QuimeraReader.Shared.Services.ToastService ToastService
+@inject HttpClient Http
+@using System.Net.Http.Json
 @namespace QuimeraReader.Shared.Components.Layout
 
 @if (ServerConfig.NeedsConfiguration)
@@ -33,6 +35,28 @@
                     <span>Conectar</span>
                 }
             </button>
+        </div>
+    </div>
+    <QuimeraReader.Shared.Components.ToastContainer />
+}
+else if (_needsLogin)
+{
+    <div class="d-flex align-items-center justify-content-center vh-100 bg-dark text-light p-3">
+        <div class="card p-4 bg-secondary shadow-lg" style="max-width: 400px; width: 100%; border-radius: 16px;">
+            <h3 class="mb-3 text-center fw-bold">@TranslationService["Auth_Title"]</h3>
+            <p class="text-center small text-white-50 mb-4">@TranslationService["Auth_Desc"]</p>
+            <form @onsubmit="LoginAsync" @onsubmit:preventDefault>
+                <div class="mb-3">
+                    <input type="password" class="form-control" @bind="_loginKey" autocomplete="current-password" disabled="@_isLoggingIn" />
+                </div>
+                <button type="submit" class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2 py-2" disabled="@_isLoggingIn">
+                    @if (_isLoggingIn)
+                    {
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    }
+                    <span>@TranslationService["Auth_Login"]</span>
+                </button>
+            </form>
         </div>
     </div>
     <QuimeraReader.Shared.Components.ToastContainer />
@@ -182,6 +206,7 @@ else
         NavManager.LocationChanged += OnLocationChanged;
         if (!ServerConfig.NeedsConfiguration)
         {
+            _ = CheckAuthAsync();
             _ = PollScanStatusAsync();
         }
         
@@ -292,6 +317,65 @@ else
 
     private bool _isTestingConfig = false;
 
+    private bool _needsLogin = false;
+    private bool _isLoggingIn = false;
+    private string _loginKey = string.Empty;
+
+    private sealed class AuthStatus
+    {
+        public bool AuthRequired { get; set; }
+        public bool Authenticated { get; set; }
+    }
+
+    // Si el servidor exige QUIMERA_API_KEY y no hay sesión (cookie en web, clave guardada en MAUI/Desktop) se muestra el login.
+    // Sin red no se bloquea: el modo offline sigue funcionando con la biblioteca local.
+    private async Task CheckAuthAsync()
+    {
+        try
+        {
+            var status = await Http.GetFromJsonAsync<AuthStatus>("api/auth/status", _cts.Token);
+            if (status != null && status.AuthRequired && !status.Authenticated)
+            {
+                _needsLogin = true;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Auth] No se pudo comprobar el estado de autenticación: {ex.Message}");
+        }
+    }
+
+    private async Task LoginAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_loginKey) || _isLoggingIn) return;
+        _isLoggingIn = true;
+
+        try
+        {
+            using var response = await Http.PostAsJsonAsync("api/auth/login", new { ApiKey = _loginKey.Trim() });
+            if (response.IsSuccessStatusCode)
+            {
+                // Web: el servidor ya ha fijado la cookie. MAUI/Desktop: la clave se envía en cada petición desde ahora.
+                ServerConfig.SaveApiKey(_loginKey.Trim());
+                NavManager.NavigateTo(NavManager.Uri, forceLoad: true);
+                return;
+            }
+
+            ToastService.ShowError(response.StatusCode == System.Net.HttpStatusCode.TooManyRequests
+                ? TranslationService["Auth_TooManyAttempts"]
+                : TranslationService["Auth_InvalidKey"]);
+        }
+        catch
+        {
+            ToastService.ShowError(TranslationService["Auth_ServerUnreachable"]);
+        }
+        finally
+        {
+            _isLoggingIn = false;
+        }
+    }
+
     private async Task SaveConfig()
     {
         if (string.IsNullOrWhiteSpace(_serverInput)) return;
@@ -317,7 +401,7 @@ else
         try
         {
             using var testClient = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
-            var pingUri = new Uri(testUri, "api/Books?page=1&pageSize=1");
+            var pingUri = new Uri(testUri, "api/health"); // público: no requiere la API key
             using var response = await testClient.GetAsync(pingUri);
             if (response.IsSuccessStatusCode)
             {

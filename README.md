@@ -85,25 +85,30 @@ services:
       - PGID=1000
       - TZ=Europe/Madrid
       - QUIMERA_DB_PATH=/config/quimerareader.db
+      # Access key required by the web UI and the mobile/desktop apps (strongly recommended)
+      - QUIMERA_API_KEY=a_long_random_secret
+      # Must match Watchtower's API token (used by the "Update" button in Settings)
+      - WATCHTOWER_TOKEN=your_secure_token
     volumes:
       - /path/to/your/downloads:/media
       - /path/to/your/library:/library
       - ./config:/config
-      # Docker socket to enable restarts and manual updates from the web UI
-      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
-  # Automatic and on-demand updates (Watchtower)
+  # Automatic and on-demand updates (Watchtower). Only this service needs the Docker socket.
   watchtower:
     image: containrrr/watchtower
     container_name: watchtower
     environment:
       - DOCKER_API_VERSION=1.44
+      - WATCHTOWER_HTTP_API_TOKEN=your_secure_token
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 300 --http-api-update --http-api-periodic-polls --http-api-token your_secure_token quimerareader
+    command: --interval 300 --http-api-update --http-api-periodic-polls quimerareader
     restart: unless-stopped
 ```
+
+**Authentication:** when `QUIMERA_API_KEY` is set, every `/api` request requires it. The web UI asks for the key once and keeps an HttpOnly cookie; the Android/desktop apps ask for it next to the server address. If the variable is not set the API stays open (as in previous versions) and a warning is logged at startup. Additional CORS origins can be allowed with `QUIMERA_CORS_ORIGINS` (comma separated).
 
 Execute the deployment:
 ```bash

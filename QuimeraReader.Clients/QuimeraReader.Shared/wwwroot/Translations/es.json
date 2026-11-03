@@ -206,5 +206,13 @@
   "Settings_LoadingPreferences": "Cargando preferencias...",
   "Settings_General": "General",
   "Settings_ServerFolders": "Carpetas del Servidor",
-  "Settings_ServerFoldersDesc": "Define dónde buscará QuimeraReader los libros y cómo los importará."
+  "Settings_ServerFoldersDesc": "Define dónde buscará QuimeraReader los libros y cómo los importará.",
+  "Settings_AccessKey": "Clave de acceso",
+  "Settings_AccessKeyHelp": "La definida en QUIMERA_API_KEY en el servidor. Déjala vacía si el servidor no la exige.",
+  "Auth_Title": "Acceso a QuimeraReader",
+  "Auth_Desc": "Este servidor está protegido. Introduce la clave de acceso (QUIMERA_API_KEY).",
+  "Auth_Login": "Entrar",
+  "Auth_InvalidKey": "Clave de acceso incorrecta.",
+  "Auth_TooManyAttempts": "Demasiados intentos. Espera un minuto y vuelve a probar.",
+  "Auth_ServerUnreachable": "No se pudo contactar con el servidor."
 }

@@ -87,7 +87,8 @@ public class MaintenanceBackgroundService : BackgroundService
         _logger.LogInformation("2. Organizando cola de procesamiento de Audio Whisper...");
         
         var pendingAudioBooks = await dbContext.Books
-            .Where(b => b.AudioTracks.Any() && b.SyncMap == null && b.ProcessingStatus != "PROCESSING")
+            // Los libros en ERROR no se reintentan solos cada noche (Whisper tarda horas): se reencolan a mano o al descargar el modelo
+            .Where(b => b.AudioTracks.Any() && b.SyncMap == null && b.ProcessingStatus != "PROCESSING" && b.ProcessingStatus != "ERROR")
             .ToListAsync(stoppingToken);
 
         if (pendingAudioBooks.Any())

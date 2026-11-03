@@ -183,7 +183,7 @@
                 else if (!Book.HasEpub)
                 {
                     <div class="no-sync-map text-center pt-5" style="flex: 1;">
-                        <img src="@(BookService.BaseAddress + @Book.CoverUrl)" class="fallback-cover mb-4" style="max-width: 200px; border-radius: 8px;" />
+                        <img src="@BookService.GetMediaUrl(Book.CoverUrl)" class="fallback-cover mb-4" style="max-width: 200px; border-radius: 8px;" />
                         <h3>Modo Audiolibro Puro</h3>
                         <p class="text-muted">No se encontraron transcripciones o texto para este título.</p>
                     </div>
@@ -725,9 +725,9 @@
         }
 
         if (Book?.AudioTracks == null || Book.AudioTracks.Count == 0)
-            return $"{BookService.BaseAddress.TrimEnd('/')}/" + Book?.AudioUrl;
+            return BookService.GetMediaUrl(Book?.AudioUrl);
 
-        return $"{BookService.BaseAddress.TrimEnd('/')}/api/media/books/{BookId}/tracks/{_currentTrackNumber}";
+        return BookService.GetMediaUrl($"api/media/books/{BookId}/tracks/{_currentTrackNumber}");
     }
 
     private async Task ChangeTrackAsync(int trackNumber)
@@ -809,7 +809,7 @@
             }
             else
             {
-                _audioSourceUrl = $"{BookService.BaseAddress.TrimEnd('/')}/{Book.AudioUrl}";
+                _audioSourceUrl = BookService.GetMediaUrl(Book.AudioUrl);
             }
         }
         
@@ -928,8 +928,7 @@
                 }
                 else
                 {
-                    var baseUrl = BookService.BaseAddress.TrimEnd('/');
-                    var epubApiUrl = $"{baseUrl}/{Book.EpubUrl}";
+                    var epubApiUrl = BookService.GetMediaUrl(Book.EpubUrl);
                     await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubApiUrl, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
                 }
 

@@ -138,7 +138,10 @@ namespace QuimeraReader.Mobile.Logging
                 if (logsToSend.Count == 0) return 0;
 
                 var endpoint = new Uri(new Uri(serverUrl), "api/Logs");
-                using var response = await _logHttpClient.PostAsJsonAsync(endpoint, logsToSend);
+                using var request = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = JsonContent.Create(logsToSend) };
+                var apiKey = Preferences.Default.Get(QuimeraReader.Mobile.Services.MobileServerConfigService.ApiKeyKey, "");
+                if (!string.IsNullOrWhiteSpace(apiKey)) request.Headers.Add("X-Api-Key", apiKey);
+                using var response = await _logHttpClient.SendAsync(request);
                 if (response.IsSuccessStatusCode)
                 {
                     using var connection = new SqliteConnection(_connectionString);

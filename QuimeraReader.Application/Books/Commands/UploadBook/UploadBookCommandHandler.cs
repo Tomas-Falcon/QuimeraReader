@@ -75,8 +75,8 @@ public class UploadBookCommandHandler : IRequestHandler<UploadBookCommand, Uploa
 
             string orphansDir = Path.Combine(libraryRoot, "Orphans");
             Directory.CreateDirectory(orphansDir);
-            string orphanPath = Path.Combine(orphansDir, request.FileName);
-            File.Move(tempPath, orphanPath, true);
+            string orphanPath = LibraryPathUtils.GetUniqueFilePath(orphansDir, request.FileName);
+            File.Move(tempPath, orphanPath);
             _dbContext.UnmatchedAudioTracks.Add(new UnmatchedAudioTrack { OriginalFileName = request.FileName, PhysicalPath = orphanPath, FileSizeBytes = request.Length, UploadedAt = DateTime.UtcNow });
             await _dbContext.SaveChangesAsync(cancellationToken);
             return new UploadBookResultDto { Message = "El audio fue guardado como huérfano porque no se encontró coincidencia." };
@@ -102,5 +102,5 @@ public class UploadBookCommandHandler : IRequestHandler<UploadBookCommand, Uploa
             Message = "Libro subido correctamente."
         };
     }
-}
-
+}
+

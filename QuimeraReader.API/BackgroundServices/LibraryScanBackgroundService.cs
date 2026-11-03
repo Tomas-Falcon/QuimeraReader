@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Infrastructure;
 using QuimeraReader.Infrastructure.Services;
 using QuimeraReader.Domain.Entities;
+using QuimeraReader.Application.Common;
 
 namespace QuimeraReader.API.BackgroundServices;
 
@@ -31,6 +32,7 @@ public class LibraryScanBackgroundService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("LibraryScanBackgroundService is starting.");
+        await MigrateLegacyOrphansAsync(stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -150,54 +152,55 @@ public class LibraryScanBackgroundService : BackgroundService
                         if (book != null)
                         {
                             int nextTrack = book.AudioTracks.Any() ? book.AudioTracks.Max(t => t.TrackNumber) + 1 : 1;
-                            string safeTitle = string.Join("_", book.Title.Split(Path.GetInvalidFileNameChars()));
-                            string bookDir = Path.GetDirectoryName(book.EpubFilePath ?? book.CoverImagePath) ?? scanFolder;
-                            string newAudioPath = Path.Combine(bookDir, $"{safeTitle} track {nextTrack}.mp3");
+                            string safeTitle = LibraryPathUtils.SafeFileName(book.Title, "audio");
+                            string bookDir = Path.GetDirectoryName(string.IsNullOrEmpty(book.EpubFilePath) ? book.CoverImagePath : book.EpubFilePath) ?? scanFolder;
+                            Directory.CreateDirectory(bookDir);
+                            string newAudioPath = LibraryPathUtils.GetUniqueFilePath(bookDir, $"{safeTitle} track {nextTrack}.mp3");
+                            string trackPath = file;
 
-                            if (file != newAudioPath)
+                            try
                             {
-                                try 
+                                if (await mediaPackager.NormalizeAudioAsync(file, newAudioPath))
                                 {
-                                    bool converted = await mediaPackager.NormalizeAudioAsync(file, newAudioPath);
-                                    if (converted)
+                                    trackPath = newAudioPath;
+                                    if (!leaveInPlace)
                                     {
-                                        if (!leaveInPlace) {
-                                            try { File.Delete(file); } catch { }
-                                        }
-                                        book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
+                                        try { File.Delete(file); } catch (Exception ex) { _logger.LogWarning(ex, "No se pudo borrar el audio original {File}", file); }
                                     }
-                                    else
-                                    {
-                                        File.Copy(file, newAudioPath, true);
-                                        book.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack });
-                                    }
-                                } 
-                                catch (Exception)
+                                }
+                                else
                                 {
-                                    book.AudioTracks.Add(new BookAudioTrack { FilePath = file, TrackNumber = nextTrack });
+                                    // Sin conversión se conserva la extensión real (antes un .m4b acababa copiado con extensión .mp3)
+                                    if (File.Exists(newAudioPath)) File.Delete(newAudioPath); // posible salida parcial de FFmpeg
+                                    trackPath = LibraryPathUtils.GetUniqueFilePath(bookDir, $"{safeTitle} track {nextTrack}{Path.GetExtension(file)}");
+                                    File.Copy(file, trackPath);
                                 }
                             }
-                            else
+                            catch (Exception ex)
                             {
-                                book.AudioTracks.Add(new BookAudioTrack { FilePath = file, TrackNumber = nextTrack });
+                                _logger.LogWarning(ex, "No se pudo copiar el audio {File}; se enlaza en su ubicación original", file);
+                                trackPath = file;
                             }
+
+                            book.AudioTracks.Add(new BookAudioTrack { FilePath = trackPath, TrackNumber = nextTrack, FileName = Path.GetFileName(file) });
                             await dbContext.SaveChangesAsync(stoppingToken);
                         }
                     }
                     else
                     {
-                        string orphansDir = Path.Combine(Directory.GetCurrentDirectory(), "Library", "Orphans");
+                        // Los huérfanos van a la biblioteca configurada (volumen persistente), no a /app dentro del contenedor
+                        string orphansDir = await GetOrphansDirAsync(dbContext, stoppingToken);
                         Directory.CreateDirectory(orphansDir);
                         string fileName = Path.GetFileName(file);
-                        string orphanPath = Path.Combine(orphansDir, fileName);
-                        
-                        if (!leaveInPlace && file != orphanPath)
+                        string orphanPath = LibraryPathUtils.GetUniqueFilePath(orphansDir, fileName);
+
+                        if (!leaveInPlace)
                         {
-                            File.Move(file, orphanPath, true);
+                            File.Move(file, orphanPath);
                         }
-                        else if (file != orphanPath)
+                        else
                         {
-                            File.Copy(file, orphanPath, true);
+                            File.Copy(file, orphanPath);
                         }
 
                         var fileInfo = new FileInfo(orphanPath);
@@ -222,5 +225,56 @@ public class LibraryScanBackgroundService : BackgroundService
             }
         }
     }
-}
 
+    private static string LegacyOrphansDir => Path.Combine(Directory.GetCurrentDirectory(), "Library", "Orphans");
+
+    private static async Task<string> GetOrphansDirAsync(AppDbContext dbContext, CancellationToken stoppingToken)
+    {
+        var libraryRoot = await dbContext.SystemSettings
+            .Where(s => s.Key == "LibraryRootPath")
+            .Select(s => s.Value)
+            .FirstOrDefaultAsync(stoppingToken);
+        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+        return Path.Combine(libraryRoot, "Orphans");
+    }
+
+    /// <summary>
+    /// Versiones anteriores guardaban los huérfanos del escáner en /app/Library/Orphans (fuera de los volúmenes de Docker),
+    /// donde se pierden al recrear el contenedor. Si todavía existen, se mueven a la biblioteca configurada.
+    /// </summary>
+    private async Task MigrateLegacyOrphansAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            string legacyDir = Path.GetFullPath(LegacyOrphansDir);
+            string targetDir = Path.GetFullPath(await GetOrphansDirAsync(dbContext, stoppingToken));
+            if (string.Equals(legacyDir, targetDir, StringComparison.OrdinalIgnoreCase) || !Directory.Exists(legacyDir)) return;
+
+            var legacyPrefix = legacyDir + Path.DirectorySeparatorChar;
+            var legacyOrphans = (await dbContext.UnmatchedAudioTracks.ToListAsync(stoppingToken))
+                .Where(o => o.PhysicalPath.StartsWith(legacyPrefix, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (legacyOrphans.Count == 0) return;
+
+            Directory.CreateDirectory(targetDir);
+            int moved = 0;
+            foreach (var orphan in legacyOrphans)
+            {
+                if (!File.Exists(orphan.PhysicalPath)) continue;
+                var newPath = LibraryPathUtils.GetUniqueFilePath(targetDir, Path.GetFileName(orphan.PhysicalPath));
+                File.Move(orphan.PhysicalPath, newPath);
+                orphan.PhysicalPath = newPath;
+                moved++;
+            }
+            await dbContext.SaveChangesAsync(stoppingToken);
+            _logger.LogInformation("Migrados {Count} audios huérfanos de {Legacy} a {Target}.", moved, legacyDir, targetDir);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error migrando audios huérfanos desde la ruta antigua.");
+        }
+    }
+}

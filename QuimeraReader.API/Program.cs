@@ -10,6 +10,8 @@ using QuimeraReader.Infrastructure.Providers;
 using QuimeraReader.Domain.Interfaces;
 using QuimeraReader.API.BackgroundServices;
 using QuimeraReader.API.Middleware;
+using QuimeraReader.API.Security;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -84,23 +86,54 @@ builder.Services.AddControllers()
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHealthChecks();
+
+// Autenticación por API key (QUIMERA_API_KEY). Sin clave definida la API queda abierta, como en versiones anteriores.
+var apiKeyAuth = new ApiKeyAuth(builder.Configuration["QUIMERA_API_KEY"]);
+builder.Services.AddSingleton(apiKeyAuth);
+
+// Limitar intentos de login para evitar fuerza bruta sobre la API key
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("login", o =>
+    {
+        o.PermitLimit = 10;
+        o.Window = TimeSpan.FromMinutes(1);
+    });
+});
+
+// CORS: la web se sirve desde el mismo origen y no lo necesita. Solo se permiten los orígenes de los WebView
+// de MAUI/Photino (fetch del EPUB desde epub.js) y los que se añadan en QUIMERA_CORS_ORIGINS (separados por comas).
+var corsOrigins = new List<string> { "https://0.0.0.0", "https://0.0.0.1", "app://0.0.0.0", "app://localhost", "http://localhost" };
+corsOrigins.AddRange((builder.Configuration["QUIMERA_CORS_ORIGINS"] ?? string.Empty)
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("Clients", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        if (builder.Environment.IsDevelopment())
+            policy.AllowAnyOrigin();
+        else
+            policy.WithOrigins(corsOrigins.ToArray());
+
+        policy.AllowAnyMethod().AllowAnyHeader();
     });
 });
 
 var app = builder.Build();
 
-app.UseCors("AllowAll");
+app.UseCors("Clients");
 
 // Middleware de logging y manejo de errores
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
+app.UseRateLimiter();
+app.UseMiddleware<ApiKeyAuthMiddleware>();
+
+if (!apiKeyAuth.IsEnabled)
+{
+    app.Logger.LogWarning("QUIMERA_API_KEY no está definida: la API es accesible sin autenticación para cualquiera que alcance este puerto.");
+}
 
 // Asegurar que la BD se migra correctamente en cada arranque y habilitar WAL para concurrencia lectora/escritora
 using (var scope = app.Services.CreateScope())

@@ -185,5 +185,13 @@
   "Settings_InvalidUrl": "The entered URL is invalid. Please make sure to include http:// or https:// and a valid format.",
   "Settings_WelcomeConfigTitle": "Server Configuration",
   "Settings_WelcomeConfigDesc": "Enter the IP address or domain of your QuimeraReader server.",
-  "Settings_Connect": "Connect"
+  "Settings_Connect": "Connect",
+  "Settings_AccessKey": "Access key",
+  "Settings_AccessKeyHelp": "The value of QUIMERA_API_KEY on the server. Leave empty if the server does not require it.",
+  "Auth_Title": "QuimeraReader access",
+  "Auth_Desc": "This server is protected. Enter the access key (QUIMERA_API_KEY).",
+  "Auth_Login": "Sign in",
+  "Auth_InvalidKey": "Wrong access key.",
+  "Auth_TooManyAttempts": "Too many attempts. Wait a minute and try again.",
+  "Auth_ServerUnreachable": "Could not reach the server."
 }

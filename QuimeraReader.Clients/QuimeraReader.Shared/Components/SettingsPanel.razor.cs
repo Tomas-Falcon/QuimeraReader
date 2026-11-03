@@ -23,6 +23,7 @@ public partial class SettingsPanel : ComponentBase
     private bool _isSendingLogs = false;
     private string _message = string.Empty;
     private string _clientServerUrl = string.Empty;
+    private string _clientApiKey = string.Empty;
     private bool _isSuccess = false;
     private bool _isScanning = false;
     private ScanStatus? _scanStatus;
@@ -94,6 +95,7 @@ public partial class SettingsPanel : ComponentBase
         if (ServerConfig?.ServerUrl != null)
         {
             _clientServerUrl = ServerConfig.ServerUrl;
+            _clientApiKey = ServerConfig.ApiKey ?? string.Empty;
         }
 
         // En móvil, mostrar las preferencias del cliente de inmediato sin esperar al servidor
@@ -257,7 +259,7 @@ public partial class SettingsPanel : ComponentBase
         try
         {
             using var testClient = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
-            var pingUri = new Uri(testUri, "api/Books?page=1&pageSize=1");
+            var pingUri = new Uri(testUri, "api/health"); // público: no requiere la API key
             using var response = await testClient.GetAsync(pingUri);
             if (response.IsSuccessStatusCode)
             {
@@ -274,6 +276,7 @@ public partial class SettingsPanel : ComponentBase
         }
 
         ServerConfig.SaveServerUrl(rawUrl);
+        ServerConfig.SaveApiKey(_clientApiKey);
 
         if (canConnect)
         {
