@@ -13,7 +13,7 @@ namespace QuimeraReader.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public partial class BooksController : ControllerBase
+public class BooksController : ControllerBase
 {
             [HttpDelete]
     public async Task<IActionResult> DeleteBooks([FromQuery] int[] ids)
@@ -37,7 +37,6 @@ public partial class BooksController : ControllerBase
     }
     private readonly AppDbContext _dbContext;
     private readonly EpubScannerService _scannerService;
-    private readonly AudioAlignmentService _alignmentService;
     private readonly AudioAlignmentQueue _queue;
     private readonly LibraryScanState _scanState;
     private readonly ILogger<BooksController> _logger;
@@ -48,14 +47,12 @@ public partial class BooksController : ControllerBase
         IEnumerable<QuimeraReader.Domain.Interfaces.IMetadataProvider> metadataProviders,
         AppDbContext dbContext, 
         EpubScannerService scannerService, 
-        AudioAlignmentService alignmentService, 
         AudioAlignmentQueue queue, 
         LibraryScanState scanState,
         ILogger<BooksController> logger, MediatR.IMediator mediator)
     {
         _dbContext = dbContext;
         _scannerService = scannerService;
-        _alignmentService = alignmentService;
         _queue = queue;
         _scanState = scanState;
         _logger = logger;
@@ -812,89 +809,6 @@ public partial class BooksController : ControllerBase
         return Ok();
     }
 
-    private async Task DeleteBookEntityAndFoldersAsync(Book book)
-    {
-        // Guardamos la ruta de la carpeta para borrarla luego
-        string? bookDir = null;
-        if (!string.IsNullOrEmpty(book.CoverImagePath)) bookDir = Path.GetDirectoryName(book.CoverImagePath);
-        else if (!string.IsNullOrEmpty(book.EpubFilePath)) bookDir = Path.GetDirectoryName(book.EpubFilePath);
-        else if (book.AudioTracks != null && book.AudioTracks.Any()) bookDir = Path.GetDirectoryName(book.AudioTracks.First().FilePath);
-
-                var authorIds = await _dbContext.Books.Where(b => b.Id == book.Id).SelectMany(b => b.Authors.Select(a => a.AuthorId)).ToListAsync();
-        var categoryIds = await _dbContext.Books.Where(b => b.Id == book.Id).SelectMany(b => b.Categories.Select(c => c.CategoryId)).ToListAsync();
-        
-        _dbContext.Books.Remove(book);
-        await _dbContext.SaveChangesAsync();
-
-        // Limpieza de huérfanos
-        foreach(var authorId in authorIds)
-        {
-            bool authorHasMoreBooks = await _dbContext.Books.AnyAsync(b => b.Authors.Any(a => a.AuthorId == authorId));
-            if (!authorHasMoreBooks)
-            {
-                var author = await _dbContext.Authors.FindAsync(authorId);
-                if (author != null) _dbContext.Authors.Remove(author);
-            }
-        }
-
-        foreach(var catId in categoryIds)
-        {
-            bool catHasMoreBooks = await _dbContext.Books.AnyAsync(b => b.Categories.Any(c => c.CategoryId == catId));
-            if (!catHasMoreBooks)
-            {
-                var cat = await _dbContext.Categories.FindAsync(catId);
-                if (cat != null) _dbContext.Categories.Remove(cat);
-            }
-        }
-        await _dbContext.SaveChangesAsync();
-        await CleanupOrphansAsync();
-
-        if (!string.IsNullOrEmpty(bookDir) && Directory.Exists(bookDir))
-        {
-            try 
-            {
-                // Borrar carpeta del libro y todo su contenido (cover.jpg, metadata.opf, etc.)
-                Directory.Delete(bookDir, true);
-
-                // Comprobar si la carpeta padre (Autor o Saga) quedó vacía
-                var parentDir = Directory.GetParent(bookDir)?.FullName;
-                if (parentDir != null && Directory.Exists(parentDir) && !Directory.EnumerateFileSystemEntries(parentDir).Any())
-                {
-                    Directory.Delete(parentDir);
-
-                    // Comprobar si la carpeta abuelo (Autor si estábamos dentro de una Saga) quedó vacía
-                    var grandParentDir = Directory.GetParent(parentDir)?.FullName;
-                    if (grandParentDir != null && Directory.Exists(grandParentDir) && !Directory.EnumerateFileSystemEntries(grandParentDir).Any())
-                    {
-                        Directory.Delete(grandParentDir);
-                    }
-                }
-            } 
-            catch (Exception ex) 
-            { 
-                _logger.LogError(ex, "Error limpiando directorios del libro"); 
-            }
-        }
-    }
-
-    private async Task CleanupOrphansAsync()
-    {
-        var orphanedAuthors = await _dbContext.Authors.Where(a => !a.Books.Any()).ToListAsync();
-        if (orphanedAuthors.Any()) _dbContext.Authors.RemoveRange(orphanedAuthors);
-
-        var orphanedCategories = await _dbContext.Categories.Where(c => !c.Books.Any()).ToListAsync();
-        if (orphanedCategories.Any()) _dbContext.Categories.RemoveRange(orphanedCategories);
-
-        var orphanedSeries = await _dbContext.Series.Where(s => !s.Books.Any()).ToListAsync();
-        if (orphanedSeries.Any()) _dbContext.Series.RemoveRange(orphanedSeries);
-
-        await _dbContext.SaveChangesAsync();
-
-        var orphanedUniverses = await _dbContext.Universes.Where(u => !u.Series.Any()).ToListAsync();
-        if (orphanedUniverses.Any()) _dbContext.Universes.RemoveRange(orphanedUniverses);
-
-        await _dbContext.SaveChangesAsync();
-    }
     [HttpPut("bulk/status")]
     public async Task<IActionResult> BulkUpdateStatus([FromBody] BulkStatusUpdateRequest request)
     {
@@ -1212,13 +1126,3 @@ public class ScanRequest
 { 
     public string FolderPath { get; set; } = string.Empty; 
 }
-
-
-
-
-
-
-
-
-
-

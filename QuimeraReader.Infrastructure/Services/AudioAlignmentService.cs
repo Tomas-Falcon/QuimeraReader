@@ -23,12 +23,6 @@ public class AudioAlignmentService
         _dbContext = dbContext;
     }
 
-    public async Task<SyncMapResult> GenerateSyncMapAsync(string audioFilePath, string textContent, CancellationToken cancellationToken = default)
-    {
-        var singleTrackList = new List<(int TrackNumber, string FilePath)> { (1, audioFilePath) };
-        return await GenerateMultiTrackSyncMapAsync(singleTrackList, textContent, null, cancellationToken);
-    }
-
     public async Task<SyncMapResult> GenerateMultiTrackSyncMapAsync(
         IReadOnlyList<(int TrackNumber, string FilePath)> tracks,
         string fullTextContent,

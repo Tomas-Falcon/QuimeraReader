@@ -95,3 +95,6 @@ project_map.md
 
 # Temporary and maintenance scripts
 scripts/
+
+# Salida de la web publicada dentro de la API (la genera el Dockerfile; no se versiona)
+QuimeraReader.API/wwwroot/

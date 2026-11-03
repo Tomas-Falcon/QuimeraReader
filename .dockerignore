@@ -23,4 +23,4 @@
 **/*.py
 **/*.ps1
 **/*.log
-QuimeraReader.API/wwwroot/_framework
+QuimeraReader.API/wwwroot

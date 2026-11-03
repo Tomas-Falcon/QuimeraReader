@@ -84,8 +84,9 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddHealthChecks();
+
+// /api/health comprueba de verdad la base de datos (antes siempre respondía "Healthy")
+builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 
 // Autenticación por API key (QUIMERA_API_KEY). Sin clave definida la API queda abierta, como en versiones anteriores.
 var apiKeyAuth = new ApiKeyAuth(builder.Configuration["QUIMERA_API_KEY"]);
