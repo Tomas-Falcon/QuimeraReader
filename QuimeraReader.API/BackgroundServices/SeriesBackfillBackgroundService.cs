@@ -44,6 +44,10 @@ public class SeriesBackfillBackgroundService : BackgroundService
         try
         {
             await RunAsync(stoppingToken);
+
+            using var scope = _serviceProvider.CreateScope();
+            var merged = await SeriesMaintenance.MergeCaseDuplicatesAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>(), stoppingToken);
+            if (merged > 0) _logger.LogInformation("Fusionadas {Count} sagas duplicadas por mayúsculas", merged);
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)

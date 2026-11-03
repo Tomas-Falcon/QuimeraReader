@@ -100,6 +100,26 @@ public class SeriesAndUniversesTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CaseDuplicates_AreMerged_AndNewImportsReuseTheSeries()
+    {
+        var duplicate = new Series { Name = "PERCY JACKSON" };
+        var book = new Book { Title = "La maldición del titán", EpubFilePath = "/library/x.epub", Series = duplicate, SeriesVolume = 3 };
+        _db.Books.Add(book);
+        await _db.SaveChangesAsync();
+
+        var removed = await QuimeraReader.Infrastructure.Services.SeriesMaintenance.MergeCaseDuplicatesAsync(_db);
+
+        removed.Should().Be(1);
+        _db.ChangeTracker.Clear();
+        (await _db.Series.CountAsync(s => s.Name.ToLower() == "percy jackson")).Should().Be(1);
+        (await _db.Books.CountAsync(b => b.Series!.Name == "Percy Jackson")).Should().Be(3);
+
+        // Un import posterior con otra capitalización reutiliza la saga existente
+        var reused = await QuimeraReader.Infrastructure.Services.SeriesAssigner.FindOrCreateAsync(_db, "percy jackson");
+        reused.Name.Should().Be("Percy Jackson");
+    }
+
+    [Fact]
     public async Task DeletingAUniverse_KeepsItsSeriesAndBooks()
     {
         var universes = new UniversesController(_db);

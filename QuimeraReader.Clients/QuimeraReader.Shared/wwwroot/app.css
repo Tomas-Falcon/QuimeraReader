@@ -1107,3 +1107,11 @@ body .rz-body {
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
     gap: 14px;
 }
+
+/* En móvil la cabecera de Autores/Géneros se apila en columna y "flex: 1 1 250px" del buscador se aplicaba
+   como ALTURA: dejaba un hueco vacío de 250 px sobre la lista */
+@media (max-width: 575.98px) {
+    .search-box {
+        flex: 0 0 auto !important;
+    }
+}

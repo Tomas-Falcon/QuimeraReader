@@ -10,7 +10,7 @@
 <div class="library-container">
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
         <h2 class="mb-0"><span class="bi bi-collection-fill text-primary me-2"></span> Sagas</h2>
-        <div style="flex: 0 1 360px;">
+        <div class="w-100" style="max-width: 360px;">
             <RadzenTextBox Placeholder="Buscar saga..." Value="@_search" @oninput="@(args => OnSearchInput(args.Value?.ToString() ?? ""))" class="w-100" />
         </div>
     </div>

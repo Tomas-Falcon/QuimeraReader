@@ -86,6 +86,7 @@ public class MaintenanceBackgroundService : BackgroundService
         // Reconstruir los índices de búsqueda por si algún cambio no se reflejó (cuesta unos segundos)
         _logger.LogInformation("1b. Reconstruyendo índices de búsqueda...");
         await SqliteSearchIndex.EnsureUpToDateAsync(dbContext, forceRebuild: true, stoppingToken);
+        await SeriesMaintenance.MergeCaseDuplicatesAsync(dbContext, stoppingToken);
 
         // 2. Armar la cola de procesamiento de Whisper priorizando el libro actual y su saga
         _logger.LogInformation("2. Organizando cola de procesamiento de Audio Whisper...");
