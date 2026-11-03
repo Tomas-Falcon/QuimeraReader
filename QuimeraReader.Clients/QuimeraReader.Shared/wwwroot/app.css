@@ -990,3 +990,58 @@ main { min-width: 0 !important; overflow-x: hidden !important; width: 100%; }
         border-radius: 12px !important;
     }
 }
+
+/* Radzen carga siempre su tema oscuro (dark.css): en tema claro pintaba los títulos de las tarjetas en blanco
+   sobre fondo claro y dejaba franjas oscuras alrededor del contenido. Se fuerzan los colores del tema de la app
+   (selectores con más especificidad porque en MAUI dark.css se carga después de este archivo). */
+body .book-card .book-title {
+    color: var(--text-main);
+}
+
+body .rz-layout,
+body .rz-body {
+    background-color: var(--bg-main);
+}
+
+/* "Toda la biblioteca" carga por bloques: el navegador no pinta las tarjetas que quedan fuera de pantalla */
+.all-books-grid > .col {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 360px;
+}
+
+/* El lector entero (cabecera, menú de ajustes, reproductor) sigue el tema de lectura elegido, no el de la app.
+   Los colores coinciden con READER_THEMES de epubInterop.js. */
+.reader-theme-dark {
+    --bg-main: #09090b;
+    --bg-card: #18181b;
+    --text-main: #f8f9fa;
+    --border-color: #27272a;
+}
+
+.reader-theme-light {
+    --bg-main: #ffffff;
+    --bg-card: #f4f4f5;
+    --text-main: #212529;
+    --border-color: #e4e4e7;
+}
+
+.reader-theme-sepia {
+    --bg-main: #fbf0d9;
+    --bg-card: #f2e3c2;
+    --text-main: #5f4b32;
+    --border-color: #e0cda4;
+}
+
+/* Textos fijos en blanco dentro del lector: con tema claro o sepia no se leían */
+.reader-content .text-white {
+    color: var(--text-main) !important;
+}
+
+.reader-content .text-white-50 {
+    color: color-mix(in srgb, var(--text-main) 65%, transparent) !important;
+}
+
+.reader-content .btn-outline-light {
+    color: var(--text-main);
+    border-color: var(--border-color);
+}

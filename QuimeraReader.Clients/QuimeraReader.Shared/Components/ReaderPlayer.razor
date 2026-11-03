@@ -26,7 +26,7 @@
     else if (Book != null)
     {
         <!-- Main Content -->
-        <div class="reader-content d-flex flex-column @(_isImmersiveMode ? "immersive-mode" : "")" style="height: 100vh; height: 100dvh; max-width: 100%; overflow: hidden; background: var(--bg-main); padding: 0;">
+        <div class="reader-content reader-theme-@(_currentTheme) d-flex flex-column @(_isImmersiveMode ? "immersive-mode" : "")" style="height: 100vh; height: 100dvh; max-width: 100%; overflow: hidden; background: var(--bg-main); padding: 0;">
             <!-- Header -->
             @if (!_isImmersiveMode)
             {
@@ -86,10 +86,10 @@
                             <button class="btn btn-sm w-100 @(_currentTheme == "dark" ? "btn-primary" : "btn-outline-light")" @onclick='() => ChangeTheme("dark")'>
                                 Oscuro
                             </button>
-                            <button class="btn btn-sm w-100 @(_currentTheme == "sepia" ? "btn-warning text-dark" : "btn-outline-warning")" @onclick='() => ChangeTheme("sepia")'>
+                            <button class="btn btn-sm w-100 @(_currentTheme == "sepia" ? "btn-primary" : "btn-outline-light")" @onclick='() => ChangeTheme("sepia")'>
                                 Sepia
                             </button>
-                            <button class="btn btn-sm w-100 @(_currentTheme == "light" ? "btn-light" : "btn-outline-light")" @onclick='() => ChangeTheme("light")'>
+                            <button class="btn btn-sm w-100 @(_currentTheme == "light" ? "btn-primary" : "btn-outline-light")" @onclick='() => ChangeTheme("light")'>
                                 Claro
                             </button>
                         </div>

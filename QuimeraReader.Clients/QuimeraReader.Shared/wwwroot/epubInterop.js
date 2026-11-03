@@ -35,6 +35,22 @@ function normalizeComparable(str) {
         .trim();
 }
 
+// Colores de cada tema de lectura (texto del libro y fondo del visor)
+const READER_THEMES = {
+    dark: { background: "#09090b", color: "#f8f9fa" },
+    light: { background: "#ffffff", color: "#212529" },
+    sepia: { background: "#fbf0d9", color: "#5f4b32" }
+};
+
+function applyReaderTheme(rendition, themeName) {
+    var theme = READER_THEMES[themeName] || READER_THEMES.dark;
+    rendition.themes.override("color", theme.color, true);
+    rendition.themes.override("background", theme.background, true);
+    // El contenedor que rodea al iframe también, para que no asome otro color en los márgenes
+    var host = window._epubElementId ? document.getElementById(window._epubElementId) : null;
+    if (host) host.style.background = theme.background;
+}
+
 function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache, initialPercentage, initialTheme, initialFontSize) {
     window._epubLocationsReady = false;
     window._epubCurrentTheme = initialTheme || "dark";
@@ -48,47 +64,16 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         allowScriptedContent: false
     });
 
-    // Registrar temas de lectura con colores de fondo explícitos para evitar transparencias residuales
-    rendition.themes.register("dark", {
-        "body": { "background": "#09090b !important", "color": "#f8f9fa !important" },
-        "p": { "color": "#f8f9fa !important" },
-        "h1": { "color": "#f8f9fa !important" },
-        "h2": { "color": "#f8f9fa !important" },
-        "h3": { "color": "#f8f9fa !important" },
-        "h4": { "color": "#f8f9fa !important" },
-        "h5": { "color": "#f8f9fa !important" },
-        "h6": { "color": "#f8f9fa !important" },
-        "span": { "color": "#f8f9fa !important" },
-        "a": { "color": "#6ea8fe !important" }
+    // Un único tema base: todo el texto hereda el color del body. El color y el fondo de cada tema se aplican con
+    // themes.override (estilo en línea con !important que epub.js reaplica a cada capítulo nuevo). Antes había tres
+    // hojas registradas y themes.select no retira la anterior: al volver a un tema ya usado quedaba el último inyectado.
+    rendition.themes.register("qr-base", {
+        "body": { "background": "transparent !important" },
+        "p, h1, h2, h3, h4, h5, h6, span, div, li, blockquote, em, strong, i, b, td, th, a": { "color": "inherit !important" }
     });
-
-    rendition.themes.register("light", {
-        "body": { "background": "#ffffff !important", "color": "#212529 !important" },
-        "p": { "color": "#212529 !important" },
-        "h1": { "color": "#212529 !important" },
-        "h2": { "color": "#212529 !important" },
-        "h3": { "color": "#212529 !important" },
-        "h4": { "color": "#212529 !important" },
-        "h5": { "color": "#212529 !important" },
-        "h6": { "color": "#212529 !important" },
-        "span": { "color": "#212529 !important" },
-        "a": { "color": "#0d6efd !important" }
-    });
-
-    rendition.themes.register("sepia", {
-        "body": { "background": "#fbf0d9 !important", "color": "#5f4b32 !important" },
-        "p": { "color": "#5f4b32 !important" },
-        "h1": { "color": "#5f4b32 !important" },
-        "h2": { "color": "#5f4b32 !important" },
-        "h3": { "color": "#5f4b32 !important" },
-        "h4": { "color": "#5f4b32 !important" },
-        "h5": { "color": "#5f4b32 !important" },
-        "h6": { "color": "#5f4b32 !important" },
-        "span": { "color": "#5f4b32 !important" },
-        "a": { "color": "#8f5902 !important" }
-    });
-
-    rendition.themes.select(window._epubCurrentTheme);
+    rendition.themes.select("qr-base");
+    window._epubElementId = elementId;
+    applyReaderTheme(rendition, window._epubCurrentTheme);
     if (initialFontSize && initialFontSize > 0) {
         try {
             rendition.themes.fontSize(`${initialFontSize}%`);
@@ -480,7 +465,7 @@ export function setTheme(themeName) {
     window._epubCurrentTheme = themeName || "dark";
     if (window.epubRendition) {
         try {
-            window.epubRendition.themes.select(window._epubCurrentTheme);
+            applyReaderTheme(window.epubRendition, window._epubCurrentTheme);
             // Re-aplicar anotaciones sin color para actualizar el color de subrayado según el tema
             if (window._epubAnnotationsList && window._epubAnnotationsList.length > 0) {
                 for (var i = 0; i < window._epubAnnotationsList.length; i++) {
