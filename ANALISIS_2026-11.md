@@ -108,6 +108,14 @@ Recorrido real en el emulador. La app se ve cuidada: portadas grandes, barra inf
 - ⚪ Estados de procesamiento como cadenas sueltas (`"SYNCED"`, `"PENDING_SYNC"`, `"ALIGNED"`…) repartidas entre API y cliente.
 - ⚪ `IBookService` es una interfaz de ~33 métodos con 7 cachés estáticas; es el puente de casi toda la UI (ver grafo). Dividirla por responsabilidades (catálogo, anotaciones, progreso, administración).
 
+### Sagas (probado con la biblioteca de pruebas de Martha Wells)
+
+- 🟠 **Sagas partidas por el nombre**: la saga se copia tal cual de `calibre:series`. *Sistemas críticos (trad. Carlos Loscertales)* trae «Matabot» y el resto «Los diarios de Matabot», así que salían dos sagas. Solo se fusionan nombres que difieren en mayúsculas. *Confirmado*; se arregló a mano renombrando la saga y reiniciando (la fusión solo corre al arrancar).
+- 🟠 **El usuario no puede corregirlo**: el editor del libro no tiene campo de saga ni de volumen, y la página de sagas no permite unir dos sagas. Solo se puede renombrar una saga, y eso tampoco fusiona hasta el siguiente arranque.
+- 🟡 **Portada de la saga**: usa la del primer volumen por número, aunque sea un relato #0.5; quedaría mejor la del #1.
+- 🟡 **Ediciones del mismo libro**: dos traducciones del mismo título aparecen como libros sin relación entre sí.
+- 🟡 **Menú lateral en el móvil**: empuja y estrecha el contenido en vez de superponerse.
+
 ## 4. Implementaciones a medias
 
 | Tema | Estado |
