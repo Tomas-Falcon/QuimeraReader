@@ -254,7 +254,7 @@ public class LibraryScanBackgroundService : BackgroundService
             .Where(s => s.Key == "LibraryRootPath")
             .Select(s => s.Value)
             .FirstOrDefaultAsync(stoppingToken);
-        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
         return Path.Combine(libraryRoot, "Orphans");
     }
 

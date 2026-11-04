@@ -19,10 +19,21 @@ public static class LibraryPathUtils
         
         var settingsDict = await db.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
         settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
-        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
         
         return Path.Combine(libraryRoot, safeAuthor, safeTitle);
     }
+
+    /// <summary>
+    /// Biblioteca a usar si no hay ninguna configurada: /library (el volumen de Docker) si existe. Nunca una carpeta
+    /// dentro de /app, que se pierde al recrear el contenedor (así se perdieron los EPUB guardados en /app/media/books).
+    /// </summary>
+    public static string DefaultLibraryRoot => System.IO.Directory.Exists("/library") ? "/library" : System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "Library");
+
+    /// <summary>Ruta dentro del contenedor que no está en un volumen (se borra al actualizar la imagen).</summary>
+    public static bool IsEphemeralContainerPath(string? path) =>
+        Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true" && !string.IsNullOrWhiteSpace(path)
+        && (path.Replace("\\", "/").TrimEnd('/') == "/app" || path.Replace("\\", "/").StartsWith("/app/", StringComparison.Ordinal));
 
     /// <summary>
     /// Convierte un texto no confiable (nombre subido por el cliente, título de metadatos) en un único segmento de ruta seguro:

@@ -30,7 +30,9 @@ public partial class SettingsPanel : ComponentBase
     private CancellationTokenSource _cts = new();
 
     private string _libraryRootPath = "/media";
-    private string _outgoingLibraryPath = "/app/media/books";
+    // /library es el volumen de Docker; el valor anterior (/app/media/books) estaba dentro del contenedor y se perdía al actualizar
+    private string _outgoingLibraryPath = "/library";
+    private bool _serverSettingsLoaded;
     private string _ingestionMode = "Move";
     private string _openAiKey = string.Empty;
     private string _googleBooksKey = string.Empty;
@@ -118,6 +120,7 @@ public partial class SettingsPanel : ComponentBase
             if (settings.TryGetValue("WhisperModelPath", out var whisper)) _whisperModelPath = whisper;
             if (settings.TryGetValue("WhisperMode", out var wMode)) _whisperMode = wMode;
             if (settings.TryGetValue("OpenAIEndpoint", out var wEndpoint)) _openAiEndpoint = wEndpoint;
+            _serverSettingsLoaded = true;
 
             if (ShowServerAdminTabs)
             {
@@ -204,6 +207,13 @@ public partial class SettingsPanel : ComponentBase
 
     private async Task SaveSettingsAsync()
     {
+        // Guardar sin haber leído los ajustes del servidor pisaría las rutas y claves reales con los valores por defecto
+        if (!_serverSettingsLoaded)
+        {
+            ShowMessage("No se pudieron leer los ajustes del servidor; no se guarda nada para no sobrescribirlos. Recarga la página.", false);
+            return;
+        }
+
         _isSaving = true;
         _message = string.Empty;
         StateHasChanged();
@@ -391,7 +401,10 @@ public partial class SettingsPanel : ComponentBase
             // Un ZIP completo puede pesar varios GB
             var stream = e.File.OpenReadStream(maxAllowedSize: 20L * 1024 * 1024 * 1024);
             content.Add(new StreamContent(stream), "file", e.File.Name);
-            var response = await HttpClient.PostAsync("api/maintenance/backup/restore", content);
+            // El cliente general corta a los 25 s: subir y restaurar un ZIP grande lleva más
+            using var uploadClient = new HttpClient { BaseAddress = HttpClient.BaseAddress, Timeout = Timeout.InfiniteTimeSpan };
+            if (!string.IsNullOrEmpty(ServerConfig.ApiKey)) uploadClient.DefaultRequestHeaders.Add("X-Api-Key", ServerConfig.ApiKey);
+            var response = await uploadClient.PostAsync("api/maintenance/backup/restore", content);
             var report = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
             if (!response.IsSuccessStatusCode)
             {

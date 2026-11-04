@@ -42,6 +42,12 @@ public class SettingsController : ControllerBase
     {
         if (SecretKeys.Contains(setting.Key) && setting.Value == SecretMask) return Ok();
 
+        if ((setting.Key == "LibraryRootPath" || setting.Key == "IncomingScanFolder")
+            && QuimeraReader.Application.Common.LibraryPathUtils.IsEphemeralContainerPath(setting.Value))
+        {
+            return BadRequest(new { Error = $"\"{setting.Value}\" está dentro del contenedor y se borraría al actualizarlo. Usa una carpeta montada como volumen (/library o /media)." });
+        }
+
         if (setting.Key == "LibraryRootPath" && !string.IsNullOrWhiteSpace(setting.Value))
         {
             if (!Directory.Exists(setting.Value))
@@ -79,7 +85,7 @@ public class SettingsController : ControllerBase
 
         var settingsDict = await _dbContext.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
         settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
-        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
         
         System.IO.Directory.CreateDirectory(libraryRoot);
         string targetPath = Path.Combine(libraryRoot, "ggml-base.bin");

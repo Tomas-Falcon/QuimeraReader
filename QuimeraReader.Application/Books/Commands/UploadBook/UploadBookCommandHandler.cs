@@ -71,7 +71,7 @@ public class UploadBookCommandHandler : IRequestHandler<UploadBookCommand, Uploa
             }
             var settingsDict = await _dbContext.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value, cancellationToken);
             settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
-            if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+            if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
 
             string orphansDir = Path.Combine(libraryRoot, "Orphans");
             Directory.CreateDirectory(orphansDir);

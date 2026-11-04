@@ -542,7 +542,7 @@ public class BooksController : ControllerBase
                 }
                 var settingsDict = await _dbContext.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
                 settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
-                if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+                if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
 
                 string orphansDir = Path.Combine(libraryRoot, "Orphans");
                 Directory.CreateDirectory(orphansDir);
@@ -1165,7 +1165,7 @@ public class BooksController : ControllerBase
         string safeTitle = LibraryPathUtils.SafeFileName(book.Title, "Unknown Book");
         var settingsDict = await db.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
         settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
-        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "Library");
+        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
         return System.IO.Path.Combine(libraryRoot, safeAuthor, safeTitle);
     }
 }

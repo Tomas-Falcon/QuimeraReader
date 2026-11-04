@@ -339,7 +339,7 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
 
         // --- ORGANIZACION FÍSICA ---
         settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
-        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
 
         string mainAuthor = book.Authors.FirstOrDefault()?.Author.Name ?? "Unknown Author";
         string sagaName = book.Series?.Name;
@@ -614,7 +614,7 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
                     var imageBytes = await _httpClient.GetByteArrayAsync(metadata.CoverImageUri);
                     
                     settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
-                    if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+                    if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
                     
                     string mainAuthor = book.Authors.FirstOrDefault()?.Author.Name ?? "Unknown Author";
                     string safeAuthor = GetSafeFilename(mainAuthor);
