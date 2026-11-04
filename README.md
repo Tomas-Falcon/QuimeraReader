@@ -47,11 +47,9 @@ QuimeraReader.slnx
 
 ## Project Status
 
-The server and the web client are in daily use with a ~140,000-book library. The Android app works online; offline mode and the Windows build have known issues that are being fixed.
+The server and the web client are in daily use. The Android and Windows apps work online and offline (books, covers, progress and multi-track audiobooks); the Linux desktop client shares the same code but is less tested.
 
-- [`ESTADO_DEL_PROYECTO.md`](ESTADO_DEL_PROYECTO.md): handoff guide (in Spanish): deployment, architecture, glossary, pending work.
-- [`ANALISIS_2026-11.md`](ANALISIS_2026-11.md): in-depth review with bugs found while testing on Android and Windows (in Spanish).
-- Roadmap: the [`wayfinder:map` issue](https://github.com/Tomas-Falcon/QuimeraReader/issues/11) and its sub-issues.
+Roadmap and open decisions: the [`wayfinder:map` issue](https://github.com/Tomas-Falcon/QuimeraReader/issues/11) and its sub-issues.
 
 ## Testing & Quality Assurance
 
