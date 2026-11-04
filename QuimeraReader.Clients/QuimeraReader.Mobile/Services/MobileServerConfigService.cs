@@ -25,6 +25,6 @@ public class MobileServerConfigService : IServerConfigService
         else Preferences.Default.Set(ApiKeyKey, apiKey.Trim());
     }
 
-    // Solo Android: es donde se ha verificado el bloqueo y donde el interceptor se ejecuta fuera del hilo de UI
-    public bool UseNativeMediaProxy => OperatingSystem.IsAndroid();
+    // Android y Windows sirven la app desde https://0.0.0.1 y bloquean los medios http:// del servidor (mixed content)
+    public bool UseNativeMediaProxy => OperatingSystem.IsAndroid() || OperatingSystem.IsWindows();
 }

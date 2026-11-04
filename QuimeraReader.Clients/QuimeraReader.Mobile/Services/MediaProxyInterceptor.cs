@@ -32,15 +32,20 @@ public static class MediaProxyInterceptor
 
         var relative = e.Uri.AbsolutePath.Substring(MediaProxy.PathPrefix.Length) + e.Uri.Query;
         var target = new Uri(new Uri(serverUrl.EndsWith('/') ? serverUrl : serverUrl + "/"), relative);
+        var range = e.Headers?.FirstOrDefault(h => string.Equals(h.Key, "Range", StringComparison.OrdinalIgnoreCase)).Value;
+
+#if WINDOWS
+        // En Windows el evento llega por el hilo de UI: se difiere la respuesta de WebView2 para no bloquearlo
+        if (e.PlatformArgs?.RequestEventArgs is { } windowsArgs && e.PlatformArgs.Sender is { } coreWebView)
+        {
+            RespondDeferred(coreWebView, windowsArgs, target, range);
+            return;
+        }
+#endif
 
         try
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, target);
-            var apiKey = Preferences.Default.Get(MobileServerConfigService.ApiKeyKey, "");
-            if (!string.IsNullOrWhiteSpace(apiKey)) request.Headers.TryAddWithoutValidation("X-Api-Key", apiKey);
-
-            var range = e.Headers?.FirstOrDefault(h => string.Equals(h.Key, "Range", StringComparison.OrdinalIgnoreCase)).Value;
-            if (!string.IsNullOrEmpty(range)) request.Headers.TryAddWithoutValidation("Range", range);
+            var request = BuildRequest(target, range);
 
             // El estado y las cabeceras (206, Content-Range) deben conocerse antes de responder, así que se espera a las cabeceras.
             // Task.Run evita bloquear un posible contexto de sincronización; el cuerpo se transmite después en streaming.
@@ -68,4 +73,65 @@ public static class MediaProxyInterceptor
             e.SetResponse(502, "Bad Gateway");
         }
     }
+
+    private static HttpRequestMessage BuildRequest(Uri target, string? range)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, target);
+        var apiKey = Preferences.Default.Get(MobileServerConfigService.ApiKeyKey, "");
+        if (!string.IsNullOrWhiteSpace(apiKey)) request.Headers.TryAddWithoutValidation("X-Api-Key", apiKey);
+        if (!string.IsNullOrEmpty(range)) request.Headers.TryAddWithoutValidation("Range", range);
+        return request;
+    }
+
+#if WINDOWS
+    private static void RespondDeferred(Microsoft.Web.WebView2.Core.CoreWebView2 coreWebView,
+        Microsoft.Web.WebView2.Core.CoreWebView2WebResourceRequestedEventArgs args, Uri target, string? range)
+    {
+        var deferral = args.GetDeferral();
+        _ = Task.Run(async () =>
+        {
+            int status;
+            string reason;
+            string headers = "Access-Control-Allow-Origin: *";
+            // WebView2 necesita un stream con posición: se carga la respuesta en memoria. El audio llega por
+            // peticiones Range (trozos), así que no se descarga el archivo entero de una vez.
+            var body = new MemoryStream();
+            try
+            {
+                using var response = await _http.SendAsync(BuildRequest(target, range), HttpCompletionOption.ResponseHeadersRead);
+                status = (int)response.StatusCode;
+                reason = response.ReasonPhrase ?? "OK";
+                foreach (var name in ForwardedResponseHeaders)
+                {
+                    if (response.Headers.TryGetValues(name, out var values) || response.Content.Headers.TryGetValues(name, out values))
+                    {
+                        headers += $"\r\n{name}: {string.Join(", ", values)}";
+                    }
+                }
+                await response.Content.CopyToAsync(body);
+                body.Position = 0;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MediaProxy] Error reenviando {target}: {ex.Message}");
+                status = 502;
+                reason = "Bad Gateway";
+            }
+
+            // Los objetos de WebView2 solo se pueden usar desde su hilo de UI
+            await MainThread.InvokeOnMainThreadAsync(() =>
+            {
+                try
+                {
+                    args.Response = coreWebView.Environment.CreateWebResourceResponse(
+                        System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(body), status, reason, headers);
+                }
+                finally
+                {
+                    deferral.Complete();
+                }
+            });
+        });
+    }
+#endif
 }

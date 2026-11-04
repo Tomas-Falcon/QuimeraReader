@@ -5,7 +5,7 @@ public partial class MainPage : ContentPage
     public MainPage()
     {
         InitializeComponent();
-#if ANDROID
+#if ANDROID || WINDOWS
         blazorWebView.WebResourceRequested += QuimeraReader.Mobile.Services.MediaProxyInterceptor.OnWebResourceRequested;
 #endif
     }
