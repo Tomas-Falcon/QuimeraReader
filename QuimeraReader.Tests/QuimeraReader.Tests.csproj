@@ -29,4 +29,8 @@
     <ProjectReference Include="..\QuimeraReader.Infrastructure\QuimeraReader.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Esquema de la BD local de los clientes: un único archivo compartido entre Mobile, Desktop y los tests -->
+    <Compile Include="..\QuimeraReader.Clients\Common\LocalSchemaSync.cs" Link="Data\LocalSchemaSync.cs" />
+  </ItemGroup>
 </Project>

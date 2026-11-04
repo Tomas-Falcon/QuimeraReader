@@ -20,37 +20,15 @@ public class LocalBookRepository : ILocalBookRepository
     }
 
     /// <summary>
-    /// Crea las tablas que falten aunque el archivo ya exista. EnsureCreated() no sirve aquí: el logger
-    /// (MauiDbLoggerProvider) crea el .db con su tabla ClientLogs antes que nadie, así que EnsureCreated
-    /// lo daba por creado y la app arrancaba sin tabla Books (lector colgado, offline roto).
+    /// Crea las tablas y añade las columnas que falten según el modelo (ver <see cref="QuimeraReader.Clients.Common.LocalSchemaSync"/>),
+    /// así una instalación existente sigue funcionando cuando el servidor añade propiedades a las entidades.
     /// </summary>
-    private async Task CreateMissingTablesAsync()
-    {
-        var script = _dbContext.Database.GenerateCreateScript();
-        script = System.Text.RegularExpressions.Regex.Replace(script, "CREATE TABLE \"", "CREATE TABLE IF NOT EXISTS \"");
-        script = System.Text.RegularExpressions.Regex.Replace(script, "CREATE (UNIQUE )?INDEX \"", "CREATE $1INDEX IF NOT EXISTS \"");
-        // ExecuteSqlRaw interpreta {n} como parámetros: se escapan las llaves por si el DDL las contuviera
-        await _dbContext.Database.ExecuteSqlRawAsync(script.Replace("{", "{{").Replace("}", "}}"));
-    }
-
     public async Task EnsureCreatedAsync()
     {
         if (_schemaInitialized) return;
-        await CreateMissingTablesAsync();
         try { await _dbContext.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN ReadingStatus TEXT;"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN EpubLocationsCache TEXT;"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN TotalPages INTEGER;"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN Description TEXT;"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Books ADD COLUMN CurrentAudioTrackNumber INTEGER;"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS ClientLogs (Id INTEGER PRIMARY KEY AUTOINCREMENT, Level TEXT, Message TEXT, Exception TEXT, CreatedAt TEXT);"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS Author (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, FileAs TEXT);"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Author ADD COLUMN FileAs TEXT;"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS Category (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT, IsUserGenerated INTEGER);"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Category ADD COLUMN IsUserGenerated INTEGER;"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS BookAuthor (BookId INTEGER, AuthorId INTEGER, Role TEXT, PRIMARY KEY(BookId, AuthorId));"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE BookAuthor ADD COLUMN Role TEXT;"); } catch { }
-        try { await _dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS BookCategory (BookId INTEGER, CategoryId INTEGER, PRIMARY KEY(BookId, CategoryId));"); } catch { }
+        var added = await QuimeraReader.Clients.Common.LocalSchemaSync.EnsureSchemaAsync(_dbContext);
+        if (added.Count > 0) System.Diagnostics.Debug.WriteLine($"[LocalDb] Columnas añadidas: {string.Join(", ", added)}");
         _schemaInitialized = true;
     }
 
