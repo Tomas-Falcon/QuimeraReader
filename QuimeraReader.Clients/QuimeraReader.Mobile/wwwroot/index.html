@@ -6,7 +6,7 @@
     <title>QuimeraReader.Mobile</title>
     <base href="/" />
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="_content/QuimeraReader.Shared/app.css?v=4" />
+    <link rel="stylesheet" href="_content/QuimeraReader.Shared/app.css?v=6" />
     <link rel="stylesheet" href="QuimeraReader.Mobile.styles.css" />
     <link rel="icon" href="data:,">
 
@@ -23,7 +23,13 @@
 
     <div class="status-bar-safe-area"></div>
 
-    <div id="app">Loading...</div>
+    <div id="app">
+        <div class="qr-boot" role="status" aria-live="polite">
+            <img class="qr-boot-logo" src="_content/QuimeraReader.Shared/logo-192.png" alt="QuimeraReader" />
+            <div class="qr-boot-spinner"></div>
+            <div class="qr-boot-text">Cargando tu biblioteca…</div>
+        </div>
+    </div>
 
     <div id="blazor-error-ui" data-nosnippet>
         An unhandled error has occurred.

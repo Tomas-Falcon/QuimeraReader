@@ -145,6 +145,64 @@ a, .btn-link {
         content: var(--blazor-load-percentage-text, "Loading");
     }
 
+/* Pantalla de carga mientras arranca Blazor: continúa la pantalla de arranque nativa de Android (mismo fondo y logo)
+   para que no se vea una página en blanco con "Loading..." en una esquina */
+.qr-boot {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    background: #1a1a1a;
+    color: rgba(255, 255, 255, 0.7);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.qr-boot-logo {
+    width: 9rem;
+    height: 9rem;
+    border-radius: 50%;
+    background: #fff;
+    object-fit: contain;
+    box-shadow: 0 0 2.5rem rgba(124, 58, 237, 0.35);
+    animation: qr-boot-pulse 1.8s ease-in-out infinite;
+}
+
+.qr-boot-spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 0.2rem solid rgba(255, 255, 255, 0.15);
+    border-top-color: #d4a017;
+    border-radius: 50%;
+    animation: qr-boot-spin 0.9s linear infinite;
+}
+
+.qr-boot-text {
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+}
+
+/* Web: Blazor WebAssembly expone el porcentaje de descarga */
+.qr-boot-progress:after {
+    content: var(--blazor-load-percentage-text, "Cargando tu biblioteca…");
+}
+
+@keyframes qr-boot-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes qr-boot-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.04); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .qr-boot-logo, .qr-boot-spinner { animation: none; }
+}
+
 code {
     color: #c02d76;
 }
