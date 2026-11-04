@@ -139,32 +139,32 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
     function reportPercentage(location, dotNetRef, book) {
         if (!window._epubLocationsReady) return;
         if (!location || !location.start || !location.start.cfi) return;
+        // Única fuente del porcentaje: el que calcula epub.js para el evento; la última página cuenta como el 100 %
         var percentage = -1;
-        try {
-            if (book.locations && book.locations.total > 0) {
-                var p = book.locations.percentageFromCfi(location.start.cfi);
-                if (typeof p === "number" && !isNaN(p) && isFinite(p)) {
-                    percentage = p;
-                }
-            }
-        } catch (e) {}
-
-        if (percentage < 0) percentage = -1;
+        var p = location.atEnd ? 1 : location.start.percentage;
+        if (typeof p === "number" && !isNaN(p) && isFinite(p) && p >= 0) {
+            percentage = p;
+        }
 
         if (dotNetRef) {
+            // Páginas del libro: bloques de "locations" (estables entre dispositivos, pero no cambian en cada pantalla)
             var currentPage = 1;
             var totalPages = 0;
+            // Página dentro del capítulo: cambia en cada pantalla (depende de la letra y del tamaño de pantalla)
+            var chapterPage = 0;
+            var chapterPages = 0;
             try {
                 if (book.locations && book.locations.total > 0) {
-                    var locIndex = book.locations.locationFromCfi(location.start.cfi);
+                    var locIndex = location.start.location;
                     currentPage = (typeof locIndex === "number" && locIndex >= 0) ? (locIndex + 1) : 1;
                     totalPages = book.locations.total || 0;
-                } else if (location.start.displayed) {
-                    currentPage = location.start.displayed.page || 1;
-                    totalPages = location.start.displayed.total || 0;
+                }
+                if (location.start.displayed) {
+                    chapterPage = location.start.displayed.page || 0;
+                    chapterPages = location.start.displayed.total || 0;
                 }
             } catch (e) {}
-            dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage, currentPage, totalPages).catch(e => { console.error("Interop Error OnEpubLocationChanged:", e); });
+            dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage, currentPage, totalPages, chapterPage, chapterPages).catch(e => { console.error("Interop Error OnEpubLocationChanged:", e); });
         }
     }
 
@@ -190,6 +190,9 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
     let isDragging = false;
     let touchStartTime = 0;
 
+    // X del evento relativa al visor visible. En modo paginado epub.js hace el iframe tan ancho como el capítulo
+    // entero y pasa de página desplazando el contenedor, así que el clientX del iframe se mide desde el inicio
+    // del capítulo: se corrige con la posición del iframe (negativa al estar desplazado) y la del visor.
     function getViewportRelativeX(event, isTouch, isEnd) {
         var clientX = 0;
         if (isTouch) {
@@ -200,6 +203,12 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         } else {
             clientX = event.clientX;
         }
+        try {
+            var frame = event.view && event.view.frameElement; // mismo origen: epub.js usa sandbox allow-same-origin
+            if (frame) clientX += frame.getBoundingClientRect().left;
+            var host = document.getElementById(elementId);
+            if (host) clientX -= host.getBoundingClientRect().left;
+        } catch (e) {}
         return clientX;
     }
 
@@ -216,15 +225,11 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         return clientY;
     }
 
+    // Ancho del visor visible (nunca el del iframe, que mide todo el capítulo)
     function getContainerWidth() {
-        try {
-            var contents = rendition.getContents();
-            if (contents && contents.length > 0 && contents[0].window) {
-                return contents[0].window.innerWidth || window.innerWidth;
-            }
-        } catch (e) {}
         var viewerEl = document.getElementById(elementId);
-        return (viewerEl && viewerEl.clientWidth > 0) ? viewerEl.clientWidth : window.innerWidth;
+        var width = viewerEl ? viewerEl.getBoundingClientRect().width : 0;
+        return width > 0 ? width : window.innerWidth;
     }
 
     rendition.on("touchstart", event => {

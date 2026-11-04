@@ -146,7 +146,7 @@
                     {
                     <div class="reading-progress px-3 py-2" style="background: var(--bg-card); font-size: 0.85rem; color: var(--text-muted); border-top: 1px solid rgba(255,255,255,0.1);">
                         <div class="d-flex align-items-center justify-content-between mb-1" style="font-size: 0.75rem;">
-                            <span class="fw-bold text-white-50">@(_totalPages > 0 ? $"Pág. {Math.Max(1, _currentPage)}" : "")</span>
+                            <span class="fw-bold text-white-50">@PageLabel</span>
                             <span class="fw-bold text-white-50">@(_totalPages > 0 ? $"{_totalPages} páginas — " : "")@($"{Math.Round(_displayPercentage, 1)}%")</span>
                         </div>
                         <input type="range" 
@@ -162,7 +162,7 @@
                     else
                     {
                     <div class="d-flex justify-content-between align-items-center px-3 py-1" style="background: transparent; font-size: 0.7rem; color: rgba(255,255,255,0.35); cursor: pointer;" @onclick="ToggleImmersiveModeAsync" title="Toca para mostrar controles">
-                        <span>@(_totalPages > 0 ? $"Pág. {Math.Max(1, _currentPage)} / {_totalPages}" : "")</span>
+                        <span>@PageLabel</span>
                         <span>@($"{Math.Round(_displayPercentage, 1)}%")</span>
                     </div>
                     }
@@ -650,6 +650,13 @@
     private double _currentTime = 0;
     private int _currentPage = 0;
     private int _totalPages = 0;
+    // Página dentro del capítulo actual: a diferencia de _currentPage (bloques de "locations"), cambia en cada pantalla
+    private int _chapterPage = 0;
+    private int _chapterPages = 0;
+
+    private string PageLabel => _chapterPages > 0
+        ? $"Pág. {Math.Max(1, _chapterPage)} de {_chapterPages} del capítulo"
+        : (_totalPages > 0 ? $"Pág. {Math.Max(1, _currentPage)}" : "");
     private int _currentTrackNumber = 1;
     private bool _showPlaylist = false;
     private bool _showAppearanceMenu = false;
@@ -993,8 +1000,10 @@
     }
 
     [JSInvokable]
-    public void OnEpubLocationChanged(string cfi, double percentage, int currentPage = 0, int totalPages = 0)
+    public void OnEpubLocationChanged(string cfi, double percentage, int currentPage = 0, int totalPages = 0, int chapterPage = 0, int chapterPages = 0)
     {
+        _chapterPage = chapterPage;
+        _chapterPages = chapterPages;
         double? scaledPercentage = percentage >= 0 ? (percentage * 100.0) : null;
         
         if (Book != null)

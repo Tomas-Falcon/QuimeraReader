@@ -451,6 +451,8 @@ public class BookService : IBookService
 
     public async Task UpdatePositionAsync(int bookId, string? epubCfi = null, double? audioPosition = null, double? percentage = null, int? audioTrackNumber = null)
     {
+        // Hora del cambio, no la de llegada: si un guardado anterior llega tarde, el servidor lo descarta en vez de pisar el nuevo
+        var readAt = DateTime.UtcNow;
         if (_bookCache.TryGetValue(bookId, out var cached))
         {
             if (!string.IsNullOrEmpty(epubCfi)) cached.CurrentEpubCfi = epubCfi;
@@ -478,7 +480,7 @@ public class BookService : IBookService
             {
                 return;
             }
-            var request = new UpdatePositionRequest { CurrentEpubCfi = epubCfi, CurrentAudioPosition = audioPosition, PercentageCompleted = percentage, CurrentAudioTrackNumber = audioTrackNumber };
+            var request = new UpdatePositionRequest { CurrentEpubCfi = epubCfi, CurrentAudioPosition = audioPosition, PercentageCompleted = percentage, CurrentAudioTrackNumber = audioTrackNumber, ReadAt = readAt };
             var response = await _httpClient.PostAsJsonAsync($"api/Books/{bookId}/positions", request);
             response.EnsureSuccessStatusCode();
         }
