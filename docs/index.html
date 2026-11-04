@@ -424,11 +424,12 @@
       - PGID=1000
       - TZ=Europe/Madrid
       - QUIMERA_DB_PATH=/config/quimerareader.db
+      - QUIMERA_API_KEY=a_long_random_secret
+      - WATCHTOWER_TOKEN=your_token_here
     volumes:
       - "/path/to/downloads:/media"
       - "/path/to/library:/library"
       - "./config:/config"
-      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
   watchtower:
@@ -436,9 +437,10 @@
     container_name: watchtower
     environment:
       - DOCKER_API_VERSION=1.44
+      - WATCHTOWER_HTTP_API_TOKEN=your_token_here
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 300 --http-api-update --http-api-periodic-polls --http-api-token your_token_here quimerareader
+    command: --interval 300 --http-api-update --http-api-periodic-polls quimerareader
     restart: unless-stopped</div>
         </div>
 
@@ -449,7 +451,7 @@
                 <span data-i18n="faq1-q">Does QuimeraReader send my data to external AI servers?</span>
             </button>
             <div class="faq-answer">
-                <p data-i18n="faq1-a">By default, no. QuimeraReader runs Whisper.net models 100% locally on your own CPU/GPU, keeping your books and audio completely private. However, you can optionally configure external APIs (OpenAI or custom endpoints like Ollama/LM Studio) or API keys for metadata providers (Google Books, Hardcover) in the settings.</p>
+                <p data-i18n="faq1-a">No. QuimeraReader runs Whisper.net 100% locally on your own server, so your books and audio never leave it. The only outbound requests are metadata lookups (OpenLibrary, Google Books, Hardcover, Goodreads, StoryGraph), which send titles and authors, never file contents.</p>
             </div>
         </div>
 
@@ -502,7 +504,7 @@
                 "theme-toggle-btn": "Toggle Theme",
                 "faq-title": "Frequently Asked Questions",
                 "faq1-q": "Does QuimeraReader send my data to external AI servers?",
-                "faq1-a": "By default, no. QuimeraReader processes speech-to-text locally on your server using Whisper.net. However, it also includes full flexibility to configure external AI endpoints (OpenAI or compatible local/remote servers like Ollama or LM Studio) as well as metadata API keys (Google Books, Hardcover).",
+                "faq1-a": "No. QuimeraReader runs Whisper.net 100% locally on your own server, so your books and audio never leave it. The only outbound requests are metadata lookups (OpenLibrary, Google Books, Hardcover, Goodreads, StoryGraph), which send titles and authors, never file contents.",
                 "faq2-q": "What file formats are supported?",
                 "faq2-a": "QuimeraReader supports standard EPUB files for ebooks and common audio formats (MP3, M4B, M4A, FLAC) for audiobooks.",
                 "faq3-q": "Where does the book metadata come from?",
@@ -526,7 +528,7 @@
                 "theme-toggle-btn": "Cambiar Tema",
                 "faq-title": "Preguntas Frecuentes",
                 "faq1-q": "¿QuimeraReader envía mis datos a servidores de IA externos?",
-                "faq1-a": "Por defecto, no. QuimeraReader transcribe y sincroniza de forma local en tu servidor con Whisper.net. No obstante, el panel de configuración ofrece total libertad para conectar APIs externas (OpenAI o endpoints compatibles como Ollama o LM Studio) y claves API de metadatos (Google Books, Hardcover).",
+                "faq1-a": "No. QuimeraReader ejecuta Whisper.net 100% en local, en tu propio servidor: tus libros y audios no salen de él. Las únicas consultas externas son las de metadatos (OpenLibrary, Google Books, Hardcover, Goodreads, StoryGraph), que envían títulos y autores, nunca el contenido de los archivos.",
                 "faq2-q": "¿Qué formatos de archivo son compatibles?",
                 "faq2-a": "QuimeraReader soporta archivos EPUB para libros electrónicos y formatos de audio comunes (MP3, M4B, M4A, FLAC) para audiolibros.",
                 "faq3-q": "¿De dónde se descargan los metadatos?",

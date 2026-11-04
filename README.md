@@ -7,16 +7,17 @@ QuimeraReader is a comprehensive, self-hosted platform (Homelab) designed for ma
 The project is built entirely on a 100% C# **.NET 10** ecosystem following strict **Clean Architecture** and **CQRS** principles, eliminating the need for Node.js or JavaScript frameworks.
 
 ```text
-QuimeraReader.sln
+QuimeraReader.slnx
 ├── QuimeraReader.Domain         # Core entities, invariants, value objects (Zero external dependencies)
 ├── QuimeraReader.Application    # Use cases, CQRS Commands & Queries (MediatR), interfaces, DTOs
-├── QuimeraReader.Infrastructure # EF Core SQLite, Whisper.net alignment, Polly-resilient HTTP providers
-├── QuimeraReader.API            # Thin ASP.NET Core REST API, HealthChecks, static WebAssembly host
+├── QuimeraReader.Infrastructure # EF Core SQLite (WAL + FTS5), Whisper.net alignment, Polly-resilient HTTP providers
+├── QuimeraReader.API            # ASP.NET Core REST API, background jobs, HealthChecks, static WebAssembly host
 ├── QuimeraReader.Clients
 │   ├── QuimeraReader.Shared     # Razor Class Library with all shared UI components & client services
 │   ├── QuimeraReader.Web        # Blazor WebAssembly frontend (runs in-browser)
-│   └── QuimeraReader.Mobile     # .NET MAUI Blazor Hybrid (Android, iOS, Windows, MacCatalyst)
-└── QuimeraReader.Tests          # Automated unit test suite (xUnit, FluentAssertions, Moq, InMemory EF)
+│   ├── QuimeraReader.Mobile     # .NET MAUI Blazor Hybrid (Android; Windows builds too)
+│   └── QuimeraReader.Desktop    # Photino.Blazor desktop client (Linux)
+└── QuimeraReader.Tests          # xUnit + FluentAssertions suite, many tests against real SQLite
 ```
 
 1. **QuimeraReader.Domain:** Contains the fundamental domain entities (`Book`, `Author`, `Category`, `Universe`, `Series`) and algorithmic utilities (Levenshtein text matching).
@@ -34,11 +35,23 @@ QuimeraReader.sln
   - **Hardcover API** (Sync and Metadata)
   - **Google Books**
   - **OpenLibrary**
+- **Accent-insensitive Search:** SQLite FTS5 index over titles, authors and series (`jk rowling`, words in any order), built for libraries of 100,000+ books.
+- **Series & Universes:** Series are read from the EPUB (`calibre:series` / EPUB3 collections); universes group several series and standalone books and are created by the user.
+- **Two Ingestion Modes:** *Move* copies books into `/library`; *Leave in place* (for torrent folders) keeps the EPUB in `/media` and links it from `/library`.
+- **Offline Reading:** books, covers and audio can be downloaded to the Android/desktop apps and progress syncs back (the most recent reading wins).
 - **System Health Checks:** Built-in health monitoring endpoint (`/api/health`) reporting the real-time status of the database and disk storage.
 - **Hardcover Sync:** Automatically sync your read books with your Hardcover.app library.
-- **Duplication & Maintenance Engine:** Easily merge duplicated authors and categories and safely delete orphaned media directly from the UI.
+- **Maintenance Engine** (Settings → Tasks/System): missing-file audit, content-hash duplicate detection and merging, cover repair, JSON/ZIP backups and restore, database snapshots, and a full library reset that keeps user data.
 - **Global Observability:** Comprehensive request logging and global exception handling built into the API middleware.
-- **Unified C# Codebase:** UI logic is written once in Razor components and shared across Web, Android, iOS, and Windows.
+- **Unified C# Codebase:** UI logic is written once in Razor components and shared across Web, Android, Windows and Linux.
+
+## Project Status
+
+The server and the web client are in daily use with a ~140,000-book library. The Android app works online; offline mode and the Windows build have known issues that are being fixed.
+
+- [`ESTADO_DEL_PROYECTO.md`](ESTADO_DEL_PROYECTO.md): handoff guide (in Spanish): deployment, architecture, glossary, pending work.
+- [`ANALISIS_2026-11.md`](ANALISIS_2026-11.md): in-depth review with bugs found while testing on Android and Windows (in Spanish).
+- Roadmap: the [`wayfinder:map` issue](https://github.com/Tomas-Falcon/QuimeraReader/issues/11) and its sub-issues.
 
 ## Testing & Quality Assurance
 
@@ -54,7 +67,7 @@ The test project (`QuimeraReader.Tests`) uses:
 - **xUnit** as the test runner.
 - **FluentAssertions** for expressive, readable assertions.
 - **Moq** for mocking infrastructure services (`IEpubScannerService`, `IAudioMatchingService`).
-- **Microsoft.EntityFrameworkCore.InMemory** for isolated database testing without touching the disk.
+- **Real SQLite** (temporary files) for anything that depends on SQLite behaviour: FTS5 search, backups, library reset. `Tests/Common/TestEpub.cs` generates real EPUB files.
 
 ## Docker Deployment (Recommended)
 
@@ -134,7 +147,7 @@ To build and run the project locally without Docker:
    ```
 
 2. **Open the Solution:**
-   Open the unified `QuimeraReader.sln` file in Visual Studio 2022, JetBrains Rider, or VS Code.
+   Open `QuimeraReader.slnx` in Visual Studio 2022 (17.13+), JetBrains Rider, or VS Code. You need the .NET 10 SDK and, for the MAUI client, the `maui-android` workload.
 
 3. **Run Tests:**
    ```bash
@@ -143,3 +156,4 @@ To build and run the project locally without Docker:
 
 4. **Run the API (Backend & Web):**
    Set `QuimeraReader.API` as the startup project. The API will automatically host the Blazor WebAssembly frontend and create the local SQLite database.
+   The database path comes from `QUIMERA_DB_PATH` (default `quimerareader.db` in the working directory). To serve the web client from a local API, publish `QuimeraReader.Web` and copy its `wwwroot` into `QuimeraReader.API/wwwroot` (git-ignored). **Publish it from Linux or Docker:** a Release publish made on Windows currently produces a WebAssembly bundle that fails at startup (`Could not load type … SemaphoreSlim`).
