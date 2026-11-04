@@ -252,7 +252,13 @@ public class DesktopLocalBookRepository : ILocalBookRepository
         if (book != null)
         {
             if (!string.IsNullOrEmpty(cfi)) book.CurrentEpubCfi = cfi;
-            if (percentage.HasValue) book.PercentageCompleted = percentage.Value;
+            if (percentage.HasValue)
+            {
+                book.PercentageCompleted = percentage.Value;
+                // Mismo umbral que el servidor (ReadingProgressPolicy.FinishedPercentage): el lector envía 100 en la última página
+                if (percentage.Value >= 99.9) book.ReadingStatus = "Read";
+                else if (book.ReadingStatus != "Read") book.ReadingStatus = "Reading";
+            }
             if (audioPosition.HasValue) book.CurrentAudioPosition = audioPosition.Value;
             if (audioTrackNumber.HasValue) book.CurrentAudioTrackNumber = audioTrackNumber.Value;
             book.LastReadAt = System.DateTime.UtcNow;

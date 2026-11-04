@@ -11,6 +11,8 @@
 @inject QuimeraReader.Shared.Services.IScanService ScanService
 @inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject QuimeraReader.Shared.Services.ToastService ToastService
+@using Microsoft.Extensions.Logging
+@inject ILogger<ReaderPlayer> Logger
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 @namespace QuimeraReader.Shared.Components
@@ -353,10 +355,20 @@
     [Parameter]
     public int BookId { get; set; }
 
+    // "Volver a leer": abrir desde la primera página sin tocar el estado ni la posición guardada
+    // (el libro solo pasa a "Leyendo" si se pasa de página)
+    [Parameter]
+    public bool FromStart { get; set; }
+
     [Inject]
     public NavigationManager NavManager { get; set; } = default!;
 
     public Book? Book { get; set; }
+
+    private string? StartCfi => FromStart ? null : Book?.CurrentEpubCfi;
+
+    // Posición guardada al abrir el lector, para poder deshacer una relectura iniciada sin querer
+    private (string? Cfi, double? Percentage, double? Audio, int? Track) _positionAtOpen;
 
     private void GoBack()
     {
@@ -835,15 +847,16 @@
     protected override async Task OnInitializedAsync()
     {
         Book = await BookService.GetBookAsync(BookId);
-        
+
         if (Book != null)
         {
+            _positionAtOpen = (Book.CurrentEpubCfi, Book.PercentageCompleted, Book.CurrentAudioPosition, Book.CurrentAudioTrackNumber);
             // Inicializar el número de pista antes del primer renderizado para evitar cargar la Pista 1 por error
-            if (Book.CurrentAudioTrackNumber.HasValue && Book.CurrentAudioTrackNumber.Value > 0)
+            if (!FromStart && Book.CurrentAudioTrackNumber.HasValue && Book.CurrentAudioTrackNumber.Value > 0)
             {
                 _currentTrackNumber = Book.CurrentAudioTrackNumber.Value;
             }
-            if (Book.CurrentAudioPosition.HasValue && Book.CurrentAudioPosition.Value > 0)
+            if (!FromStart && Book.CurrentAudioPosition.HasValue && Book.CurrentAudioPosition.Value > 0)
             {
                 _currentTime = Book.CurrentAudioPosition.Value;
             }
@@ -919,7 +932,7 @@
                 await _jsModule.InvokeVoidAsync("initializePlayer", _audioElement, _dotNetRef);
                 await _jsModule.InvokeVoidAsync("setPlaybackRate", _audioElement, _playbackRate);
 
-                if (Book.CurrentAudioPosition.HasValue && Book.CurrentAudioPosition.Value > 0)
+                if (!FromStart && Book.CurrentAudioPosition.HasValue && Book.CurrentAudioPosition.Value > 0)
                 {
                     await _jsModule.InvokeVoidAsync("seekAudio", _audioElement, Book.CurrentAudioPosition.Value);
                 }
@@ -931,8 +944,8 @@
                 _epubJsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/QuimeraReader.Shared/epubInterop.js");
 
                 // Si no hay CFI guardado pero sí hay posición de audio y mapa de sincronización, calcular porcentaje inicial
-                double initialPct = Book.PercentageCompleted ?? 0;
-                if (string.IsNullOrWhiteSpace(Book.CurrentEpubCfi) && initialPct <= 0 && _currentTime > 0 && _segments.Any())
+                double initialPct = FromStart ? 0 : (Book.PercentageCompleted ?? 0);
+                if (string.IsNullOrWhiteSpace(StartCfi) && initialPct <= 0 && _currentTime > 0 && _segments.Any())
                 {
                     var approx = GetApproximateAudioPercentage(_currentTime, _currentTrackNumber);
                     if (approx > 0) initialPct = approx * 100.0;
@@ -947,7 +960,7 @@
                 {
                     if (epubFileUrl.StartsWith("blob:")) 
                     {
-                        await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubFileUrl, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
+                        await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubFileUrl, _dotNetRef, StartCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
                     }
                     else
                     {
@@ -955,7 +968,7 @@
                         {
                             using var fileStream = System.IO.File.OpenRead(epubFileUrl);
                             using var streamRef = new DotNetStreamReference(stream: fileStream);
-                            await _epubJsModule.InvokeVoidAsync("initializeEpubFromStream", "epub-viewer", streamRef, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
+                            await _epubJsModule.InvokeVoidAsync("initializeEpubFromStream", "epub-viewer", streamRef, _dotNetRef, StartCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
                         }
                         catch (Exception ex)
                         {
@@ -969,7 +982,7 @@
                     {
                         using var fileStream = System.IO.File.OpenRead(Book.LocalEpubPath);
                         using var streamRef = new DotNetStreamReference(stream: fileStream);
-                        await _epubJsModule.InvokeVoidAsync("initializeEpubFromStream", "epub-viewer", streamRef, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
+                        await _epubJsModule.InvokeVoidAsync("initializeEpubFromStream", "epub-viewer", streamRef, _dotNetRef, StartCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
                     }
                     catch (Exception ex)
                     {
@@ -979,7 +992,7 @@
                 else
                 {
                     var epubApiUrl = BookService.GetMediaUrl(Book.EpubUrl);
-                    await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubApiUrl, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
+                    await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubApiUrl, _dotNetRef, StartCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
                 }
 
                 // Cargar y pintar anotaciones guardadas en el hilo de UI una vez inicializado el visor
@@ -1024,7 +1037,11 @@
     [JSInvokable]
     public void OnEpubLocationChanged(string cfi, double percentage, int currentPage = 0, int totalPages = 0, int chapterPage = 0, int chapterPages = 0, bool userNavigated = false)
     {
-        if (userNavigated) _hasReadThisSession = true;
+        if (userNavigated && !_hasReadThisSession)
+        {
+            _hasReadThisSession = true;
+            _ = StartRereadingIfReadAsync();
+        }
         _chapterPage = chapterPage;
         _chapterPages = chapterPages;
         double? scaledPercentage = percentage >= 0 ? (percentage * 100.0) : null;
@@ -1065,6 +1082,40 @@
             try {
                 await BookService.UpdatePositionAsync(BookId, epubCfi: cfi, percentage: scaledPercentage, audioTrackNumber: Book?.HasAudio == true ? _currentTrackNumber : null);
             } catch { }
+        });
+    }
+
+    /// <summary>
+    /// Un libro "Leído" que se vuelve a leer (se pasa de página) pasa a "Leyendo", con la opción de deshacerlo
+    /// por si fue sin querer: Deshacer devuelve el estado y la posición anteriores y sale del lector.
+    /// </summary>
+    private async Task StartRereadingIfReadAsync()
+    {
+        if (Book == null || Book.ReadingStatus != "Read") return;
+
+        // La posición guardada al abrir: la de ahora ya la movió el posicionamiento inicial (p. ej. al principio)
+        var (previousCfi, previousPercentage, previousAudio, previousTrack) = _positionAtOpen;
+        Book.ReadingStatus = "Reading";
+        try
+        {
+            await BookService.BulkUpdateStatusAsync(new List<int> { BookId }, "Reading");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "[Reader] No se pudo marcar como Leyendo el libro {BookId}", BookId);
+        }
+
+        ToastService.ShowWithAction(string.Format(TranslationService["Reader_Rereading"], Book.Title), TranslationService["Action_Undo"], async () =>
+        {
+            _hasReadThisSession = false; // lo que se haya pasado de página no cuenta
+            Book.ReadingStatus = "Read";
+            Book.CurrentEpubCfi = previousCfi;
+            Book.PercentageCompleted = previousPercentage;
+            Book.CurrentAudioPosition = previousAudio;
+            Book.CurrentAudioTrackNumber = previousTrack;
+            await BookService.UpdatePositionAsync(BookId, previousCfi, previousAudio, previousPercentage, previousTrack);
+            await BookService.BulkUpdateStatusAsync(new List<int> { BookId }, "Read");
+            await InvokeAsync(GoBack);
         });
     }
 

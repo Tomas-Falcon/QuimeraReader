@@ -6,10 +6,14 @@
     @foreach (var toast in _toasts)
     {
         <div class="toast align-items-center text-white bg-@(toast.Type switch { "success" => "success", "error" => "danger", _ => "info" }) border-0 show" role="alert" aria-live="assertive" aria-atomic="true" style="margin-top: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
-            <div class="d-flex">
+            <div class="d-flex align-items-center">
                 <div class="toast-body">
                     @toast.Message
                 </div>
+                @if (toast.Action != null)
+                {
+                    <button type="button" class="btn btn-sm btn-light fw-bold ms-auto me-1" @onclick="() => RunActionAsync(toast)">@toast.ActionText</button>
+                }
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" @onclick="() => RemoveToast(toast)" aria-label="Close"></button>
             </div>
         </div>
@@ -22,16 +26,28 @@
     protected override void OnInitialized()
     {
         ToastService.OnShow += ShowToast;
+        ToastService.OnShowWithAction += ShowToastWithAction;
     }
 
-    private async void ShowToast(string message, string type)
+    private void ShowToast(string message, string type) =>
+        _ = AddAndExpireAsync(new ToastModel { Message = message, Type = type }, TimeSpan.FromSeconds(3));
+
+    // Con botón se deja más tiempo para poder pulsarlo (p. ej. "Deshacer")
+    private void ShowToastWithAction(string message, string type, string actionText, Func<Task> action) =>
+        _ = AddAndExpireAsync(new ToastModel { Message = message, Type = type, ActionText = actionText, Action = action }, TimeSpan.FromSeconds(8));
+
+    private async Task AddAndExpireAsync(ToastModel toast, TimeSpan lifetime)
     {
-        var toast = new ToastModel { Message = message, Type = type };
         _toasts.Add(toast);
-        InvokeAsync(StateHasChanged);
-        
-        await Task.Delay(3000); // Auto dismiss
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(lifetime);
         RemoveToast(toast);
+    }
+
+    private async Task RunActionAsync(ToastModel toast)
+    {
+        RemoveToast(toast);
+        if (toast.Action != null) await toast.Action();
     }
 
     private void RemoveToast(ToastModel toast)
@@ -46,11 +62,14 @@
     public void Dispose()
     {
         ToastService.OnShow -= ShowToast;
+        ToastService.OnShowWithAction -= ShowToastWithAction;
     }
 
     private class ToastModel
     {
         public string Message { get; set; } = string.Empty;
         public string Type { get; set; } = "info";
+        public string? ActionText { get; set; }
+        public Func<Task>? Action { get; set; }
     }
 }

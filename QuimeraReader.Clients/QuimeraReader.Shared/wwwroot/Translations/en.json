@@ -198,5 +198,8 @@
   "Auth_Login": "Sign in",
   "Auth_InvalidKey": "Wrong access key.",
   "Auth_TooManyAttempts": "Too many attempts. Wait a minute and try again.",
-  "Auth_ServerUnreachable": "Could not reach the server."
+  "Auth_ServerUnreachable": "Could not reach the server.",
+  "Reader_Rereading": "Rereading “{0}”",
+  "Action_Undo": "Undo",
+  "BookDetails_Status": "Status"
 }

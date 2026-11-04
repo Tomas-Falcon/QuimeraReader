@@ -219,5 +219,8 @@
   "Auth_Login": "Entrar",
   "Auth_InvalidKey": "Clave de acceso incorrecta.",
   "Auth_TooManyAttempts": "Demasiados intentos. Espera un minuto y vuelve a probar.",
-  "Auth_ServerUnreachable": "No se pudo contactar con el servidor."
+  "Auth_ServerUnreachable": "No se pudo contactar con el servidor.",
+  "Reader_Rereading": "Releyendo «{0}»",
+  "Action_Undo": "Deshacer",
+  "BookDetails_Status": "Estado"
 }

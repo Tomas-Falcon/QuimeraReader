@@ -678,7 +678,7 @@ public class BooksController : ControllerBase
         }
 
         book.LastReadAt = readAt;
-        if (book.ReadingStatus != "Read") book.ReadingStatus = "Reading";
+        book.ReadingStatus = ReadingProgressPolicy.StatusAfterProgress(book.ReadingStatus, request.PercentageCompleted);
         if (request.CurrentEpubCfi != null) book.CurrentEpubCfi = request.CurrentEpubCfi;
         if (request.CurrentAudioPosition.HasValue) book.CurrentAudioPosition = request.CurrentAudioPosition;
         if (request.CurrentAudioTrackNumber.HasValue) book.CurrentAudioTrackNumber = request.CurrentAudioTrackNumber;
