@@ -268,6 +268,8 @@ public class BooksController : ControllerBase
                 ProcessingStatus = b.ProcessingStatus == "SYNCED" ? "ALIGNED" : b.ProcessingStatus,
                 Authors = b.Authors.Select(a => a.Author!.Name).ToList(),
                 Categories = b.Categories.Select(c => c.Category!.Name).ToList(),
+                Series = b.Series != null ? b.Series.Name : null,
+                Universe = b.Series != null && b.Series.Universe != null ? b.Series.Universe.Name : (b.Universe != null ? b.Universe.Name : null),
                 HasCover = !string.IsNullOrEmpty(b.CoverImagePath),
                 IsAvailableOffline = b.IsAvailableOffline,
                 HasEpub = !string.IsNullOrEmpty(b.EpubFilePath),
