@@ -1078,11 +1078,47 @@
         // Abrir no es leer: el posicionamiento inicial no se guarda (no debe pisar lo leído en otro dispositivo)
         if (!_hasReadThisSession) return;
 
-        _ = System.Threading.Tasks.Task.Run(async () => {
-            try {
-                await BookService.UpdatePositionAsync(BookId, epubCfi: cfi, percentage: scaledPercentage, audioTrackNumber: Book?.HasAudio == true ? _currentTrackNumber : null);
-            } catch { }
-        });
+        _ = SavePagePositionAsync(cfi, scaledPercentage);
+    }
+
+    /// <summary>
+    /// Guarda la página leída. En libros sincronizados con audio (SyncMap) y con el audio parado, guarda también la
+    /// posición de audio del principio de esa página: libro y audio comparten posición, así cualquier dispositivo
+    /// reanuda el audio donde se llegó leyendo. Si el audio suena, la posición la marca el propio audio.
+    /// </summary>
+    private async Task SavePagePositionAsync(string cfi, double? percentage)
+    {
+        try
+        {
+            double? audioPosition = null;
+            int? audioTrack = Book?.HasAudio == true ? _currentTrackNumber : null;
+            if (Book?.HasAudio == true && !_isPlaying && _segments.Any())
+            {
+                var segment = await FindSegmentAtPageStartAsync();
+                if (segment != null)
+                {
+                    audioPosition = segment.Start;
+                    audioTrack = segment.TrackNumber > 0 ? segment.TrackNumber : 1;
+                    Book.CurrentAudioPosition = audioPosition;
+                    Book.CurrentAudioTrackNumber = audioTrack;
+                }
+            }
+            await BookService.UpdatePositionAsync(BookId, epubCfi: cfi, audioPosition: audioPosition, percentage: percentage, audioTrackNumber: audioTrack);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "[Reader] No se pudo guardar la posición del libro {BookId}", BookId);
+        }
+    }
+
+    // Frase de audio con la que empieza la página visible (el principio del texto, no la mejor coincidencia de toda la página)
+    private async Task<SyncSegment?> FindSegmentAtPageStartAsync()
+    {
+        if (_epubJsModule == null) return null;
+        var visibleText = await _epubJsModule.InvokeAsync<string>("getVisiblePageText");
+        if (string.IsNullOrWhiteSpace(visibleText)) return null;
+        var pageStart = visibleText.Length > 160 ? visibleText.Substring(0, 160) : visibleText;
+        return FindBestMatchingSegment(pageStart, _displayPercentage);
     }
 
     /// <summary>
