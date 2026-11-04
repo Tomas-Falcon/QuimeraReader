@@ -85,13 +85,14 @@ public class LibraryResetService
         return Path.GetFullPath(path).StartsWith(r, StringComparison.Ordinal);
     }
 
-    public async Task<Plan> PlanAsync(CancellationToken cancellationToken = default)
+    public async Task<Plan> PlanAsync(CancellationToken cancellationToken = default, Action<string>? phase = null, Action<int>? progress = null)
     {
         var settings = await _db.SystemSettings.AsNoTracking().ToDictionaryAsync(s => s.Key, s => s.Value, cancellationToken);
         settings.TryGetValue("LibraryRootPath", out var libraryRoot);
         settings.TryGetValue("IncomingScanFolder", out var incoming);
         settings.TryGetValue("IngestionMode", out var mode);
 
+        phase?.Invoke("Leyendo tus libros con datos");
         var plan = new Plan
         {
             SettingsKept = settings.Count,
@@ -103,12 +104,15 @@ public class LibraryResetService
             BooksWithUserData = (await _backup.BuildManifestAsync(cancellationToken)).Books.Count
         };
 
+        phase?.Invoke("Comprobando archivos");
         var books = await _db.Books.AsNoTracking().Select(b => new { b.Id, b.EpubFilePath, b.ContentHash }).ToListAsync(cancellationToken);
+        int checkedBooks = 0;
         plan.TotalBooks = books.Count;
         plan.BooksWithHash = books.Count(b => b.ContentHash != null);
         foreach (var book in books)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (++checkedBooks % 1000 == 0) progress?.Invoke(checkedBooks);
             var path = LibraryPathResolver.Resolve(book.EpubFilePath, libraryRoot);
             if (path == null) { plan.BooksWithoutFile++; continue; }
             plan.BooksWithFile++;

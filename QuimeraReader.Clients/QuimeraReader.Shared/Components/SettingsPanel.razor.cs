@@ -448,7 +448,9 @@ public partial class SettingsPanel : ComponentBase
             var status = pick(await HttpClient.GetFromJsonAsync<System.Text.Json.JsonElement>(statusUrl, _cts.Token));
             if (!status.GetProperty("running").GetBoolean()) return status;
             var phase = status.TryGetProperty("phase", out var p) && p.ValueKind == System.Text.Json.JsonValueKind.String ? p.GetString() : label;
-            _resetStatus = $"{phase}... {status.GetProperty("progress").GetInt32():N0}";
+            var count = status.GetProperty("progress").GetInt32();
+            var elapsed = status.TryGetProperty("startedAt", out var s) && s.ValueKind == System.Text.Json.JsonValueKind.String ? DateTime.UtcNow - s.GetDateTime().ToUniversalTime() : TimeSpan.Zero;
+            _resetStatus = $"{phase}...{(count > 0 ? $" {count:N0} libros" : "")} ({(int)elapsed.TotalMinutes}:{elapsed.Seconds:D2})";
             StateHasChanged();
         }
     }

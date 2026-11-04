@@ -81,8 +81,8 @@ public class MaintenanceController : ControllerBase
     [HttpPost("reset/plan")]
     public IActionResult PlanReset()
     {
-        var started = _runner.TryStart(ResetPlanJob, null, async (services, _, _, token) =>
-            await services.GetRequiredService<LibraryResetService>().PlanAsync(token));
+        var started = _runner.TryStart(ResetPlanJob, null, async (services, progress, phase, token) =>
+            await services.GetRequiredService<LibraryResetService>().PlanAsync(token, phase, progress));
         return started ? Accepted(_runner.GetStatus(ResetPlanJob)) : Conflict(_runner.GetStatus(ResetPlanJob));
     }
 
