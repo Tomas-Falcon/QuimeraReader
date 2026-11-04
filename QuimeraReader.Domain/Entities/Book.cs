@@ -14,6 +14,8 @@ public class Book
     // Local File Paths
     public string EpubFilePath { get; set; } = string.Empty;
     public string? SourceFilePath { get; set; } // Tracks original path for LeaveInPlace mode
+    /// <summary>SHA-256 del EPUB: identifica el mismo archivo aunque cambie de ruta o se descargue dos veces.</summary>
+    public string? ContentHash { get; set; }
     public string? CoverImagePath { get; set; }
     
     // Reading Progress

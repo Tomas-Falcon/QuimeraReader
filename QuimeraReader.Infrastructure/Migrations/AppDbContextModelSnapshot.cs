@@ -48,6 +48,9 @@ namespace QuimeraReader.Infrastructure.Migrations
                     b.Property<double?>("AverageRating")
                         .HasColumnType("REAL");
 
+                    b.Property<string>("ContentHash")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("CoverImagePath")
                         .HasColumnType("TEXT");
 
@@ -114,6 +117,8 @@ namespace QuimeraReader.Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ContentHash");
 
                     b.HasIndex("SeriesId");
 
@@ -266,6 +271,37 @@ namespace QuimeraReader.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Categories");
+                });
+
+            modelBuilder.Entity("QuimeraReader.Domain.Entities.ScannedSourceFile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("BookId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ContentHash")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ScannedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Path")
+                        .IsUnique();
+
+                    b.ToTable("ScannedSourceFiles");
                 });
 
             modelBuilder.Entity("QuimeraReader.Domain.Entities.Series", b =>

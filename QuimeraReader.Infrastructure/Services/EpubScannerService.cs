@@ -20,6 +20,9 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
     private readonly AppDbContext _dbContext;
     private readonly AudioAlignmentQueue _queue;
     private readonly ILogger<EpubScannerService> _logger;
+
+    /// <summary>Resultado del último ScanEpubAsync: Imported, Duplicate (se ignoró) o Relinked (recuperó un libro sin archivo).</summary>
+    public string LastScanOutcome { get; private set; } = "";
     private static readonly SemaphoreSlim _scanLock = new(1, 1);
 
     public EpubScannerService(IEnumerable<IMetadataProvider> providers, HttpClient httpClient, AppDbContext dbContext, AudioAlignmentQueue queue, ILogger<EpubScannerService> logger)
@@ -38,12 +41,60 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
             ? Path.GetFileNameWithoutExtension(originalFileName) 
             : (epubBook.Title ?? "Sin Título");
             
-        var book = await _dbContext.Books
+        // El mismo archivo (mismo hash) es el mismo libro aunque venga de otra ruta: si ya lo tenemos con su
+        // archivo no se toca; si su archivo se perdió, se vuelve a enlazar a este.
+        string contentHash = await BookFingerprint.ComputeAsync(sourceFilePath);
+        var settingsForRoot = await _dbContext.SystemSettings.Where(s => s.Key == "LibraryRootPath").Select(s => s.Value).FirstOrDefaultAsync();
+        var sameFile = await _dbContext.Books
             .Include(b => b.Authors).ThenInclude(ba => ba.Author)
             .Include(b => b.Categories).ThenInclude(bc => bc.Category)
-            .FirstOrDefaultAsync(b => b.Title == bookTitle) 
-            ?? new Book { Title = bookTitle };
-            
+            .Where(b => b.ContentHash == contentHash)
+            .OrderBy(b => b.Id)
+            .ToListAsync();
+        var present = sameFile.FirstOrDefault(b => LibraryPathResolver.Resolve(b.EpubFilePath, settingsForRoot) != null);
+        if (present != null)
+        {
+            LastScanOutcome = "Duplicate";
+            return present;
+        }
+
+        // Si no, el mismo título solo es el mismo libro si comparte algún autor (antes bastaba el título y se mezclaban ediciones y obras distintas)
+        var epubAuthors = (epubBook.AuthorList ?? new List<string>()).Select(a => a.Trim()).Where(a => a.Length > 0).ToList();
+        var book = sameFile.FirstOrDefault();
+        if (book == null)
+        {
+            var sameTitle = await _dbContext.Books
+                .Include(b => b.Authors).ThenInclude(ba => ba.Author)
+                .Include(b => b.Categories).ThenInclude(bc => bc.Category)
+                .Where(b => b.Title == bookTitle)
+                .OrderBy(b => b.Id)
+                .ToListAsync();
+            var candidates = sameTitle.Where(b => epubAuthors.Count == 0 || b.Authors.Count == 0
+                                                  || b.Authors.Any(ba => ba.Author != null && epubAuthors.Contains(ba.Author.Name, StringComparer.OrdinalIgnoreCase)))
+                                      .ToList();
+            // Preferir uno cuyo archivo se perdió: este EPUB lo recupera
+            book = candidates.FirstOrDefault(b => LibraryPathResolver.Resolve(b.EpubFilePath, settingsForRoot) == null) ?? candidates.FirstOrDefault();
+        }
+
+        if (book != null && book.Id != 0 && LibraryPathResolver.Resolve(book.EpubFilePath, settingsForRoot) == null)
+        {
+            LastScanOutcome = "Relinked";
+            // Este archivo pasa a ser el origen del libro recuperado
+            book.SourceFilePath = null;
+        }
+        else if (book != null && book.Id != 0)
+        {
+            // Mismo libro con su archivo en su sitio: otra copia (p. ej. el torrent la volvió a bajar), se ignora
+            LastScanOutcome = "Duplicate";
+            return book;
+        }
+        else
+        {
+            LastScanOutcome = "Imported";
+        }
+        book ??= new Book { Title = bookTitle };
+        book.ContentHash ??= contentHash;
+
         // Evitamos duplicar autores ya existentes
         if (epubBook.AuthorList != null)
         {

@@ -73,6 +73,8 @@ public class LibraryScanBackgroundService : BackgroundService
 
             var sourcesList = await dbContext.Books.Where(b => b.SourceFilePath != null).Select(b => b.SourceFilePath!).ToListAsync(stoppingToken);
             processedSources = new HashSet<string>(sourcesList);
+            // También los duplicados ignorados y los EPUB que fallaron: no volver a leerlos en cada escaneo
+            processedSources.UnionWith(await dbContext.ScannedSourceFiles.Select(f => f.Path).ToListAsync(stoppingToken));
             
             var audiosList = await dbContext.BookAudioTracks.Where(t => t.FilePath != null).Select(t => t.FilePath!).ToListAsync(stoppingToken);
             processedAudios = new HashSet<string>(audiosList);
@@ -142,6 +144,7 @@ public class LibraryScanBackgroundService : BackgroundService
                         dbContext.Books.Add(book);
                     }
                     await dbContext.SaveChangesAsync(stoppingToken);
+                    await RecordScannedFileAsync(dbContext, file, book.ContentHash, book.Id, scannerService.LastScanOutcome, stoppingToken);
                 }
                 else if (audioExtensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
                 {
@@ -218,12 +221,29 @@ public class LibraryScanBackgroundService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error escaneando el archivo {file}");
+                if (epubExtensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
+                {
+                    // Un EPUB corrupto no se reintenta en cada arranque
+                    dbContext.ChangeTracker.Clear();
+                    try { await RecordScannedFileAsync(dbContext, file, null, null, "Error", stoppingToken); } catch { }
+                }
             }
             finally
             {
                 _scanState.FilesProcessed++;
             }
         }
+    }
+
+    private static async Task RecordScannedFileAsync(AppDbContext dbContext, string path, string? hash, int? bookId, string outcome, CancellationToken stoppingToken)
+    {
+        var entry = await dbContext.ScannedSourceFiles.FirstOrDefaultAsync(f => f.Path == path, stoppingToken);
+        if (entry == null) dbContext.ScannedSourceFiles.Add(entry = new ScannedSourceFile { Path = path });
+        entry.ContentHash = hash;
+        entry.BookId = bookId is > 0 ? bookId : null;
+        entry.Outcome = outcome;
+        entry.ScannedAt = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(stoppingToken);
     }
 
     private static string LegacyOrphansDir => Path.Combine(Directory.GetCurrentDirectory(), "Library", "Orphans");

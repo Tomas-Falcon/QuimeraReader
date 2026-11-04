@@ -14,6 +14,7 @@ public class AppDbContext : DbContext, IAppDbContext
 
     public DbSet<Universe> Universes { get; set; } = null!;
     public DbSet<Series> Series { get; set; } = null!;
+    public DbSet<ScannedSourceFile> ScannedSourceFiles { get; set; } = null!;
     public DbSet<Category> Categories { get; set; } = null!;
     public DbSet<BookCategory> BookCategories { get; set; } = null!;
 
@@ -164,6 +165,8 @@ public class AppDbContext : DbContext, IAppDbContext
 
         // Las sagas se buscan por nombre al importar
         modelBuilder.Entity<Series>().HasIndex(s => s.Name);
+        modelBuilder.Entity<Book>().HasIndex(b => b.ContentHash);
+        modelBuilder.Entity<ScannedSourceFile>().HasIndex(f => f.Path).IsUnique();
 
         // SystemSettings configuration
         modelBuilder.Entity<SystemSetting>()
