@@ -143,6 +143,8 @@
   "BookDetails_DeleteError": "Error al borrar: {0}",
   "OfflineLibrary_Loading": "Cargando descargas...",
   "OfflineLibrary_Empty": "No tienes libros descargados para leer sin conexión.",
+  "OfflineLibrary_Error": "No se pudieron cargar los libros descargados en este dispositivo.",
+  "OfflineLibrary_Retry": "Reintentar",
   "AudioManagement_Title": "Gestión de Audios",
   "AudioManagement_AutoMatch": "Auto-vincular",
   "AudioManagement_Reload": "Recargar",

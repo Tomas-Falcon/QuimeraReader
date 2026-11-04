@@ -149,6 +149,8 @@
   "BookDetails_DeleteError": "Error deleting: {0}",
   "OfflineLibrary_Loading": "Loading downloads...",
   "OfflineLibrary_Empty": "You have no downloaded books to read offline.",
+  "OfflineLibrary_Error": "Could not load the books downloaded on this device.",
+  "OfflineLibrary_Retry": "Retry",
   "AudioManagement_Title": "Audio Management",
   "AudioManagement_AutoMatch": "Auto-match",
   "AudioManagement_Reload": "Reload",

@@ -18,6 +18,15 @@
             <p class="mt-3 text-muted">@TranslationService["OfflineLibrary_Loading"]</p>
         </div>
     }
+    else if (_error != null)
+    {
+        <div class="text-center p-5">
+            <RadzenIcon Icon="error_outline" Style="font-size: 3rem; color: var(--rz-danger);" />
+            <p class="mt-2" style="color: var(--text-color);">@TranslationService["OfflineLibrary_Error"]</p>
+            <p class="text-muted small">@_error</p>
+            <RadzenButton Icon="refresh" Text="@TranslationService["OfflineLibrary_Retry"]" ButtonStyle="ButtonStyle.Primary" Click="LoadAsync" />
+        </div>
+    }
     else if (_books.Count == 0)
     {
         <div class="text-center p-5">
@@ -41,9 +50,14 @@
 @code {
     private List<Book> _books = new();
     private bool _isLoading = true;
+    private string? _error;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
     {
+        _isLoading = true;
+        _error = null;
         try
         {
             var localRepo = ServiceProvider.GetService(typeof(ILocalBookRepository)) as ILocalBookRepository;
@@ -56,7 +70,9 @@
         }
         catch (Exception ex)
         {
-            _books = new List<Book> { new Book { Title = "ERROR: " + ex.Message } };
+            // Un fallo de la base de datos local no es un libro: se muestra como error con opción de reintentar
+            _books = new List<Book>();
+            _error = ex.Message;
         }
         finally
         {
