@@ -50,6 +50,8 @@ public class AudioTrackDto
     public int Id { get; set; }
     public int TrackNumber { get; set; }
     public string FileName { get; set; } = "";
+    // Copia offline de la pista en este dispositivo (ruta local o marcador blob: de IndexedDB); null si no se descargó
+    public string? LocalPath { get; set; }
 }
 
 public class UpdatePositionRequest

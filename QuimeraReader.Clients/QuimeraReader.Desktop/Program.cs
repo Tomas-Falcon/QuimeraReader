@@ -54,6 +54,7 @@ public class Program
         appBuilder.Services.AddDbContext<DesktopLocalAppDbContext>();
         appBuilder.Services.AddScoped<ILocalBookRepository, DesktopLocalBookRepository>();
         appBuilder.Services.AddSingleton<IOfflineSyncWorker, DesktopOfflineSyncWorker>();
+        appBuilder.Services.AddSingleton<ILocalMediaServer, DesktopLocalMediaServer>();
 
         // Register Root Component
         appBuilder.RootComponents.Add<Routes>("#app");

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using QuimeraReader.Shared.Interfaces;
 using QuimeraReader.Shared.Models;
+using QuimeraReader.Shared.Services;
 
 namespace QuimeraReader.Mobile.Data;
 
@@ -58,7 +59,7 @@ public class LocalBookRepository : ILocalBookRepository
         if (domainBook == null) return null!;
         var orderedTracks = domainBook.AudioTracks?.OrderBy(t => t.TrackNumber).ToList()
                             ?? new List<QuimeraReader.Domain.Entities.BookAudioTrack>();
-        var firstAudioPath = orderedTracks.FirstOrDefault()?.FilePath;
+        var firstAudioPath = ExistingFile(orderedTracks.FirstOrDefault()?.FilePath);
         return new Book
         {
             Id = domainBook.Id,
@@ -84,7 +85,8 @@ public class LocalBookRepository : ILocalBookRepository
             {
                 Id = t.Id,
                 TrackNumber = t.TrackNumber,
-                FileName = t.FileName ?? Path.GetFileName(t.FilePath)
+                FileName = string.IsNullOrEmpty(t.FileName) ? Path.GetFileName(t.FilePath) : t.FileName,
+                LocalPath = ExistingFile(t.FilePath)
             }).ToList(),
             Authors = domainBook.Authors?.Select(a => a.Author?.Name ?? "").Where(n => !string.IsNullOrEmpty(n)).ToList() ?? new List<string>(),
             Categories = domainBook.Categories?.Select(c => c.Category?.Name ?? "").Where(n => !string.IsNullOrEmpty(n)).ToList() ?? new List<string>(),
@@ -187,24 +189,7 @@ public class LocalBookRepository : ILocalBookRepository
             existing.Categories = new List<QuimeraReader.Domain.Entities.BookCategory>();
         }
 
-        if (!string.IsNullOrEmpty(book.LocalAudioPath))
-        {
-            existing.AudioTracks ??= new List<QuimeraReader.Domain.Entities.BookAudioTrack>();
-            if (!existing.AudioTracks.Any())
-            {
-                existing.AudioTracks.Add(new QuimeraReader.Domain.Entities.BookAudioTrack
-                {
-                    BookId = existing.Id,
-                    TrackNumber = 1,
-                    FilePath = book.LocalAudioPath,
-                    FileName = Path.GetFileName(book.LocalAudioPath)
-                });
-            }
-            else
-            {
-                existing.AudioTracks.First().FilePath = book.LocalAudioPath;
-            }
-        }
+        SaveAudioTracks(existing, book);
 
         if (!string.IsNullOrEmpty(book.SyncMapJson))
         {
@@ -254,6 +239,46 @@ public class LocalBookRepository : ILocalBookRepository
 
         await _dbContext.SaveChangesAsync();
     }
+
+    /// <summary>
+    /// Guarda todas las pistas del libro con la ruta de su copia offline (FilePath vacío si no se descargó).
+    /// Antes solo se guardaba la primera, así que sin conexión la lista de pistas mostraba una sola.
+    /// </summary>
+    private void SaveAudioTracks(QuimeraReader.Domain.Entities.Book existing, Book book)
+    {
+        existing.AudioTracks ??= new List<QuimeraReader.Domain.Entities.BookAudioTrack>();
+        var tracks = book.AudioTracks.Count > 0
+            ? book.AudioTracks
+            : !string.IsNullOrEmpty(book.LocalAudioPath)
+                ? new List<AudioTrackDto> { new() { TrackNumber = existing.AudioTracks.FirstOrDefault()?.TrackNumber ?? 1, FileName = Path.GetFileName(book.LocalAudioPath) } }
+                : new List<AudioTrackDto>();
+        // Un libro sin pistas (p. ej. releído del repositorio solo para guardar el caché de páginas) no borra las guardadas
+        if (tracks.Count == 0) return;
+
+        var firstNumber = tracks.Min(t => t.TrackNumber);
+        foreach (var stale in existing.AudioTracks.Where(t => tracks.All(d => d.TrackNumber != t.TrackNumber)).ToList())
+        {
+            existing.AudioTracks.Remove(stale);
+            _dbContext.Remove(stale);
+        }
+
+        foreach (var dto in tracks)
+        {
+            var entity = existing.AudioTracks.FirstOrDefault(t => t.TrackNumber == dto.TrackNumber);
+            if (entity == null)
+            {
+                entity = new QuimeraReader.Domain.Entities.BookAudioTrack { BookId = existing.Id, TrackNumber = dto.TrackNumber };
+                existing.AudioTracks.Add(entity);
+            }
+            if (!string.IsNullOrEmpty(dto.FileName)) entity.FileName = dto.FileName;
+
+            var localPath = dto.TrackNumber == firstNumber ? book.LocalAudioPath : dto.LocalPath;
+            // Una pista sin copia nueva conserva la que ya tenía
+            if (!string.IsNullOrEmpty(localPath) && File.Exists(localPath)) entity.FilePath = localPath;
+        }
+    }
+
+    private static string? ExistingFile(string? path) => !string.IsNullOrEmpty(path) && File.Exists(path) ? path : null;
 
     public async Task SaveBooksAsync(IEnumerable<Book> books)
     {
@@ -390,6 +415,9 @@ public class LocalBookRepository : ILocalBookRepository
     {
         var book = await GetBookByIdAsync(bookId);
         if (book == null) return null;
+
+        var trackNumber = OfflineAudio.TrackNumberFromFileType(fileType);
+        if (trackNumber.HasValue) return book.AudioTracks.FirstOrDefault(t => t.TrackNumber == trackNumber.Value)?.LocalPath;
 
         return fileType.ToLower() switch
         {

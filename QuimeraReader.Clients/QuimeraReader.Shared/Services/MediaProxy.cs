@@ -8,4 +8,7 @@ namespace QuimeraReader.Shared.Services;
 public static class MediaProxy
 {
     public const string PathPrefix = "/_qrmedia/";
+
+    // Archivos descargados para uso offline, servidos por el host desde su carpeta de datos (ILocalMediaServer)
+    public const string LocalPathPrefix = "/_qrlocal/";
 }

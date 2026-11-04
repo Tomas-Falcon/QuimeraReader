@@ -17,8 +17,18 @@ public static class MediaProxyInterceptor
         "Content-Type", "Content-Length", "Content-Range", "Accept-Ranges", "Cache-Control", "Last-Modified", "ETag"
     };
 
+    // Tamaño máximo de cada respuesta de un archivo offline: el audio se pide por tramos (Range) y no se carga entero en memoria
+    private const long MaxLocalChunk = 2 * 1024 * 1024;
+
     public static void OnWebResourceRequested(object? sender, WebViewWebResourceRequestedEventArgs e)
     {
+        if (e.Uri.AbsolutePath.StartsWith(MediaProxy.LocalPathPrefix, StringComparison.Ordinal))
+        {
+            e.Handled = true;
+            ServeLocalFile(e);
+            return;
+        }
+
         if (!e.Uri.AbsolutePath.StartsWith(MediaProxy.PathPrefix, StringComparison.Ordinal)) return;
 
         e.Handled = true;
@@ -71,6 +81,61 @@ public static class MediaProxyInterceptor
         {
             System.Diagnostics.Debug.WriteLine($"[MediaProxy] Error reenviando {target}: {ex.Message}");
             e.SetResponse(502, "Bad Gateway");
+        }
+    }
+
+    /// <summary>
+    /// Sirve una descarga offline (ver <see cref="MobileLocalMediaServer"/>) desde la carpeta de datos de la app, con el
+    /// tramo pedido en Range para que el audio pueda saltar sin leer el archivo entero.
+    /// </summary>
+    private static void ServeLocalFile(WebViewWebResourceRequestedEventArgs e)
+    {
+        try
+        {
+            var path = LocalMediaFile.ResolveFile(FileSystem.AppDataDirectory, e.Uri.AbsolutePath.Substring(MediaProxy.LocalPathPrefix.Length));
+            if (path == null)
+            {
+                e.SetResponse(404, "Not Found");
+                return;
+            }
+
+            var length = new FileInfo(path).Length;
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Content-Type"] = LocalMediaFile.ContentType(path),
+                ["Accept-Ranges"] = "bytes",
+                ["Access-Control-Allow-Origin"] = "*"
+            };
+            var rangeHeader = e.Headers?.FirstOrDefault(h => string.Equals(h.Key, "Range", StringComparison.OrdinalIgnoreCase)).Value;
+            var range = LocalMediaFile.ParseRange(rangeHeader, length, MaxLocalChunk);
+
+            if (range == null)
+            {
+                headers["Content-Length"] = length.ToString();
+                e.SetResponse(200, "OK", headers, File.OpenRead(path));
+                return;
+            }
+
+            headers["Content-Range"] = range.ContentRange(length);
+            if (!range.Satisfiable)
+            {
+                e.SetResponse(416, "Range Not Satisfiable", headers, Stream.Null);
+                return;
+            }
+
+            var buffer = new byte[range.Length];
+            using (var fs = File.OpenRead(path))
+            {
+                fs.Seek(range.Start, SeekOrigin.Begin);
+                fs.ReadExactly(buffer);
+            }
+            headers["Content-Length"] = range.Length.ToString();
+            e.SetResponse(206, "Partial Content", headers, new MemoryStream(buffer));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MediaProxy] Error sirviendo archivo local {e.Uri.AbsolutePath}: {ex.Message}");
+            e.SetResponse(500, "Internal Server Error");
         }
     }
 

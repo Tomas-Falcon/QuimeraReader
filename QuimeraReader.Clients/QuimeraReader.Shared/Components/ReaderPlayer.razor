@@ -742,11 +742,11 @@
 
     private string GetCurrentTrackUrl()
     {
-        // La copia offline solo guarda la primera pista: usarla para otra haría sonar la pista 1 con el karaoke de la pista elegida
-        bool isFirstTrack = Book?.AudioTracks == null || Book.AudioTracks.Count <= 1 || _currentTrackNumber == Book.AudioTracks.Min(t => t.TrackNumber);
-        if (isFirstTrack && !string.IsNullOrEmpty(_audioSourceUrl) && (_audioSourceUrl.StartsWith("blob:") || _audioSourceUrl.StartsWith("data:")))
+        // Cada pista usa su propia copia offline si la hay (antes la de la pista 1 sonaba en todas)
+        var trackKey = Book?.AudioTracks == null || Book.AudioTracks.Count == 0 ? 1 : _currentTrackNumber;
+        if (_localTrackUrls.TryGetValue(trackKey, out var localUrl))
         {
-            return _audioSourceUrl;
+            return localUrl;
         }
 
         if (Book?.AudioTracks == null || Book.AudioTracks.Count == 0)
@@ -774,18 +774,31 @@
 
     private bool _isPlaying = false;
     private List<SyncSegment> _segments = new();
-    private string _audioSourceUrl = "";
+    // URL reproducible de la copia offline de cada pista (número de pista => blob: de IndexedDB o URL del servidor local nativo)
+    private readonly Dictionary<int, string> _localTrackUrls = new();
 
-    private static string GetAudioMimeType(string filePath)
+    private async Task LoadLocalTrackUrlsAsync()
     {
-        var ext = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
-        return ext switch
+        if (Book == null || !Book.HasAudio) return;
+        var localMedia = ServiceProvider.GetService(typeof(QuimeraReader.Shared.Interfaces.ILocalMediaServer)) as QuimeraReader.Shared.Interfaces.ILocalMediaServer;
+        var trackNumbers = Book.AudioTracks.Count > 0 ? Book.AudioTracks.Select(t => t.TrackNumber).Distinct().ToList() : new List<int> { 1 };
+
+        foreach (var trackNumber in trackNumbers)
         {
-            ".m4b" or ".m4a" => "audio/mp4",
-            ".ogg" => "audio/ogg",
-            ".wav" => "audio/wav",
-            _ => "audio/mpeg"
-        };
+            var local = await TryGetLocalFileUrlAsync(OfflineAudio.FileType(Book, trackNumber));
+            if (string.IsNullOrEmpty(local)) continue;
+
+            if (local.StartsWith("blob:") || local.StartsWith("data:"))
+            {
+                _localTrackUrls[trackNumber] = local;
+            }
+            else if (localMedia != null && System.IO.File.Exists(local))
+            {
+                // El WebView no carga rutas del disco: el host nativo sirve el archivo con soporte de Range
+                var url = localMedia.GetUrl(local);
+                if (!string.IsNullOrEmpty(url)) _localTrackUrls[trackNumber] = url;
+            }
+        }
     }
 
     protected override async Task OnInitializedAsync()
@@ -811,37 +824,7 @@
                 _currentTime = 0;
             }
 
-            var audioFileUrl = await TryGetLocalFileUrlAsync("audio");
-            if (!string.IsNullOrEmpty(audioFileUrl) && (audioFileUrl.StartsWith("blob:") || audioFileUrl.StartsWith("data:")))
-            {
-                _audioSourceUrl = audioFileUrl;
-            }
-            else if (!string.IsNullOrEmpty(audioFileUrl) && System.IO.File.Exists(audioFileUrl))
-            {
-                // En MAUI Android/iOS, el WebView corre sobre https://0.0.0.0/ y bloquea rutas file:// locales en <audio src="...">
-                try
-                {
-                    var fileInfo = new System.IO.FileInfo(audioFileUrl);
-                    if (fileInfo.Length > 0 && fileInfo.Length <= 25 * 1024 * 1024)
-                    {
-                        var bytes = await System.IO.File.ReadAllBytesAsync(audioFileUrl);
-                        var mime = GetAudioMimeType(audioFileUrl);
-                        _audioSourceUrl = $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
-                    }
-                    else
-                    {
-                        _audioSourceUrl = audioFileUrl;
-                    }
-                }
-                catch
-                {
-                    _audioSourceUrl = audioFileUrl;
-                }
-            }
-            else
-            {
-                _audioSourceUrl = BookService.GetMediaUrl(Book.AudioUrl);
-            }
+            await LoadLocalTrackUrlsAsync();
         }
         
         if (Book != null)

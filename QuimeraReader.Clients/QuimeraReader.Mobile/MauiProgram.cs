@@ -64,6 +64,7 @@ public static class MauiProgram
         builder.Services.AddDbContext<QuimeraReader.Mobile.Data.LocalAppDbContext>();
         builder.Services.AddScoped<QuimeraReader.Shared.Interfaces.ILocalBookRepository, QuimeraReader.Mobile.Data.LocalBookRepository>();
         builder.Services.AddSingleton<QuimeraReader.Shared.Interfaces.IOfflineSyncWorker, QuimeraReader.Mobile.Services.MauiOfflineSyncWorker>();
+        builder.Services.AddSingleton<QuimeraReader.Shared.Interfaces.ILocalMediaServer, QuimeraReader.Mobile.Services.MobileLocalMediaServer>();
 
 
 		return builder.Build();

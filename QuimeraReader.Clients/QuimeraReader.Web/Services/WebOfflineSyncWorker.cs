@@ -152,6 +152,21 @@ namespace QuimeraReader.Web.Services
                     }
                     if (!string.IsNullOrEmpty(audioPath)) serverBook.LocalAudioPath = audioPath;
 
+                    if (serverBook.HasAudio)
+                    {
+                        foreach (var track in OfflineAudio.ExtraTracks(serverBook))
+                        {
+                            var trackPath = localBook?.AudioTracks.FirstOrDefault(t => t.TrackNumber == track.TrackNumber)?.LocalPath;
+                            if (string.IsNullOrEmpty(trackPath) || !trackPath.StartsWith("blob:"))
+                            {
+                                trackPath = await DownloadFileToDbAsync(serverBook.Id, OfflineAudio.FileType(serverBook, track.TrackNumber),
+                                    OfflineAudio.TrackServerPath(serverBook.Id, track.TrackNumber), baseUrl);
+                            }
+                            // downloadFileToDb devuelve la URL original si falla: solo cuenta como descargada si es un blob:
+                            if (!string.IsNullOrEmpty(trackPath) && trackPath.StartsWith("blob:")) track.LocalPath = trackPath;
+                        }
+                    }
+
                     var existingMap = localBook?.SyncMapJson;
                     if (!string.IsNullOrEmpty(existingMap))
                     {

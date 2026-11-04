@@ -167,6 +167,10 @@ public class DesktopOfflineSyncWorker : IOfflineSyncWorker
                     if (!string.IsNullOrEmpty(b.LocalEpubPath) && File.Exists(b.LocalEpubPath)) File.Delete(b.LocalEpubPath);
                     if (!string.IsNullOrEmpty(b.LocalCoverPath) && File.Exists(b.LocalCoverPath)) File.Delete(b.LocalCoverPath);
                     if (!string.IsNullOrEmpty(b.LocalAudioPath) && File.Exists(b.LocalAudioPath)) File.Delete(b.LocalAudioPath);
+                    foreach (var track in b.AudioTracks)
+                    {
+                        if (!string.IsNullOrEmpty(track.LocalPath) && File.Exists(track.LocalPath)) File.Delete(track.LocalPath);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -189,6 +193,13 @@ public class DesktopOfflineSyncWorker : IOfflineSyncWorker
 
                 var localAudio = await DownloadFileAsync(httpClient, book.AudioUrl, $"audio_{book.Id}.mp3");
                 if (localAudio != book.AudioUrl) book.LocalAudioPath = localAudio;
+
+                foreach (var track in OfflineAudio.ExtraTracks(book))
+                {
+                    var trackUrl = OfflineAudio.TrackServerPath(book.Id, track.TrackNumber);
+                    var localTrack = await DownloadFileAsync(httpClient, trackUrl, OfflineAudio.LocalFileName(book.Id, track));
+                    if (localTrack != trackUrl) track.LocalPath = localTrack;
+                }
 
                 await localRepo.SaveBookAsync(book);
 
