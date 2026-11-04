@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using QuimeraReader.Application.Common;
 
 namespace QuimeraReader.Infrastructure.Services;
 
@@ -30,6 +31,15 @@ public static class LibraryFileAudit
         public int EpubMissing { get; set; }
         public int EpubFoundElsewhere { get; set; }
         public int EpubAmbiguous { get; set; }
+        /// <summary>Encontrado por nombre, pero ese archivo ya es de otro libro: el que falta es un duplicado importado de nuevo.</summary>
+        public int EpubFoundButInUse { get; set; }
+        /// <summary>Sin archivo y con otro libro con archivo con el mismo título y primer autor.</summary>
+        public int MissingWithDuplicate { get; set; }
+        public int MissingWithProgress { get; set; }
+        public int MissingWithAudio { get; set; }
+        public int MissingWithAnnotations { get; set; }
+        /// <summary>Sin archivo, sin duplicado, sin progreso, audio ni notas: no se pierde nada borrándolos.</summary>
+        public int MissingUnrecoverable { get; set; }
         public int CoverOk { get; set; }
         public int CoverMissing { get; set; }
         public int CoverFoundElsewhere { get; set; }
@@ -92,9 +102,26 @@ public static class LibraryFileAudit
         var index = BuildFileIndex(folders, cancellationToken, onFilesIndexed);
 
         var books = await db.Books.AsNoTracking()
-            .Select(b => new { b.Id, b.EpubFilePath, b.CoverImagePath })
+            .Select(b => new { b.Id, b.Title, b.EpubFilePath, b.CoverImagePath, b.ReadingStatus, b.PercentageCompleted, b.CurrentAudioPosition })
             .ToListAsync(cancellationToken);
         report.TotalBooks = books.Count;
+
+        var firstAuthor = (await db.BookAuthors.AsNoTracking().Select(ba => new { ba.BookId, ba.Author.Name }).ToListAsync(cancellationToken))
+            .GroupBy(x => x.BookId).ToDictionary(g => g.Key, g => g.Min(x => x.Name) ?? "");
+        var withAudio = (await db.BookAudioTracks.AsNoTracking().Select(t => t.BookId).Distinct().ToListAsync(cancellationToken)).ToHashSet();
+        var withNotes = (await db.BookAnnotations.AsNoTracking().Select(a => a.BookId).Distinct().ToListAsync(cancellationToken)).ToHashSet();
+        string TitleKey(int id, string title) => TextNormalizer.Fold(title) + "|" + TextNormalizer.Fold(firstAuthor.GetValueOrDefault(id));
+
+        // Primera pasada: qué libros tienen su EPUB y qué archivos están ya en uso
+        var resolvedEpubs = new Dictionary<int, string>();
+        foreach (var book in books)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var resolved = LibraryPathResolver.Resolve(book.EpubFilePath, libraryRoot);
+            if (resolved != null) resolvedEpubs[book.Id] = resolved;
+        }
+        var usedFiles = resolvedEpubs.Values.ToHashSet(StringComparer.Ordinal);
+        var presentTitles = books.Where(b => resolvedEpubs.ContainsKey(b.Id)).Select(b => TitleKey(b.Id, b.Title)).ToHashSet();
 
         var groups = new Dictionary<string, FolderGroup>();
         var epubFixes = new Dictionary<int, string>();
@@ -107,8 +134,7 @@ public static class LibraryFileAudit
 
             if (!string.IsNullOrEmpty(book.EpubFilePath))
             {
-                var resolved = LibraryPathResolver.Resolve(book.EpubFilePath, libraryRoot);
-                if (resolved != null)
+                if (resolvedEpubs.TryGetValue(book.Id, out var resolved))
                 {
                     report.EpubOk++;
                     epubDir = Path.GetDirectoryName(resolved);
@@ -126,16 +152,30 @@ public static class LibraryFileAudit
                     group.MaxBookId = Math.Max(group.MaxBookId, book.Id);
                     if (group.Samples.Count < 5) group.Samples.Add(book.EpubFilePath);
 
+                    bool duplicate = presentTitles.Contains(TitleKey(book.Id, book.Title));
+                    bool progress = (book.PercentageCompleted ?? 0) > 0 || (book.CurrentAudioPosition ?? 0) > 0
+                                    || (!string.IsNullOrEmpty(book.ReadingStatus) && book.ReadingStatus != "Unread");
+                    if (duplicate) report.MissingWithDuplicate++;
+                    if (progress) report.MissingWithProgress++;
+                    if (withAudio.Contains(book.Id)) report.MissingWithAudio++;
+                    if (withNotes.Contains(book.Id)) report.MissingWithAnnotations++;
+
                     if (index.TryGetValue(Path.GetFileName(book.EpubFilePath.Replace("\\", "/")), out var candidates))
                     {
-                        if (candidates.Count == 1)
+                        var free = candidates.Where(c => !usedFiles.Contains(c)).ToList();
+                        if (free.Count == 0) report.EpubFoundButInUse++;
+                        else if (free.Count == 1)
                         {
                             report.EpubFoundElsewhere++;
-                            epubFixes[book.Id] = candidates[0];
-                            epubDir = Path.GetDirectoryName(candidates[0]);
+                            epubFixes[book.Id] = free[0];
+                            usedFiles.Add(free[0]);
+                            epubDir = Path.GetDirectoryName(free[0]);
                         }
                         else report.EpubAmbiguous++;
                     }
+
+                    if (!duplicate && !progress && !withAudio.Contains(book.Id) && !withNotes.Contains(book.Id) && !epubFixes.ContainsKey(book.Id))
+                        report.MissingUnrecoverable++;
                 }
             }
 

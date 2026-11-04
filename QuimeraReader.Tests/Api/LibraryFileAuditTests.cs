@@ -50,16 +50,22 @@ public class LibraryFileAuditTests : IAsyncLifetime
         _db.Books.AddRange(
             new Book { Title = "Bueno", EpubFilePath = okEpub },
             new Book { Title = "Movido", EpubFilePath = "/media/torrents/viejo/movido.epub", CoverImagePath = "/media/torrents/viejo/movido.jpg" },
-            new Book { Title = "Perdido", EpubFilePath = "/media/torrents/viejo/perdido.epub" });
+            new Book { Title = "Perdido", EpubFilePath = "/media/torrents/viejo/perdido.epub" },
+            new Book { Title = "Perdido", EpubFilePath = Touch("ok", "perdido-nuevo.epub") },
+            new Book { Title = "Bueno", EpubFilePath = "/app/media/books/bueno.epub", PercentageCompleted = 0.4 });
         await _db.SaveChangesAsync();
 
         var report = await LibraryFileAudit.RunAsync(_db, null, new[] { _root }, apply: false);
 
-        report.EpubOk.Should().Be(1);
-        report.EpubMissing.Should().Be(2);
+        report.EpubOk.Should().Be(2);
+        report.EpubMissing.Should().Be(3);
+        report.EpubFoundButInUse.Should().Be(1);
+        report.MissingWithDuplicate.Should().Be(2);
+        report.MissingWithProgress.Should().Be(1);
+        report.MissingUnrecoverable.Should().Be(0);
         report.EpubFoundElsewhere.Should().Be(1);
         report.CoverFoundElsewhere.Should().Be(1);
-        report.MissingEpubFolders.Single().Folder.Should().Be("/media/torrents/viejo");
+        report.MissingEpubFolders.First().Folder.Should().Be("/media/torrents/viejo");
         report.Repaired.Should().Be(0);
 
         var applied = await LibraryFileAudit.RunAsync(_db, null, new[] { _root }, apply: true);
@@ -69,6 +75,6 @@ public class LibraryFileAuditTests : IAsyncLifetime
         var movido = await _db.Books.SingleAsync(b => b.Title == "Movido");
         movido.EpubFilePath.Should().Be(movedEpub);
         movido.CoverImagePath.Should().Be(movedCover);
-        (await _db.Books.SingleAsync(b => b.Title == "Perdido")).EpubFilePath.Should().Be("/media/torrents/viejo/perdido.epub");
+        (await _db.Books.FirstAsync(b => b.Title == "Perdido")).EpubFilePath.Should().Be("/media/torrents/viejo/perdido.epub");
     }
 }
