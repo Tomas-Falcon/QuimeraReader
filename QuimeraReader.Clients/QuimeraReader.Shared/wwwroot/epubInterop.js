@@ -35,6 +35,121 @@ function normalizeComparable(str) {
         .trim();
 }
 
+// Texto comparable de todo el capítulo con, para cada carácter, el nodo de texto y el desplazamiento de origen.
+// Permite encontrar un segmento aunque cruce párrafos y acotar el resaltado exactamente a él.
+function buildComparableIndex(doc) {
+    var chars = [];
+    var nodes = [];
+    var offsets = [];
+    var walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
+    var node;
+    while ((node = walker.nextNode())) {
+        var parentTag = node.parentElement ? node.parentElement.tagName : "";
+        if (parentTag === "SCRIPT" || parentTag === "STYLE") continue;
+        var raw = node.nodeValue || "";
+        for (var i = 0; i < raw.length; i++) {
+            var ch = raw[i];
+            var norm = (ch >= "a" && ch <= "z") || (ch >= "0" && ch <= "9") ? ch : normalizeComparable(ch);
+            for (var j = 0; j < norm.length; j++) {
+                chars.push(norm[j]);
+                nodes.push(node);
+                offsets.push(i);
+            }
+        }
+    }
+    return { text: chars.join(""), nodes: nodes, offsets: offsets };
+}
+
+// Primera aparición a partir de preferFrom; si no hay ninguna después, la última anterior
+function pickOccurrence(text, needle, preferFrom) {
+    var at = text.indexOf(needle);
+    if (at < 0 || preferFrom <= 0) return at;
+    var lastBefore = at;
+    while (at >= 0) {
+        if (at >= preferFrom) return at;
+        lastBefore = at;
+        at = text.indexOf(needle, at + 1);
+    }
+    return lastBefore;
+}
+
+// Busca el segmento en el capítulo: entero, o por su comienzo o su final cuando la transcripción de Whisper no coincide
+// del todo con el libro. Si aparece varias veces se prefiere la aparición a partir de la página visible.
+function findSegmentInIndex(index, searchStr, preferFrom) {
+    var text = index.text;
+    if (text.length === 0) return null;
+
+    var start = pickOccurrence(text, searchStr, preferFrom);
+    var end = start + searchStr.length;
+    if (start < 0) {
+        var probeLen = Math.min(28, searchStr.length);
+        if (probeLen < 10) return null;
+        var prefixAt = pickOccurrence(text, searchStr.substring(0, probeLen), preferFrom);
+        if (prefixAt >= 0) {
+            start = prefixAt;
+            end = Math.min(text.length, prefixAt + searchStr.length);
+        } else {
+            var suffixAt = pickOccurrence(text, searchStr.substring(searchStr.length - probeLen), preferFrom);
+            if (suffixAt < 0) return null;
+            end = suffixAt + probeLen;
+            start = Math.max(0, end - searchStr.length);
+        }
+    }
+
+    return {
+        startNode: index.nodes[start],
+        startOffset: index.offsets[start],
+        endNode: index.nodes[end - 1],
+        endOffset: index.offsets[end - 1] + 1
+    };
+}
+
+// Posición en el índice del primer carácter de la página visible (0 si no se puede saber)
+function getVisibleStartIndex(content, index) {
+    try {
+        var loc = window.epubRendition.currentLocation();
+        var startCfi = loc && loc.start && loc.start.cfi;
+        if (!startCfi) return 0;
+        var range = content.range(startCfi);
+        if (!range) return 0;
+        var startNode = range.startContainer;
+        var lastNode = null;
+        var nodeFollows = false;
+        for (var i = 0; i < index.nodes.length; i++) {
+            var n = index.nodes[i];
+            if (n === startNode) {
+                if (index.offsets[i] >= range.startOffset) return i;
+                continue;
+            }
+            if (n !== lastNode) {
+                lastNode = n;
+                nodeFollows = (startNode.compareDocumentPosition(n) & 4) !== 0; // DOCUMENT_POSITION_FOLLOWING
+            }
+            if (nodeFollows) return i;
+        }
+    } catch (e) {}
+    return 0;
+}
+
+// Si el comienzo del rango cae en la página visible. El iframe de epub.js mide lo que todas las columnas del capítulo
+// (miles de px en modo paginado), así que se mide contra el contenedor que se desplaza, no contra el propio iframe.
+function isRangeStartVisible(content, range) {
+    try {
+        var rects = range.getClientRects();
+        var rect = rects.length > 0 ? rects[0] : range.getBoundingClientRect();
+        var frame = content.window.frameElement;
+        var container = window.epubRendition.manager && window.epubRendition.manager.container;
+        if (!frame || !container) return true;
+        var frameBox = frame.getBoundingClientRect();
+        var box = container.getBoundingClientRect();
+        var x = frameBox.left + rect.left + 1;
+        var y = frameBox.top + rect.top + 1;
+        return x >= box.left && x < box.right && y >= box.top && y < box.bottom;
+    } catch (e) {
+        return true;
+    }
+}
+
 // Colores de cada tema de lectura (texto del libro y fondo del visor)
 const READER_THEMES = {
     dark: { background: "#09090b", color: "#f8f9fa" },
@@ -634,59 +749,16 @@ export function highlightKaraokePhrase(text, autoNavigatePage = true) {
     var searchStr = normalizeComparable(text);
     if (searchStr.length < 4) return null;
 
-    var treeWalker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
-    var currentNode = treeWalker.nextNode();
-    var bestMatch = null;
-    var bestMatchOffset = 0;
-    var bestMatchLength = 0;
-    var bestScore = 0;
+    var index = buildComparableIndex(doc);
+    var match = findSegmentInIndex(index, searchStr, getVisibleStartIndex(content, index));
 
-    var searchPrefix = searchStr.substring(0, Math.min(28, searchStr.length));
-
-    while (currentNode) {
-        var rawText = currentNode.nodeValue || "";
-        var normNodeText = normalizeComparable(rawText);
-
-        // Evitar falsos positivos con nodos muy cortos al inicio del capítulo
-        if (normNodeText.length >= 6) {
-            if (normNodeText.includes(searchStr)) {
-                bestMatch = currentNode;
-                bestScore = searchStr.length * 2;
-                break;
-            }
-            if (searchPrefix.length >= 10 && normNodeText.includes(searchPrefix)) {
-                if (searchPrefix.length > bestScore) {
-                    bestMatch = currentNode;
-                    bestScore = searchPrefix.length;
-                }
-            } else if (normNodeText.length >= 18 && searchStr.includes(normNodeText)) {
-                if (normNodeText.length > bestScore) {
-                    bestMatch = currentNode;
-                    bestScore = normNodeText.length;
-                }
-            }
-        }
-        currentNode = treeWalker.nextNode();
-    }
-
-    if (bestMatch) {
+    if (match) {
         var computedCfi = null;
+        var range = null;
         try {
-            var range = doc.createRange();
-            var rawVal = bestMatch.nodeValue || "";
-            // Intentar acotar el rango dentro del nodo de texto si es un párrafo largo
-            var words = text.trim().split(/\s+/).filter(w => w.length > 2);
-            var startIdx = 0;
-            var endIdx = rawVal.length;
-            if (words.length > 0) {
-                var firstWordPos = rawVal.toLowerCase().indexOf(words[0].toLowerCase().replace(/[^a-záéíóúüñ0-9]/gi, ""));
-                if (firstWordPos >= 0) {
-                    startIdx = firstWordPos;
-                    endIdx = Math.min(rawVal.length, startIdx + Math.max(text.length, 20));
-                }
-            }
-            range.setStart(bestMatch, startIdx);
-            range.setEnd(bestMatch, endIdx);
+            range = doc.createRange();
+            range.setStart(match.startNode, match.startOffset);
+            range.setEnd(match.endNode, match.endOffset);
             computedCfi = content.cfiFromRange(range);
         } catch (e) {}
 
@@ -701,18 +773,14 @@ export function highlightKaraokePhrase(text, autoNavigatePage = true) {
             } catch (e) {}
 
             // En lugar de scrollIntoView (que rompe las columnas de epub.js), usar rendition.display si está fuera de la página visible
-            if (autoNavigatePage) {
+            if (autoNavigatePage && !isRangeStartVisible(content, range)) {
                 try {
-                    var win = content.window;
-                    var rect = range.getBoundingClientRect();
-                    if (rect.left < 0 || rect.right > win.innerWidth || rect.top < 0 || rect.bottom > win.innerHeight) {
-                        window.epubRendition.display(computedCfi);
-                    }
+                    window.epubRendition.display(computedCfi);
                 } catch (e) {}
             }
             return computedCfi;
-        } else if (bestMatch.parentElement) {
-            var targetEl = bestMatch.parentElement;
+        } else if (match.startNode.parentElement) {
+            var targetEl = match.startNode.parentElement;
             if (targetEl.tagName !== "SCRIPT" && targetEl.tagName !== "STYLE") {
                 targetEl.classList.add("karaoke-highlight");
                 targetEl.style.backgroundColor = "rgba(255, 193, 7, 0.35)";

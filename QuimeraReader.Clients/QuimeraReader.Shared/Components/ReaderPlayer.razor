@@ -742,7 +742,9 @@
 
     private string GetCurrentTrackUrl()
     {
-        if (!string.IsNullOrEmpty(_audioSourceUrl) && (_audioSourceUrl.StartsWith("blob:") || _audioSourceUrl.StartsWith("data:")))
+        // La copia offline solo guarda la primera pista: usarla para otra haría sonar la pista 1 con el karaoke de la pista elegida
+        bool isFirstTrack = Book?.AudioTracks == null || Book.AudioTracks.Count <= 1 || _currentTrackNumber == Book.AudioTracks.Min(t => t.TrackNumber);
+        if (isFirstTrack && !string.IsNullOrEmpty(_audioSourceUrl) && (_audioSourceUrl.StartsWith("blob:") || _audioSourceUrl.StartsWith("data:")))
         {
             return _audioSourceUrl;
         }
