@@ -95,6 +95,21 @@
                         </div>
                     </div>
 
+                    <div class="mb-3">
+                        <label class="form-label text-white-50 small mb-1">Tipo de letra</label>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm w-100 @(_fontFamily == "original" ? "btn-primary" : "btn-outline-light")" @onclick='() => ChangeFontFamily("original")'>
+                                Original
+                            </button>
+                            <button class="btn btn-sm w-100 @(_fontFamily == "serif" ? "btn-primary" : "btn-outline-light")" style="font-family: Georgia, 'Noto Serif', serif;" @onclick='() => ChangeFontFamily("serif")'>
+                                Con serifa
+                            </button>
+                            <button class="btn btn-sm w-100 @(_fontFamily == "sans" ? "btn-primary" : "btn-outline-light")" style="font-family: system-ui, Roboto, sans-serif;" @onclick='() => ChangeFontFamily("sans")'>
+                                Sin serifa
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="mb-2">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <label class="form-label text-white-50 small mb-0">Tamaño de fuente</label>
@@ -662,6 +677,8 @@
     private bool _showAppearanceMenu = false;
     private string _currentTheme = "dark";
     private int _fontSize = 100;
+    // "original" (la del libro), "serif" o "sans"
+    private string _fontFamily = "original";
     private double _displayPercentage = 0;
     private bool _isDraggingProgress = false;
     private System.Threading.CancellationTokenSource? _sliderDebounceCts;
@@ -686,6 +703,17 @@
             await _epubJsModule.InvokeVoidAsync("setTheme", theme);
         }
         try { await JS.InvokeVoidAsync("window.localStorage.setItem", "quimera_reader_theme", theme); } catch { }
+        StateHasChanged();
+    }
+
+    private async Task ChangeFontFamily(string fontFamily)
+    {
+        _fontFamily = fontFamily;
+        if (_epubJsModule != null)
+        {
+            await _epubJsModule.InvokeVoidAsync("setFontFamily", fontFamily);
+        }
+        try { await JS.InvokeVoidAsync("window.localStorage.setItem", "quimera_reader_fontfamily", fontFamily); } catch { }
         StateHasChanged();
     }
 
@@ -864,6 +892,9 @@
                 var savedTheme = await JS.InvokeAsync<string?>("window.localStorage.getItem", "quimera_reader_theme");
                 if (!string.IsNullOrWhiteSpace(savedTheme)) _currentTheme = savedTheme;
 
+                var savedFontFamily = await JS.InvokeAsync<string?>("window.localStorage.getItem", "quimera_reader_fontfamily");
+                if (savedFontFamily is "original" or "serif" or "sans") _fontFamily = savedFontFamily;
+
                 var savedFontSize = await JS.InvokeAsync<string?>("window.localStorage.getItem", "quimera_reader_fontsize");
                 if (int.TryParse(savedFontSize, out int parsedSize) && parsedSize >= 70 && parsedSize <= 200)
                 {
@@ -904,8 +935,11 @@
                     if (approx > 0) initialPct = approx * 100.0;
                 }
 
+                // Antes de cargar el libro, para que el primer capítulo ya salga con la fuente elegida
+                try { await _epubJsModule.InvokeVoidAsync("setFontFamily", _fontFamily); } catch { }
+
                 var epubFileUrl = await TryGetLocalFileUrlAsync("epub");
-                
+
                 if (!string.IsNullOrEmpty(epubFileUrl) && (epubFileUrl.StartsWith("blob:") || System.IO.File.Exists(epubFileUrl)))
                 {
                     if (epubFileUrl.StartsWith("blob:")) 

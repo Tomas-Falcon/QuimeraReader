@@ -194,6 +194,8 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
             rendition.themes.fontSize(`${initialFontSize}%`);
         } catch (e) {}
     }
+    // Tipo de letra elegido (setFontFamily): se aplica a cada capítulo al cargarse
+    rendition.hooks.content.register(function (contents) { applyFontFamily(contents); });
 
     var hasValidInitialCfi = !!(lastCfi && typeof lastCfi === "string" && lastCfi.trim().length > 0);
     rendition.display(hasValidInitialCfi ? lastCfi : undefined);
@@ -575,6 +577,52 @@ export async function navigateToSegmentText(text, fallbackPercentage, spineIndex
     }
 
     return null;
+}
+
+// Fuentes del sistema (funcionan sin conexión). "original" respeta la del libro.
+const READER_FONTS = {
+    serif: 'Georgia, "Noto Serif", "Droid Serif", "Times New Roman", serif',
+    sans: 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif'
+};
+
+// La hoja del libro suele fijar la fuente en párrafos y títulos, así que una fuente en <html> no basta:
+// se inyecta una regla con !important en cada capítulo (sin tocar el código, que debe seguir siendo monoespaciado)
+function applyFontFamily(contents) {
+    var doc = contents && contents.document;
+    if (!doc || !doc.head) return;
+    var style = doc.getElementById("qr-font-family");
+    var family = READER_FONTS[window._epubFontFamily];
+    if (!family) {
+        if (style) style.remove();
+        return;
+    }
+    if (!style) {
+        style = doc.createElement("style");
+        style.id = "qr-font-family";
+        doc.head.appendChild(style);
+    }
+    style.textContent = "body, body *:not(code):not(pre):not(kbd):not(samp) { font-family: " + family + " !important; }";
+}
+
+export function setFontFamily(fontKey) {
+    var key = READER_FONTS[fontKey] ? fontKey : "original";
+    if (key === window._epubFontFamily) return;
+    window._epubFontFamily = key;
+    var rendition = window.epubRendition;
+    if (!rendition) return;
+    try {
+        // Otra fuente recoloca el texto en otras columnas: se vuelve al mismo punto del libro, no a la misma página
+        var location = rendition.currentLocation();
+        var cfi = location && location.start ? location.start.cfi : null;
+        rendition.getContents().forEach(applyFontFamily);
+        if (cfi) {
+            setTimeout(function () {
+                try { rendition.display(cfi); } catch (e) {}
+            }, 150);
+        }
+    } catch (e) {
+        console.error("Error setting font family:", e);
+    }
 }
 
 export function setFontSize(sizePercent) {
