@@ -189,6 +189,10 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
     let endY = 0;
     let isDragging = false;
     let touchStartTime = 0;
+    // Tras un toque, el navegador móvil emite también mousedown/mouseup simulados: sin filtrarlos, cada toque
+    // pasaba dos páginas
+    let lastTouchTime = 0;
+    const isEmulatedMouse = () => Date.now() - lastTouchTime < 800;
 
     // X del evento relativa al visor visible. En modo paginado epub.js hace el iframe tan ancho como el capítulo
     // entero y pasa de página desplazando el contenedor, así que el clientX del iframe se mide desde el inicio
@@ -237,11 +241,13 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
             startX = getViewportRelativeX(event, true, false);
             startY = getViewportRelativeY(event, true, false);
             touchStartTime = Date.now();
+            lastTouchTime = touchStartTime;
         }
     });
 
     rendition.on("touchend", event => {
         if (event.changedTouches && event.changedTouches.length > 0) {
+            lastTouchTime = Date.now();
             endX = getViewportRelativeX(event, true, true);
             endY = getViewportRelativeY(event, true, true);
             handleSwipe(event);
@@ -249,7 +255,7 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
     });
 
     rendition.on("mousedown", event => {
-        if (event.button !== 0) return;
+        if (event.button !== 0 || isEmulatedMouse()) return;
         isDragging = true;
         startX = getViewportRelativeX(event, false, false);
         startY = getViewportRelativeY(event, false, false);
@@ -257,7 +263,7 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
     });
 
     rendition.on("mouseup", event => {
-        if (!isDragging) return;
+        if (!isDragging || isEmulatedMouse()) return;
         isDragging = false;
         endX = getViewportRelativeX(event, false, true);
         endY = getViewportRelativeY(event, false, true);
