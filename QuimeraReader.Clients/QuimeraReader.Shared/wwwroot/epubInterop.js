@@ -168,6 +168,9 @@ function applyReaderTheme(rendition, themeName) {
 
 function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache, initialPercentage, initialTheme, initialFontSize) {
     window._epubLocationsReady = false;
+    // Abrir no es leer: hasta que el usuario pase de página (o el karaoke lo haga al sonar el audio) las
+    // reubicaciones son solo de posicionamiento y no deben guardarse como progreso
+    window._epubUserNavigated = false;
     window._epubCurrentTheme = initialTheme || "dark";
     window._epubAnnotationsList = [];
     window._lastMarkClickedTime = 0;
@@ -281,7 +284,7 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
                     chapterPages = location.start.displayed.total || 0;
                 }
             } catch (e) {}
-            dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage, currentPage, totalPages, chapterPage, chapterPages).catch(e => { console.error("Interop Error OnEpubLocationChanged:", e); });
+            dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage, currentPage, totalPages, chapterPage, chapterPages, !!window._epubUserNavigated).catch(e => { console.error("Interop Error OnEpubLocationChanged:", e); });
         }
     }
 
@@ -463,6 +466,13 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
             dotNetRef.invokeMethodAsync("OnAnnotationClicked", cfiRange).catch(e => {});
         }
     });
+
+    // Toda navegación de página (toques, deslizar, teclas, botones y el karaoke) pasa por next/prev:
+    // a partir de la primera, lo que se reubica ya es lectura y se guarda
+    var originalNext = rendition.next.bind(rendition);
+    var originalPrev = rendition.prev.bind(rendition);
+    rendition.next = function () { window._epubUserNavigated = true; return originalNext(); };
+    rendition.prev = function () { window._epubUserNavigated = true; return originalPrev(); };
 
     window.epubBook = book;
     window.epubRendition = rendition;
@@ -695,6 +705,8 @@ export function goToPercentage(pct) {
     if (window.epubBook && window.epubBook.locations && window.epubBook.locations.total > 0) {
         var cfi = window.epubBook.locations.cfiFromPercentage(Math.min(1.0, Math.max(0.0, pct / 100.0)));
         if (cfi && window.epubRendition) {
+            // Mover la barra de progreso es una decisión del usuario: cuenta como lectura
+            window._epubUserNavigated = true;
             window.epubRendition.display(cfi);
             return true;
         }

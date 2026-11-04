@@ -668,6 +668,8 @@
     // Página dentro del capítulo actual: a diferencia de _currentPage (bloques de "locations"), cambia en cada pantalla
     private int _chapterPage = 0;
     private int _chapterPages = 0;
+    // Abrir no es leer: solo se guarda progreso cuando en esta sesión se pasó de página o sonó el audio
+    private bool _hasReadThisSession = false;
 
     private string PageLabel => _chapterPages > 0
         ? $"Pág. {Math.Max(1, _chapterPage)} de {_chapterPages} del capítulo"
@@ -785,6 +787,7 @@
 
     private async Task ChangeTrackAsync(int trackNumber)
     {
+        _hasReadThisSession = true; // elegir una pista para escucharla es lectura
         _currentTrackNumber = trackNumber;
         _currentTime = 0;
         _lastSavedTime = -1;
@@ -1019,8 +1022,9 @@
     }
 
     [JSInvokable]
-    public void OnEpubLocationChanged(string cfi, double percentage, int currentPage = 0, int totalPages = 0, int chapterPage = 0, int chapterPages = 0)
+    public void OnEpubLocationChanged(string cfi, double percentage, int currentPage = 0, int totalPages = 0, int chapterPage = 0, int chapterPages = 0, bool userNavigated = false)
     {
+        if (userNavigated) _hasReadThisSession = true;
         _chapterPage = chapterPage;
         _chapterPages = chapterPages;
         double? scaledPercentage = percentage >= 0 ? (percentage * 100.0) : null;
@@ -1053,6 +1057,9 @@
             }
             StateHasChanged();
         }
+
+        // Abrir no es leer: el posicionamiento inicial no se guarda (no debe pisar lo leído en otro dispositivo)
+        if (!_hasReadThisSession) return;
 
         _ = System.Threading.Tasks.Task.Run(async () => {
             try {
@@ -1374,8 +1381,11 @@
             }
         }
 
+        // Reproducir es leer; colocar el audio en la posición guardada al abrir el libro no lo es
+        if (_isPlaying) _hasReadThisSession = true;
+
         // Guardar progreso cada 5 segundos incluyendo tanto audio como CFI y porcentaje calculado
-        if (_lastSavedTime == -1 || Math.Abs(time - _lastSavedTime) > 5)
+        if (_hasReadThisSession && (_lastSavedTime == -1 || Math.Abs(time - _lastSavedTime) > 5))
         {
             _lastSavedTime = time;
             double? pctToSave = Book?.PercentageCompleted;
@@ -1410,8 +1420,15 @@
     public async Task OnPlayStateChanged(bool isPlaying)
     {
         _isPlaying = isPlaying;
+        if (_isPlaying) _hasReadThisSession = true;
         if (!_isPlaying)
         {
+            // Pausa sin haber reproducido en esta sesión (p. ej. al cargar): no hay nada que guardar
+            if (!_hasReadThisSession)
+            {
+                StateHasChanged();
+                return;
+            }
             if (_epubJsModule != null)
             {
                 var pausedCfi = await _epubJsModule.InvokeAsync<string?>("convertKaraokeToHardMark");
@@ -1469,7 +1486,7 @@
 
     public async ValueTask DisposeAsync()
     {
-        if (Book != null && (!string.IsNullOrEmpty(Book.CurrentEpubCfi) || _currentTime > 0 || Book.PercentageCompleted.HasValue))
+        if (_hasReadThisSession && Book != null && (!string.IsNullOrEmpty(Book.CurrentEpubCfi) || _currentTime > 0 || Book.PercentageCompleted.HasValue))
         {
             try
             {
