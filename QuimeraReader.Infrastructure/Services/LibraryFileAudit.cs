@@ -42,8 +42,9 @@ public static class LibraryFileAudit
     private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
 
     /// <summary>Índice nombre de archivo (sin distinguir mayúsculas) → rutas completas.</summary>
-    public static Dictionary<string, List<string>> BuildFileIndex(IEnumerable<string> folders, CancellationToken cancellationToken = default)
+    public static Dictionary<string, List<string>> BuildFileIndex(IEnumerable<string> folders, CancellationToken cancellationToken = default, Action<int>? onProgress = null)
     {
+        int seen = 0;
         var index = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.System };
         foreach (var folder in folders)
@@ -51,6 +52,7 @@ public static class LibraryFileAudit
             foreach (var file in Directory.EnumerateFiles(folder, "*", options))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (++seen % 5000 == 0) onProgress?.Invoke(seen);
                 var ext = Path.GetExtension(file).ToLowerInvariant();
                 if (ext != ".epub" && !ImageExtensions.Contains(ext)) continue;
                 var name = Path.GetFileName(file);
@@ -58,6 +60,7 @@ public static class LibraryFileAudit
                 if (!list.Contains(file, StringComparer.Ordinal)) list.Add(file);
             }
         }
+        onProgress?.Invoke(seen);
         return index;
     }
 
@@ -73,7 +76,8 @@ public static class LibraryFileAudit
     /// <summary>
     /// Revisa todos los libros. Con <paramref name="apply"/> guarda las rutas reencontradas (solo coincidencias únicas).
     /// </summary>
-    public static async Task<Report> RunAsync(AppDbContext db, string? libraryRoot, IEnumerable<string> searchFolders, bool apply, CancellationToken cancellationToken = default)
+    public static async Task<Report> RunAsync(AppDbContext db, string? libraryRoot, IEnumerable<string> searchFolders, bool apply,
+        CancellationToken cancellationToken = default, Action<int>? onFilesIndexed = null)
     {
         var report = new Report { Applied = apply };
         var folders = searchFolders
@@ -85,7 +89,7 @@ public static class LibraryFileAudit
         folders = folders.Where(f => !folders.Any(o => o != f && f.StartsWith(o + Path.DirectorySeparatorChar, StringComparison.Ordinal))).ToList();
         report.SearchedFolders = folders;
 
-        var index = BuildFileIndex(folders, cancellationToken);
+        var index = BuildFileIndex(folders, cancellationToken, onFilesIndexed);
 
         var books = await db.Books.AsNoTracking()
             .Select(b => new { b.Id, b.EpubFilePath, b.CoverImagePath })

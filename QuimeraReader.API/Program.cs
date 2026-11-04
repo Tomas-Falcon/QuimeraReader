@@ -78,6 +78,7 @@ builder.Services.AddHostedService<LibraryScanBackgroundService>();
 builder.Services.AddHostedService<AudioAlignmentBackgroundService>();
 builder.Services.AddHostedService<MaintenanceBackgroundService>();
 builder.Services.AddHostedService<SeriesBackfillBackgroundService>();
+builder.Services.AddSingleton<MissingFilesAuditRunner>();
 
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(QuimeraReader.Application.Interfaces.IAppDbContext).Assembly));
 

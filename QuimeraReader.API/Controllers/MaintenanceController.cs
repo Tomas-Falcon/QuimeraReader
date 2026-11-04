@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using QuimeraReader.Infrastructure;
-using QuimeraReader.Infrastructure.Services;
+using QuimeraReader.API.BackgroundServices;
 
 namespace QuimeraReader.API.Controllers;
 
@@ -9,30 +7,22 @@ namespace QuimeraReader.API.Controllers;
 [Route("api/maintenance")]
 public class MaintenanceController : ControllerBase
 {
-    private readonly AppDbContext _dbContext;
+    private readonly MissingFilesAuditRunner _runner;
 
-    public MaintenanceController(AppDbContext dbContext)
+    public MaintenanceController(MissingFilesAuditRunner runner)
     {
-        _dbContext = dbContext;
+        _runner = runner;
     }
+
+    /// <summary>Estado de la revisión de archivos que faltan y el último informe.</summary>
+    [HttpGet("missing-files")]
+    public IActionResult Status() => Ok(_runner.GetStatus());
 
     /// <summary>
-    /// Informe de libros cuyo EPUB o portada no existe, agrupado por carpeta. Con apply=true guarda
-    /// las rutas reencontradas por nombre de archivo en la biblioteca, la carpeta de entrada, /library y /media.
+    /// Lanza en segundo plano la revisión de libros cuyo EPUB o portada no existe (recorrer /media puede tardar mucho).
+    /// Con apply=true guarda las rutas reencontradas por nombre de archivo.
     /// </summary>
-    [HttpGet("missing-files")]
-    public Task<IActionResult> Report(CancellationToken cancellationToken) => RunAsync(false, cancellationToken);
-
-    [HttpPost("missing-files/repair")]
-    public Task<IActionResult> Repair(CancellationToken cancellationToken) => RunAsync(true, cancellationToken);
-
-    private async Task<IActionResult> RunAsync(bool apply, CancellationToken cancellationToken)
-    {
-        var settings = await _dbContext.SystemSettings.AsNoTracking().ToDictionaryAsync(s => s.Key, s => s.Value, cancellationToken);
-        settings.TryGetValue("LibraryRootPath", out var libraryRoot);
-        settings.TryGetValue("IncomingScanFolder", out var incoming);
-
-        var report = await LibraryFileAudit.RunAsync(_dbContext, libraryRoot, new[] { libraryRoot, incoming, "/library", "/media" }!, apply, cancellationToken);
-        return Ok(report);
-    }
+    [HttpPost("missing-files/run")]
+    public IActionResult Run([FromQuery] bool apply = false) =>
+        _runner.TryStart(apply) ? Accepted(_runner.GetStatus()) : Conflict(_runner.GetStatus());
 }
