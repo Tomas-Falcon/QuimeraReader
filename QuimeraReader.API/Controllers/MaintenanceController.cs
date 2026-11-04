@@ -42,7 +42,7 @@ public class MaintenanceController : ControllerBase
     [HttpPost("missing-files/run")]
     public IActionResult RunMissingFiles([FromQuery] bool apply = false)
     {
-        var started = _runner.TryStart(MissingFilesJob, new { apply }, async (services, progress, token) =>
+        var started = _runner.TryStart(MissingFilesJob, new { apply }, async (services, progress, _, token) =>
         {
             var db = services.GetRequiredService<AppDbContext>();
             var (libraryRoot, incoming) = await GetFoldersAsync(db, token);
@@ -64,9 +64,38 @@ public class MaintenanceController : ControllerBase
     [HttpPost("covers/run")]
     public IActionResult RunCovers([FromQuery] bool online = true)
     {
-        var started = _runner.TryStart(CoversJob, new { online }, async (services, progress, token) =>
+        var started = _runner.TryStart(CoversJob, new { online }, async (services, progress, _, token) =>
             await services.GetRequiredService<CoverRepairService>().RepairAllAsync(online, progress, token));
         return started ? Accepted(_runner.GetStatus(CoversJob)) : Conflict(_runner.GetStatus(CoversJob));
+    }
+
+    private const string ResetPlanJob = "reset-plan";
+    private const string ResetJob = "reset";
+    public const string ResetConfirmation = "VACIAR";
+
+    /// <summary>Qué haría el vaciado de la biblioteca (no cambia nada) y su último resultado.</summary>
+    [HttpGet("reset")]
+    public IActionResult ResetStatus() => Ok(new { Plan = _runner.GetStatus(ResetPlanJob), Reset = _runner.GetStatus(ResetJob) });
+
+    /// <summary>Calcula el plan del vaciado en segundo plano (revisa los archivos de todos los libros).</summary>
+    [HttpPost("reset/plan")]
+    public IActionResult PlanReset()
+    {
+        var started = _runner.TryStart(ResetPlanJob, null, async (services, _, _, token) =>
+            await services.GetRequiredService<LibraryResetService>().PlanAsync(token));
+        return started ? Accepted(_runner.GetStatus(ResetPlanJob)) : Conflict(_runner.GetStatus(ResetPlanJob));
+    }
+
+    /// <summary>
+    /// Vacía los libros para reimportar desde cero (ver <see cref="LibraryResetService"/>). Exige confirm=VACIAR.
+    /// </summary>
+    [HttpPost("reset/run")]
+    public IActionResult RunReset([FromQuery] string? confirm)
+    {
+        if (confirm != ResetConfirmation) return BadRequest(new { Error = $"Para vaciar la biblioteca hay que confirmar con confirm={ResetConfirmation}." });
+        var started = _runner.TryStart(ResetJob, null, async (services, progress, phase, token) =>
+            await services.GetRequiredService<LibraryResetService>().RunAsync(phase, progress, token));
+        return started ? Accepted(_runner.GetStatus(ResetJob)) : Conflict(_runner.GetStatus(ResetJob));
     }
 
     /// <summary>Estado de la limpieza de duplicados y su último informe.</summary>
@@ -80,7 +109,7 @@ public class MaintenanceController : ControllerBase
     [HttpPost("duplicates/run")]
     public IActionResult RunDuplicates([FromQuery] bool apply = false, [FromQuery] bool deleteOrphans = false)
     {
-        var started = _runner.TryStart(DuplicatesJob, new { apply, deleteOrphans }, async (services, progress, token) =>
+        var started = _runner.TryStart(DuplicatesJob, new { apply, deleteOrphans }, async (services, progress, _, token) =>
         {
             var db = services.GetRequiredService<AppDbContext>();
             var (libraryRoot, _) = await GetFoldersAsync(db, token);

@@ -301,6 +301,27 @@
                             <RadzenButton Text="Actualizar y Reiniciar" Icon="system_update_alt" Click="UpdateContainerAsync" ButtonStyle="Radzen.ButtonStyle.Danger" />
                         </div>
                     </RadzenCard>
+
+                    <RadzenCard class="mb-4 bg-dark text-light border-danger shadow-sm">
+                        <h4 class="text-danger"><RadzenIcon Icon="restart_alt" /> Vaciar biblioteca y volver a escanear</h4>
+                        <p class="text-white-50 small mb-3">
+                            Borra los libros de la base de datos para reimportarlos desde cero. Se conservan los ajustes y claves, los audios huérfanos y los archivos en disco.
+                            Antes se guardan una copia de la base de datos, una copia completa de tus libros en lectura, sin conexión y con notas (que se restauran primero) y una caché de metadatos
+                            para no volver a consultar Google Books y compañía. Los universos y el estado de los demás libros se reaplican a medida que el escáner los reimporta.
+                        </p>
+                        <div class="d-flex gap-2 flex-wrap align-items-center">
+                            <RadzenButton Text="Ver qué haría" Icon="search" Click="PlanResetAsync" Disabled="@_resetBusy" ButtonStyle="Radzen.ButtonStyle.Light" Variant="Radzen.Variant.Outlined" Size="Radzen.ButtonSize.Small" />
+                            @if (_resetPlanReady)
+                            {
+                                <RadzenTextBox @bind-Value="_resetConfirm" Placeholder="Escribe VACIAR" class="bg-secondary text-light border-0" Style="max-width: 160px;" />
+                                <RadzenButton Text="Vaciar y reescanear" Icon="delete_sweep" Click="RunResetAsync" Disabled="@(_resetBusy || _resetConfirm != "VACIAR")" ButtonStyle="Radzen.ButtonStyle.Danger" Size="Radzen.ButtonSize.Small" />
+                            }
+                        </div>
+                        @if (_resetStatus != null)
+                        {
+                            <pre class="small text-info mt-3 mb-0" style="white-space: pre-wrap;">@_resetStatus</pre>
+                        }
+                    </RadzenCard>
                 </RadzenTabsItem>
                 }
             </Tabs>

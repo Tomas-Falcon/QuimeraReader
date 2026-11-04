@@ -15,6 +15,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<Universe> Universes { get; set; } = null!;
     public DbSet<Series> Series { get; set; } = null!;
     public DbSet<ScannedSourceFile> ScannedSourceFiles { get; set; } = null!;
+    public DbSet<BookMetadataCache> BookMetadataCache { get; set; } = null!;
     public DbSet<Category> Categories { get; set; } = null!;
     public DbSet<BookCategory> BookCategories { get; set; } = null!;
 
@@ -167,6 +168,7 @@ public class AppDbContext : DbContext, IAppDbContext
         modelBuilder.Entity<Series>().HasIndex(s => s.Name);
         modelBuilder.Entity<Book>().HasIndex(b => b.ContentHash);
         modelBuilder.Entity<ScannedSourceFile>().HasIndex(f => f.Path).IsUnique();
+        modelBuilder.Entity<BookMetadataCache>().HasIndex(c => c.ContentHash).IsUnique();
 
         // SystemSettings configuration
         modelBuilder.Entity<SystemSetting>()

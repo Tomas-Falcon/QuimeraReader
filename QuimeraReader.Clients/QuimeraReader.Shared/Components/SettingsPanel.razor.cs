@@ -427,6 +427,94 @@ public partial class SettingsPanel : ComponentBase
         }
     }
 
+    private bool _resetBusy;
+    private bool _resetPlanReady;
+    private string _resetConfirm = "";
+    private string? _resetStatus;
+
+    /// <summary>Lanza un trabajo de mantenimiento y espera a que termine, mostrando fase y progreso.</summary>
+    private async Task<System.Text.Json.JsonElement?> RunJobAsync(string startUrl, string statusUrl, Func<System.Text.Json.JsonElement, System.Text.Json.JsonElement> pick, string label)
+    {
+        var start = await HttpClient.PostAsync(startUrl, null);
+        if (!start.IsSuccessStatusCode && start.StatusCode != System.Net.HttpStatusCode.Conflict)
+        {
+            var body = await start.Content.ReadAsStringAsync();
+            _resetStatus = $"Error: {body}";
+            return null;
+        }
+        while (true)
+        {
+            await Task.Delay(3000, _cts.Token);
+            var status = pick(await HttpClient.GetFromJsonAsync<System.Text.Json.JsonElement>(statusUrl, _cts.Token));
+            if (!status.GetProperty("running").GetBoolean()) return status;
+            var phase = status.TryGetProperty("phase", out var p) && p.ValueKind == System.Text.Json.JsonValueKind.String ? p.GetString() : label;
+            _resetStatus = $"{phase}... {status.GetProperty("progress").GetInt32():N0}";
+            StateHasChanged();
+        }
+    }
+
+    private async Task PlanResetAsync()
+    {
+        _resetBusy = true;
+        _resetPlanReady = false;
+        _resetStatus = "Revisando la biblioteca...";
+        try
+        {
+            var status = await RunJobAsync("api/maintenance/reset/plan", "api/maintenance/reset", s => s.GetProperty("plan"), "Revisando");
+            if (status == null) return;
+            if (status.Value.TryGetProperty("error", out var err) && err.ValueKind == System.Text.Json.JsonValueKind.String) { _resetStatus = "Error: " + err.GetString(); return; }
+
+            var r = status.Value.GetProperty("result");
+            int Get(string name) => r.GetProperty(name).GetInt32();
+            var blockers = r.GetProperty("blockers").EnumerateArray().Select(b => "⚠ " + b.GetString()).ToList();
+            _resetStatus =
+                $"{Get("totalBooks"):N0} libros: {Get("booksWithFile"):N0} con archivo y {Get("booksWithoutFile"):N0} sin él (no volverán).\n" +
+                $"Hashes calculados: {Get("booksWithHash"):N0} (caché de metadatos).\n" +
+                $"{Get("booksWithUserData")} libros con datos tuyos se restaurarán primero; {Get("universes")} universos se recrearán.\n" +
+                $"{Get("libraryOnlyEpubs"):N0} EPUB solo están en la biblioteca (subidos o del modo mover) y se reimportarán desde ahí.\n" +
+                $"Se conservan {Get("settingsKept")} ajustes y {Get("unmatchedAudiosKept")} audios huérfanos." +
+                (blockers.Count > 0 ? "\n" + string.Join("\n", blockers) : "");
+            _resetPlanReady = r.GetProperty("canRun").GetBoolean();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _resetStatus = "Error: " + ex.Message; }
+        finally
+        {
+            _resetBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RunResetAsync()
+    {
+        _resetBusy = true;
+        _resetStatus = "Empezando...";
+        try
+        {
+            var status = await RunJobAsync($"api/maintenance/reset/run?confirm={_resetConfirm}", "api/maintenance/reset", s => s.GetProperty("reset"), "Vaciando");
+            if (status == null) return;
+            if (status.Value.TryGetProperty("error", out var err) && err.ValueKind == System.Text.Json.JsonValueKind.String) { _resetStatus = "Error: " + err.GetString(); return; }
+
+            var r = status.Value.GetProperty("result");
+            var restore = r.GetProperty("restore");
+            int found = restore.GetProperty("matchedByHash").GetInt32() + restore.GetProperty("imported").GetInt32();
+            _resetStatus =
+                $"Hecho. {r.GetProperty("booksDeleted").GetInt32():N0} libros vaciados, {r.GetProperty("metadataCached").GetInt32():N0} metadatos en caché.\n" +
+                $"{found} libros con datos tuyos restaurados; {r.GetProperty("libraryOnlyImported").GetInt32():N0} EPUB de la biblioteca reimportados.\n" +
+                $"El escáner reimporta ahora la carpeta de entrada; el estado y los universos que falten se reaplican al terminar cada pasada.\n" +
+                $"Copia de la base de datos: {r.GetProperty("databaseSnapshot").GetString()}";
+            _resetPlanReady = false;
+            _resetConfirm = "";
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _resetStatus = "Error: " + ex.Message; }
+        finally
+        {
+            _resetBusy = false;
+            StateHasChanged();
+        }
+    }
+
     private bool _coversRunning;
     private string? _coversStatus;
 

@@ -252,6 +252,61 @@ namespace QuimeraReader.Infrastructure.Migrations
                     b.ToTable("BookCategories");
                 });
 
+            modelBuilder.Entity("QuimeraReader.Domain.Entities.BookMetadataCache", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Authors")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("AverageRating")
+                        .HasColumnType("REAL");
+
+                    b.Property<DateTime>("CachedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Categories")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CoverImagePath")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsMetadataComplete")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Isbn")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SeriesName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("SeriesVolume")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("TotalPages")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContentHash")
+                        .IsUnique();
+
+                    b.ToTable("BookMetadataCache");
+                });
+
             modelBuilder.Entity("QuimeraReader.Domain.Entities.Category", b =>
                 {
                     b.Property<int>("Id")

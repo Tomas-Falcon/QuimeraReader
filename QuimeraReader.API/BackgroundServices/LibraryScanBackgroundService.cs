@@ -53,6 +53,8 @@ public class LibraryScanBackgroundService : BackgroundService
 
     private async Task PerformFullScanAsync(CancellationToken stoppingToken)
     {
+        if (_scanState.Paused) return;
+
         string scanFolder;
         int batchSize;
         HashSet<string> processedSources;
@@ -103,7 +105,7 @@ public class LibraryScanBackgroundService : BackgroundService
             // Procesar en lotes creando un Scope nuevo por lote para no saturar el DbContext
             for (int i = 0; i < pendingFiles.Length; i += batchSize)
             {
-                if (stoppingToken.IsCancellationRequested) break;
+                if (stoppingToken.IsCancellationRequested || _scanState.Paused) break;
 
                 var batchFiles = pendingFiles.Skip(i).Take(batchSize).ToArray();
                 await ProcessBatchFilesAsync(batchFiles, scanFolder, epubExtensions, audioExtensions, stoppingToken);
@@ -113,6 +115,11 @@ public class LibraryScanBackgroundService : BackgroundService
         {
             _scanState.IsScanning = false;
             _logger.LogInformation("Escaneo de biblioteca finalizado.");
+        }
+
+        if (!_scanState.Paused && !stoppingToken.IsCancellationRequested)
+        {
+            await ApplyPendingRestoreAsync(stoppingToken);
         }
     }
 
@@ -129,7 +136,7 @@ public class LibraryScanBackgroundService : BackgroundService
 
         foreach (var file in files)
         {
-            if (stoppingToken.IsCancellationRequested) break;
+            if (stoppingToken.IsCancellationRequested || _scanState.Paused) break;
             _scanState.CurrentFile = Path.GetFileName(file);
             // Recordar el archivo durante la vida del proceso: duplicados y EPUB corruptos no se reintentan en bucle
             _attemptedFiles.Add(file);
@@ -232,6 +239,42 @@ public class LibraryScanBackgroundService : BackgroundService
             {
                 _scanState.FilesProcessed++;
             }
+        }
+    }
+
+    /// <summary>
+    /// Tras vaciar la biblioteca, el estado del usuario (progreso, sin conexión, notas, universos) queda pendiente en
+    /// un JSON y se reaplica después de cada pasada del escáner, a medida que van apareciendo sus libros.
+    /// Se da por terminado cuando todos los libros y universos se han encontrado.
+    /// </summary>
+    private async Task ApplyPendingRestoreAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var path = BackupService.PendingRestorePath(dbContext);
+            if (!File.Exists(path)) return;
+
+            var backup = scope.ServiceProvider.GetRequiredService<BackupService>();
+            BackupService.RestoreReport report;
+            await using (var stream = File.OpenRead(path))
+            {
+                report = await backup.RestoreAsync(stream, isZip: false, stoppingToken);
+            }
+
+            _logger.LogInformation("Restauración pendiente: {Found} de {Total} libros encontrados, {Pending} universos sin completar",
+                report.BooksInBackup - report.NotFound.Count, report.BooksInBackup, report.UniversesPending);
+
+            if (report.NotFound.Count == 0 && report.UniversesPending == 0)
+            {
+                File.Move(path, Path.Combine(Path.GetDirectoryName(path)!, $"pending-restore.applied-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json"));
+                _logger.LogInformation("Restauración pendiente completada.");
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "No se pudo aplicar la restauración pendiente");
         }
     }
 

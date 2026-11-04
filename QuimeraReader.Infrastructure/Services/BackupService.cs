@@ -41,6 +41,22 @@ public class BackupService
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public bool IncludesFiles { get; set; }
         public List<BackupBook> Books { get; set; } = new();
+        public List<BackupUniverse> Universes { get; set; } = new();
+    }
+
+    public class BackupUniverse
+    {
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+        public List<string> Series { get; set; } = new();
+        /// <summary>Libros sueltos del universo (los que no van por saga).</summary>
+        public List<BackupUniverseBook> Books { get; set; } = new();
+    }
+
+    public class BackupUniverseBook
+    {
+        public string Title { get; set; } = "";
+        public string? Author { get; set; }
     }
 
     public class BackupBook
@@ -98,6 +114,9 @@ public class BackupService
         public int AudioTracksAdded { get; set; }
         public List<string> NotFound { get; set; } = new();
         public List<string> Errors { get; set; } = new();
+        public int UniversesApplied { get; set; }
+        /// <summary>Universos a los que aún les falta alguna saga o libro por importar.</summary>
+        public int UniversesPending { get; set; }
     }
 
     private async Task<string?> GetLibraryRootAsync(CancellationToken cancellationToken) =>
@@ -153,6 +172,23 @@ public class BackupService
                 }).ToList()
             });
         }
+
+        // Los universos los crea el usuario: no salen de los EPUB, así que se guardan todos
+        var universes = await _db.Universes.AsNoTracking()
+            .Select(u => new { u.Name, u.Description, Series = u.Series.Select(s => s.Name).ToList() })
+            .ToListAsync(cancellationToken);
+        var standalone = await _db.Books.AsNoTracking()
+            .Where(b => b.UniverseId != null)
+            .Select(b => new { UniverseName = b.Universe!.Name, b.Title, Author = b.Authors.OrderBy(a => a.AuthorId).Select(a => a.Author.Name).FirstOrDefault() })
+            .ToListAsync(cancellationToken);
+        manifest.Universes = universes.Select(u => new BackupUniverse
+        {
+            Name = u.Name,
+            Description = u.Description,
+            Series = u.Series,
+            Books = standalone.Where(b => b.UniverseName == u.Name).Select(b => new BackupUniverseBook { Title = b.Title, Author = b.Author }).ToList()
+        }).ToList();
+
         return manifest;
     }
 
@@ -271,8 +307,58 @@ public class BackupService
                 _db.ChangeTracker.Clear();
             }
         }
+
+        await RestoreUniversesAsync(manifest.Universes, report, cancellationToken);
         return report;
     }
+
+    /// <summary>
+    /// Recrea los universos y les vuelve a asignar sus sagas y libros sueltos (por nombre). Idempotente: lo que aún
+    /// no existe (la saga o el libro todavía no se ha importado) cuenta como pendiente para un intento posterior.
+    /// </summary>
+    private async Task RestoreUniversesAsync(List<BackupUniverse> universes, RestoreReport report, CancellationToken cancellationToken)
+    {
+        foreach (var item in universes)
+        {
+            var universe = await _db.Universes.FirstOrDefaultAsync(u => EF.Functions.Collate(u.Name, "NOCASE") == item.Name, cancellationToken);
+            if (universe == null)
+            {
+                universe = new Universe { Name = item.Name, Description = item.Description };
+                _db.Universes.Add(universe);
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+
+            bool complete = true;
+            foreach (var seriesName in item.Series)
+            {
+                var series = await _db.Series.FirstOrDefaultAsync(s => EF.Functions.Collate(s.Name, "NOCASE") == seriesName, cancellationToken);
+                if (series == null) { complete = false; continue; }
+                series.UniverseId ??= universe.Id;
+            }
+            foreach (var standalone in item.Books)
+            {
+                var title = TextNormalizer.Fold(standalone.Title);
+                var author = TextNormalizer.Fold(standalone.Author);
+                var candidates = await _db.Books.Include(b => b.Authors).ThenInclude(ba => ba.Author)
+                    .Where(b => EF.Functions.Collate(b.Title, "NOCASE") == standalone.Title).ToListAsync(cancellationToken);
+                var book = candidates.FirstOrDefault(b => TextNormalizer.Fold(b.Title) == title
+                    && (author.Length == 0 || b.Authors.Any(a => a.Author != null && TextNormalizer.Fold(a.Author.Name) == author)));
+                if (book == null) { complete = false; continue; }
+                book.UniverseId ??= universe.Id;
+            }
+            await _db.SaveChangesAsync(cancellationToken);
+
+            if (complete) report.UniversesApplied++;
+            else report.UniversesPending++;
+        }
+    }
+
+    /// <summary>Restauración que se reaplica tras cada pasada del escáner después de vaciar la biblioteca.</summary>
+    public static string PendingRestorePath(AppDbContext db) =>
+        Path.Combine(BackupsDir(db), "pending-restore.json");
+
+    public static string BackupsDir(AppDbContext db) =>
+        Path.Combine(Path.GetDirectoryName(Path.GetFullPath(db.Database.GetDbConnection().DataSource)) ?? ".", "backups");
 
     private IQueryable<Book> BooksWithChildren() => _db.Books
         .Include(b => b.Authors).ThenInclude(ba => ba.Author)

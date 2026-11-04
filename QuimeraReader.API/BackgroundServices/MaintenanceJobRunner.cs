@@ -15,11 +15,12 @@ public class MaintenanceJobRunner
         public DateTime? StartedAt { get; set; }
         public DateTime? FinishedAt { get; set; }
         public int Progress { get; set; }
+        public string? Phase { get; set; }
         public string? Error { get; set; }
         public object? Result { get; set; }
     }
 
-    public delegate Task<object> Job(IServiceProvider services, Action<int> reportProgress, CancellationToken cancellationToken);
+    public delegate Task<object> Job(IServiceProvider services, Action<int> reportProgress, Action<string> reportPhase, CancellationToken cancellationToken);
 
     private readonly IServiceProvider _serviceProvider;
     private readonly IHostApplicationLifetime _lifetime;
@@ -38,7 +39,7 @@ public class MaintenanceJobRunner
         var state = _jobs.GetOrAdd(name, _ => new JobState());
         lock (state)
         {
-            return new { Running = state.Running, state.Options, state.StartedAt, state.FinishedAt, state.Progress, state.Error, state.Result };
+            return new { Running = state.Running, state.Options, state.StartedAt, state.FinishedAt, state.Progress, state.Phase, state.Error, state.Result };
         }
     }
 
@@ -53,6 +54,7 @@ public class MaintenanceJobRunner
             state.StartedAt = DateTime.UtcNow;
             state.FinishedAt = null;
             state.Progress = 0;
+            state.Phase = null;
             state.Error = null;
         }
 
@@ -63,7 +65,8 @@ public class MaintenanceJobRunner
             try
             {
                 using var scope = _serviceProvider.CreateScope();
-                result = await job(scope.ServiceProvider, p => { lock (state) state.Progress = p; }, _lifetime.ApplicationStopping);
+                result = await job(scope.ServiceProvider, p => { lock (state) state.Progress = p; },
+                    ph => { lock (state) { state.Phase = ph; state.Progress = 0; } }, _lifetime.ApplicationStopping);
             }
             catch (Exception ex)
             {

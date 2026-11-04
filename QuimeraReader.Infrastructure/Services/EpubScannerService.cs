@@ -95,8 +95,47 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
         book ??= new Book { Title = bookTitle };
         book.ContentHash ??= contentHash;
 
+        // Este EPUB ya estuvo en la biblioteca (p. ej. antes de vaciarla): se reutilizan sus metadatos, con las
+        // correcciones a mano, en vez de volver a consultar los servicios externos
+        var cached = book.Id == 0 ? await MetadataCacheService.FindAsync(_dbContext, contentHash) : null;
+        if (cached != null)
+        {
+            book.Title = cached.Title;
+            book.Description = cached.Description;
+            book.AverageRating ??= cached.AverageRating;
+            book.TotalPages ??= cached.TotalPages;
+            foreach (var authorName in MetadataCacheService.Split(cached.Authors))
+            {
+                var author = _dbContext.ChangeTracker.Entries<Author>().Select(e => e.Entity).FirstOrDefault(a => a.Name == authorName)
+                             ?? await _dbContext.Authors.FirstOrDefaultAsync(a => a.Name == authorName);
+                if (author == null)
+                {
+                    author = new Author { Name = authorName, FileAs = authorName };
+                    _dbContext.Authors.Add(author);
+                }
+                book.Authors.Add(new BookAuthor { Author = author });
+            }
+            foreach (var catName in MetadataCacheService.Split(cached.Categories))
+            {
+                var category = _dbContext.ChangeTracker.Entries<Category>().Select(e => e.Entity).FirstOrDefault(c => c.Name == catName)
+                               ?? await _dbContext.Set<Category>().FirstOrDefaultAsync(c => c.Name == catName);
+                if (category == null)
+                {
+                    category = new Category { Name = catName, IsUserGenerated = false };
+                    _dbContext.Add(category);
+                }
+                book.Categories.Add(new BookCategory { Category = category });
+            }
+            if (!string.IsNullOrWhiteSpace(cached.SeriesName))
+            {
+                book.Series = await SeriesAssigner.FindOrCreateAsync(_dbContext, cached.SeriesName);
+                book.SeriesVolume = cached.SeriesVolume;
+            }
+            _logger.LogInformation("Metadatos de '{Title}' reutilizados de la caché (sin consultar servicios externos)", book.Title);
+        }
+
         // Evitamos duplicar autores ya existentes
-        if (epubBook.AuthorList != null)
+        if (cached == null && epubBook.AuthorList != null)
         {
             foreach (var authorName in epubBook.AuthorList)
             {
@@ -178,7 +217,7 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
         }
 
         // Extraer categorías/subjects directamente del EPUB (dc:subject)
-        if (epubBook.Schema?.Package?.Metadata?.Subjects != null)
+        if (cached == null && epubBook.Schema?.Package?.Metadata?.Subjects != null)
         {
             foreach (var subjectRaw in epubBook.Schema.Package.Metadata.Subjects)
             {
@@ -231,7 +270,10 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
         var query = hasTitle ? book.Title : Path.GetFileNameWithoutExtension(fallbackName);
         var authorHint = book.Authors.FirstOrDefault()?.Author?.Name;
         
-        var orderedProviders = _providers.OrderByDescending(p => p.ProviderName == preferredProviderName);
+        // Con metadatos en caché no se consulta ningún servicio externo
+        var orderedProviders = cached != null
+            ? Enumerable.Empty<IMetadataProvider>()
+            : _providers.OrderByDescending(p => p.ProviderName == preferredProviderName);
 
         BookMetadata? metadata = null;
         foreach (var provider in orderedProviders)
@@ -255,6 +297,11 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
         }
 
         byte[]? apiCoverBytes = null;
+        if (cached != null)
+        {
+            if (!string.IsNullOrWhiteSpace(cached.Isbn)) book.Isbn = cached.Isbn;
+            apiCoverBytes = await MetadataCacheService.ReadCoverAsync(cached, settingsDict.GetValueOrDefault("LibraryRootPath"));
+        }
 
         if (metadata != null)
         {
