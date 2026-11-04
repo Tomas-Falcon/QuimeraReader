@@ -143,6 +143,13 @@ public class AnnotationDto
     public string? ColorHex { get; set; }
     public string? Note { get; set; }
     public DateTime CreatedAt { get; set; }
+    // "listen" = "Seguir escuchando aquí" (una por libro); null = marca normal
+    public string? Kind { get; set; }
+    public double? AudioPosition { get; set; }
+    public int? AudioTrackNumber { get; set; }
+
+    public const string ListenKind = "listen";
+    public bool IsListenMarker => Kind == ListenKind;
 }
 
 public class ManagedAudioDto

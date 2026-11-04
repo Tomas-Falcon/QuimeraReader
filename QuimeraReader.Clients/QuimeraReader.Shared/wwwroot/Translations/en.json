@@ -201,5 +201,7 @@
   "Auth_ServerUnreachable": "Could not reach the server.",
   "Reader_Rereading": "Rereading “{0}”",
   "Action_Undo": "Undo",
-  "BookDetails_Status": "Status"
+  "BookDetails_Status": "Status",
+  "Reader_PlayingFromSelection": "Playing from the selected passage.",
+  "Reader_ListenMarkerSet": "Marked: you will keep listening from here."
 }

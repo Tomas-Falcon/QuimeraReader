@@ -343,7 +343,10 @@ public class LocalBookRepository : ILocalBookRepository
                 SelectedText = a.SelectedText,
                 Note = a.Note,
                 ColorHex = a.ColorHex,
-                CreatedAt = a.CreatedAt
+                CreatedAt = a.CreatedAt,
+                Kind = a.Kind,
+                AudioPosition = a.AudioPosition,
+                AudioTrackNumber = a.AudioTrackNumber
             })
             .ToListAsync();
 
@@ -384,7 +387,10 @@ public class LocalBookRepository : ILocalBookRepository
                 SelectedText = a.SelectedText,
                 Note = a.Note ?? "",
                 ColorHex = a.ColorHex ?? "",
-                CreatedAt = a.CreatedAt
+                CreatedAt = a.CreatedAt,
+                Kind = a.Kind,
+                AudioPosition = a.AudioPosition,
+                AudioTrackNumber = a.AudioTrackNumber
             }).ToList();
             await _dbContext.SaveChangesAsync();
         }

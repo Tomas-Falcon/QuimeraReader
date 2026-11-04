@@ -222,5 +222,7 @@
   "Auth_ServerUnreachable": "No se pudo contactar con el servidor.",
   "Reader_Rereading": "Releyendo «{0}»",
   "Action_Undo": "Deshacer",
-  "BookDetails_Status": "Estado"
+  "BookDetails_Status": "Estado",
+  "Reader_PlayingFromSelection": "Reproduciendo desde el fragmento seleccionado.",
+  "Reader_ListenMarkerSet": "Marcado: seguirás escuchando desde aquí."
 }

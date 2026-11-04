@@ -951,7 +951,16 @@ public class BooksController : ControllerBase
         annotation.BookId = id;
         annotation.CreatedAt = DateTime.UtcNow;
         annotation.UpdatedAt = DateTime.UtcNow;
-        
+
+        // "Seguir escuchando aquí": una por libro, la nueva sustituye a la anterior
+        if (annotation.Kind == QuimeraReader.Domain.Entities.BookAnnotation.ListenKind)
+        {
+            var previous = await _dbContext.BookAnnotations
+                .Where(a => a.BookId == id && a.Kind == QuimeraReader.Domain.Entities.BookAnnotation.ListenKind)
+                .ToListAsync();
+            _dbContext.BookAnnotations.RemoveRange(previous);
+        }
+
         _dbContext.BookAnnotations.Add(annotation);
         await _dbContext.SaveChangesAsync();
 
@@ -971,7 +980,10 @@ public class BooksController : ControllerBase
                 a.SelectedText,
                 a.ColorHex,
                 a.Note,
-                a.CreatedAt
+                a.CreatedAt,
+                a.Kind,
+                a.AudioPosition,
+                a.AudioTrackNumber
             })
             .ToListAsync();
 

@@ -34,6 +34,8 @@ public interface IBookService
     Task UpdateAnnotationAsync(int bookId, int annotationId, string colorHex, string note);
     Task DeleteAnnotationAsync(int bookId, int annotationId);
     Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId);
+    /// <summary>Crea la marca "Seguir escuchando aquí" (sustituye a la anterior del libro). null si no hay conexión.</summary>
+    Task<AnnotationDto?> SetListenMarkerAsync(int bookId, string cfiRange, string selectedText, double audioPosition, int audioTrackNumber);
     Task UpdateCoverAsync(int bookId, string imageUrl);
     Task SaveEpubLocationsAsync(int bookId, string locationsJson);
     void InvalidateCache();
@@ -615,6 +617,31 @@ public class BookService : IBookService
             {
                 await localRepo.QueueAnnotationAsync(bookId, cfiRange, selectedText, colorHex, note);
             }
+        }
+    }
+
+    public async Task<AnnotationDto?> SetListenMarkerAsync(int bookId, string cfiRange, string selectedText, double audioPosition, int audioTrackNumber)
+    {
+        // Sin conexión no se crea: la posición de audio ya se guardó en local con UpdatePositionAsync
+        if (_networkState.IsOffline) return null;
+        try
+        {
+            var payload = new
+            {
+                CfiRange = cfiRange,
+                SelectedText = selectedText,
+                Kind = AnnotationDto.ListenKind,
+                AudioPosition = audioPosition,
+                AudioTrackNumber = audioTrackNumber
+            };
+            var response = await _httpClient.PostAsJsonAsync($"api/Books/{bookId}/annotations", payload);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<AnnotationDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[BookService] No se pudo crear la marca de audio del libro {BookId}", bookId);
+            return null;
         }
     }
 

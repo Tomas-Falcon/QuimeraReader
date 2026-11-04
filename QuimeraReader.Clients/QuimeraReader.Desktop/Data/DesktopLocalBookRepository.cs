@@ -294,7 +294,7 @@ public class DesktopLocalBookRepository : ILocalBookRepository
     public async Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId)
     {
         var queued = await GetQueuedAnnotationsAsync();
-        var dbAnns = await _dbContext.Books.Where(b => b.Id == bookId).SelectMany(b => b.Annotations).Select(a => new AnnotationDto { Id = a.Id, CfiRange = a.CfiRange, SelectedText = a.SelectedText, Note = a.Note, ColorHex = a.ColorHex, CreatedAt = a.CreatedAt }).ToListAsync();
+        var dbAnns = await _dbContext.Books.Where(b => b.Id == bookId).SelectMany(b => b.Annotations).Select(a => new AnnotationDto { Id = a.Id, CfiRange = a.CfiRange, SelectedText = a.SelectedText, Note = a.Note, ColorHex = a.ColorHex, CreatedAt = a.CreatedAt, Kind = a.Kind, AudioPosition = a.AudioPosition, AudioTrackNumber = a.AudioTrackNumber }).ToListAsync();
         foreach(var q in queued.Where(x => x.BookId == bookId)) {
             dbAnns.Add(new AnnotationDto { CfiRange = q.CfiRange, SelectedText = q.SelectedText, Note = q.Note, ColorHex = q.ColorHex });
         }
@@ -306,7 +306,7 @@ public class DesktopLocalBookRepository : ILocalBookRepository
         var book = await _dbContext.Books.Include(b => b.Annotations).FirstOrDefaultAsync(b => b.Id == bookId);
         if (book != null) {
             _dbContext.RemoveRange(book.Annotations);
-            book.Annotations = annotations.Select(a => new QuimeraReader.Domain.Entities.BookAnnotation { BookId = bookId, CfiRange = a.CfiRange, SelectedText = a.SelectedText, Note = a.Note, ColorHex = a.ColorHex, CreatedAt = a.CreatedAt }).ToList();
+            book.Annotations = annotations.Select(a => new QuimeraReader.Domain.Entities.BookAnnotation { BookId = bookId, CfiRange = a.CfiRange, SelectedText = a.SelectedText, Note = a.Note, ColorHex = a.ColorHex, CreatedAt = a.CreatedAt, Kind = a.Kind, AudioPosition = a.AudioPosition, AudioTrackNumber = a.AudioTrackNumber }).ToList();
             await _dbContext.SaveChangesAsync();
         }
     }

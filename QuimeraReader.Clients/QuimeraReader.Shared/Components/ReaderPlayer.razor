@@ -999,6 +999,7 @@
                 try
                 {
                     _bookAnnotations = await BookService.GetAnnotationsAsync(BookId);
+                    ExtractListenMarker();
                     if (_bookAnnotations.Any() && _epubJsModule != null)
                     {
                         var json = System.Text.Json.JsonSerializer.Serialize(_bookAnnotations);
@@ -1007,8 +1008,25 @@
                 }
                 catch { }
 
+                // "Seguir escuchando aquí" manda sobre la posición automática: el audio arranca en la marca
+                if (_listenMarker != null && !FromStart && _epubJsModule != null)
+                {
+                    await _epubJsModule.InvokeVoidAsync("setAudioBookmark", _listenMarker.CfiRange);
+                    if (_listenMarker.AudioPosition.HasValue)
+                    {
+                        int markerTrack = _listenMarker.AudioTrackNumber ?? 1;
+                        if (markerTrack != _currentTrackNumber && Book.AudioTracks != null && Book.AudioTracks.Any(t => t.TrackNumber == markerTrack))
+                        {
+                            _currentTrackNumber = markerTrack;
+                            StateHasChanged();
+                            await Task.Delay(80);
+                        }
+                        _currentTime = _listenMarker.AudioPosition.Value;
+                        if (_jsModule != null) await _jsModule.InvokeVoidAsync("seekAudio", _audioElement, _currentTime);
+                    }
+                }
                 // Si el usuario tenía posición de audio activa, resaltar o situar la marca de audio inicial
-                if (_currentTime > 0 && _segments.Any())
+                else if (_currentTime > 0 && _segments.Any())
                 {
                     var currentSeg = FindSegmentAtTime(_currentTime, _currentTrackNumber);
                     if (currentSeg != null && _epubJsModule != null)
@@ -1092,7 +1110,7 @@
         {
             double? audioPosition = null;
             int? audioTrack = Book?.HasAudio == true ? _currentTrackNumber : null;
-            if (Book?.HasAudio == true && !_isPlaying && _segments.Any())
+            if (Book?.HasAudio == true && !_isPlaying && _listenMarker == null && _segments.Any())
             {
                 var segment = await FindSegmentAtPageStartAsync();
                 if (segment != null)
@@ -1162,6 +1180,29 @@
     }
 
     private List<QuimeraReader.Shared.Models.AnnotationDto>? _bookAnnotations;
+    // "Seguir escuchando aquí" (una por libro); va aparte de las marcas normales, que se pintan con applyAllAnnotations
+    private QuimeraReader.Shared.Models.AnnotationDto? _listenMarker;
+
+    private void ExtractListenMarker()
+    {
+        if (_bookAnnotations == null) return;
+        _listenMarker = _bookAnnotations.FirstOrDefault(a => a.IsListenMarker);
+        _bookAnnotations.RemoveAll(a => a.IsListenMarker);
+    }
+
+    // La marca se consume cuando el audio ya pasó por ella
+    private async Task ConsumeListenMarkerIfPassedAsync()
+    {
+        var marker = _listenMarker;
+        if (marker == null || !_isPlaying || !marker.AudioPosition.HasValue) return;
+        int markerTrack = marker.AudioTrackNumber ?? 1;
+        bool passed = _currentTrackNumber > markerTrack || (_currentTrackNumber == markerTrack && _currentTime > marker.AudioPosition.Value + 5);
+        if (!passed) return;
+
+        _listenMarker = null;
+        if (_epubJsModule != null) await _epubJsModule.InvokeVoidAsync("clearAudioBookmark");
+        try { await BookService.DeleteAnnotationAsync(BookId, marker.Id); } catch { }
+    }
     private bool _showQuickSelectionPill = false;
     private bool _showAnnotationDialog = false;
     private int? _editingAnnotationId = null;
@@ -1264,12 +1305,20 @@
                     await _epubJsModule.InvokeVoidAsync("setAudioBookmark", _selectedCfi);
                 }
 
+                _hasReadThisSession = true; // fijar dónde seguir escuchando es una decisión de lectura
                 await BookService.UpdatePositionAsync(BookId, epubCfi: _selectedCfi, audioPosition: startOffset, percentage: _displayPercentage, audioTrackNumber: _currentTrackNumber);
+
+                // Sin reproducir: queda como marca "Seguir escuchando aquí", que sobrevive al cierre y viaja a otros dispositivos.
+                // Reproduciendo ya desde aquí no hace falta marca (el audio avanza desde ese punto).
+                if (!autoPlay && !string.IsNullOrEmpty(_selectedCfi))
+                {
+                    _listenMarker = await BookService.SetListenMarkerAsync(BookId, _selectedCfi, _selectedText ?? "", startOffset, _currentTrackNumber) ?? _listenMarker;
+                }
 
                 if (autoPlay)
                 {
                     await SeekToSegmentAsync(match, startOffset);
-                    ToastService.ShowSuccess("Reproduciendo desde el fragmento seleccionado.");
+                    ToastService.ShowSuccess(TranslationService["Reader_PlayingFromSelection"]);
                 }
                 else
                 {
@@ -1277,7 +1326,7 @@
                     {
                         await _jsModule.InvokeVoidAsync("seekAudio", _audioElement, startOffset);
                     }
-                    ToastService.ShowSuccess("Marca de audiolibro establecida y guardada.");
+                    ToastService.ShowSuccess(TranslationService["Reader_ListenMarkerSet"]);
                 }
             }
             else
@@ -1349,6 +1398,7 @@
                 {
                     await BookService.CreateAnnotationAsync(BookId, _selectedCfi, _selectedText, color, _annotationNote);
                     _bookAnnotations = await BookService.GetAnnotationsAsync(BookId);
+                    ExtractListenMarker();
                     ToastService.ShowSuccess("Anotación guardada.");
                 }
 
@@ -1470,6 +1520,7 @@
 
         // Reproducir es leer; colocar el audio en la posición guardada al abrir el libro no lo es
         if (_isPlaying) _hasReadThisSession = true;
+        _ = ConsumeListenMarkerIfPassedAsync();
 
         // Guardar progreso cada 5 segundos incluyendo tanto audio como CFI y porcentaje calculado
         if (_hasReadThisSession && (_lastSavedTime == -1 || Math.Abs(time - _lastSavedTime) > 5))
