@@ -66,4 +66,34 @@ public class LibraryPathUtilsTests
             Directory.Delete(dir, true);
         }
     }
+
+    [Fact]
+    public void BookOutputDir_IsTheEpubFolderInTheLibrary_NeverTheCoverOrAnotherBooksAudio()
+    {
+        var book = new QuimeraReader.Domain.Entities.Book
+        {
+            Title = "Sistemas críticos",
+            EpubFilePath = "/library/Martha Wells/Sistemas críticos/Sistemas críticos.epub",
+            CoverImagePath = "https://books.google.com/cover.jpg"
+        };
+        book.AudioTracks.Add(new QuimeraReader.Domain.Entities.BookAudioTrack { FilePath = "/library/Garcilaso de la Vega/Obras/x.mp3" });
+
+        LibraryPathUtils.GetBookOutputDir(book, "/library").Replace("\\", "/").Should().Be("/library/Martha Wells/Sistemas críticos");
+    }
+
+    [Fact]
+    public void BookOutputDir_EpubInTheTorrentFolder_UsesAuthorAndTitleInTheLibrary()
+    {
+        var book = new QuimeraReader.Domain.Entities.Book { Title = "Rey Brujo", EpubFilePath = "/media/biblioteca/Rey_Brujo.epub" };
+        book.Authors.Add(new QuimeraReader.Domain.Entities.BookAuthor { Author = new QuimeraReader.Domain.Entities.Author { Name = "Martha Wells" } });
+
+        LibraryPathUtils.GetBookOutputDir(book, "/library").Replace("\\", "/").Should().Be("/library/Martha Wells/Rey Brujo");
+    }
+
+    [Theory]
+    [InlineData("capitulo.m4b", null, ".m4b")]
+    [InlineData("Dailan Kifki", "/tmp/upload.MP3", ".mp3")]
+    [InlineData(null, "/library/x/track1", ".mp3")]
+    public void AudioExtension_NeverEmpty(string? original, string? physical, string expected) =>
+        LibraryPathUtils.AudioExtension(original, physical).Should().Be(expected);
 }

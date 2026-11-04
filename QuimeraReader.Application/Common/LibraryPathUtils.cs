@@ -9,19 +9,39 @@ namespace QuimeraReader.Application.Common;
 
 public static class LibraryPathUtils
 {
+    /// <summary>
+    /// Carpeta del libro en la biblioteca, donde van su audio y su portada: la del EPUB si está dentro de la biblioteca
+    /// (también en modo torrent, donde ahí está el enlace al EPUB); si no, biblioteca/Autor/Título.
+    /// Antes se usaba la carpeta de la portada o de la primera pista, y una pista mal colocada (o una portada que era
+    /// una URL) arrastraba los audios nuevos a la carpeta de otro libro.
+    /// </summary>
     public static async Task<string> GetBookOutputDirAsync(Book book, IAppDbContext db)
     {
-        if (!string.IsNullOrEmpty(book.CoverImagePath)) return Path.GetDirectoryName(book.CoverImagePath)!;
-        if (book.AudioTracks != null && book.AudioTracks.Any()) return Path.GetDirectoryName(book.AudioTracks.First().FilePath)!;
-        
-        string safeAuthor = string.Join("_", (book.Authors?.FirstOrDefault()?.Author?.Name ?? "Unknown Author").Split(Path.GetInvalidFileNameChars()));
-        string safeTitle = string.Join("_", book.Title.Split(Path.GetInvalidFileNameChars()));
-        
-        var settingsDict = await db.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
-        settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
-        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
-        
+        var libraryRoot = await db.SystemSettings.Where(s => s.Key == "LibraryRootPath").Select(s => s.Value).FirstOrDefaultAsync();
+        return GetBookOutputDir(book, libraryRoot);
+    }
+
+    public static string GetBookOutputDir(Book book, string? libraryRoot)
+    {
+        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = DefaultLibraryRoot;
+        var root = libraryRoot.Replace("\\", "/").TrimEnd('/') + "/";
+
+        if (!string.IsNullOrEmpty(book.EpubFilePath) && book.EpubFilePath.Replace("\\", "/").StartsWith(root, StringComparison.Ordinal))
+        {
+            return Path.GetDirectoryName(book.EpubFilePath)!;
+        }
+
+        string safeAuthor = SafeFileName(book.Authors?.FirstOrDefault()?.Author?.Name, "Unknown Author");
+        string safeTitle = SafeFileName(book.Title, "Unknown Book");
         return Path.Combine(libraryRoot, safeAuthor, safeTitle);
+    }
+
+    /// <summary>Extensión para un audio: la del nombre original, la del archivo en disco o .mp3 (antes quedaban archivos sin extensión).</summary>
+    public static string AudioExtension(string? originalFileName, string? physicalPath)
+    {
+        var ext = Path.GetExtension(originalFileName ?? "");
+        if (string.IsNullOrEmpty(ext)) ext = Path.GetExtension(physicalPath ?? "");
+        return string.IsNullOrEmpty(ext) ? ".mp3" : ext.ToLowerInvariant();
     }
 
     /// <summary>

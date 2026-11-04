@@ -530,7 +530,7 @@ public class BooksController : ControllerBase
                             string baseName = !string.IsNullOrEmpty(matchedBook.EpubFilePath)
                                 ? Path.GetFileNameWithoutExtension(matchedBook.EpubFilePath)
                                 : matchedBook.Title;
-                            string newAudioPath = LibraryPathUtils.GetUniqueFilePath(outDir, $"{baseName}_track{nextTrack}{Path.GetExtension(safeFileName)}");
+                            string newAudioPath = LibraryPathUtils.GetUniqueFilePath(outDir, $"{baseName}_track{nextTrack}{LibraryPathUtils.AudioExtension(safeFileName, null)}");
                             System.IO.File.Move(tempPath, newAudioPath);
                             matchedBook.AudioTracks.Add(new BookAudioTrack { FilePath = newAudioPath, TrackNumber = nextTrack, FileName = safeFileName });
                             matchedBook.ProcessingStatus = "PENDING_SYNC";
@@ -836,7 +836,7 @@ public class BooksController : ControllerBase
                 ? System.IO.Path.GetFileNameWithoutExtension(targetBook.EpubFilePath) 
                 : LibraryPathUtils.SafeFileName(targetBook.Title, "audio");
                 
-            string newAudioPath = LibraryPathUtils.GetUniqueFilePath(outDir, baseName + $"_track{nextTrack}" + Path.GetExtension(originalFileName));
+            string newAudioPath = LibraryPathUtils.GetUniqueFilePath(outDir, baseName + $"_track{nextTrack}" + LibraryPathUtils.AudioExtension(originalFileName, track.FilePath));
             
             if (System.IO.File.Exists(track.FilePath))
             {
@@ -1067,7 +1067,7 @@ public class BooksController : ControllerBase
             string baseName = !string.IsNullOrEmpty(book.EpubFilePath)
                 ? Path.GetFileNameWithoutExtension(book.EpubFilePath)
                 : LibraryPathUtils.SafeFileName(book.Title, "audio");
-            newAudioPath = LibraryPathUtils.GetUniqueFilePath(outDir, baseName + $"_track{nextTrack}" + Path.GetExtension(audio.OriginalFileName));
+            newAudioPath = LibraryPathUtils.GetUniqueFilePath(outDir, baseName + $"_track{nextTrack}" + LibraryPathUtils.AudioExtension(audio.OriginalFileName, audio.PhysicalPath));
             Directory.CreateDirectory(outDir);
             if (System.IO.File.Exists(audio.PhysicalPath))
             {
@@ -1130,7 +1130,7 @@ public class BooksController : ControllerBase
                                 string baseName = !string.IsNullOrEmpty(book.EpubFilePath)
                     ? Path.GetFileNameWithoutExtension(book.EpubFilePath)
                     : LibraryPathUtils.SafeFileName(book.Title, "audio");
-                newAudioPath = LibraryPathUtils.GetUniqueFilePath(outDir, baseName + $"_track{nextTrack}" + Path.GetExtension(audio.OriginalFileName));
+                newAudioPath = LibraryPathUtils.GetUniqueFilePath(outDir, baseName + $"_track{nextTrack}" + LibraryPathUtils.AudioExtension(audio.OriginalFileName, audio.PhysicalPath));
                                 Directory.CreateDirectory(outDir);
                                 if (System.IO.File.Exists(audio.PhysicalPath))
                                 {
@@ -1157,17 +1157,8 @@ public class BooksController : ControllerBase
         return Ok("El proceso ha iniciado en segundo plano. Esto tardará unos minutos.");
     }
 
-    private async Task<string> GetBookOutputDirAsync(QuimeraReader.Domain.Entities.Book book, QuimeraReader.Infrastructure.AppDbContext db)
-    {
-        if (!string.IsNullOrEmpty(book.CoverImagePath)) return System.IO.Path.GetDirectoryName(book.CoverImagePath)!;
-        if (book.AudioTracks != null && book.AudioTracks.Any()) return System.IO.Path.GetDirectoryName(book.AudioTracks.First().FilePath)!;
-        string safeAuthor = LibraryPathUtils.SafeFileName(book.Authors?.FirstOrDefault()?.Author?.Name, "Unknown Author");
-        string safeTitle = LibraryPathUtils.SafeFileName(book.Title, "Unknown Book");
-        var settingsDict = await db.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
-        settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
-        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
-        return System.IO.Path.Combine(libraryRoot, safeAuthor, safeTitle);
-    }
+    private static Task<string> GetBookOutputDirAsync(QuimeraReader.Domain.Entities.Book book, QuimeraReader.Infrastructure.AppDbContext db) =>
+        LibraryPathUtils.GetBookOutputDirAsync(book, db);
 }
 public class ScanRequest 
 { 
