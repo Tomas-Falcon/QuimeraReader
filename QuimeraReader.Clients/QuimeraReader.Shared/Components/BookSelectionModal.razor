@@ -1,3 +1,4 @@
+@implements IDisposable
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
@@ -80,6 +81,12 @@
     private void ConfirmSelection()
     {
         DialogService.Close(_selectedBookId);
+    }
+
+    public void Dispose()
+    {
+        _debounceTimer?.Stop();
+        _debounceTimer?.Dispose();
     }
 }
 

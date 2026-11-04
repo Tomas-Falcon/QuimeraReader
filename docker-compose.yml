@@ -13,6 +13,10 @@ services:
       - TZ=Europe/Madrid
       # Ruta de la base de datos dentro del contenedor
       - QUIMERA_DB_PATH=/config/quimerareader.db
+      # Clave de acceso a la API y a la web (recomendado). Sin ella cualquiera que alcance el puerto controla la biblioteca.
+      - QUIMERA_API_KEY=${QUIMERA_API_KEY:-}
+      # Debe coincidir con --http-api-token de Watchtower (botón "Actualizar" de Ajustes)
+      - WATCHTOWER_TOKEN=${WATCHTOWER_TOKEN:-quimera}
     volumes:
       # Carpeta donde dejas los libros sueltos (Si usas el modo "Mover", asegúrate de no poner :ro)
       - ./media:/media
@@ -22,18 +26,16 @@ services:
       
       # Carpeta donde guarda la Base de Datos SQLite, Ajustes y SyncMaps
       - ./config:/config
-      
-      # Socket de Docker para permitir reinicio y actualizaciones desde la web
-      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
-  # Actualizador automático (Watchtower)
+  # Actualizador automático (Watchtower). Es el único servicio que necesita el socket de Docker.
   watchtower:
     image: containrrr/watchtower
     container_name: watchtower
     environment:
       - DOCKER_API_VERSION=1.44
+      - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_TOKEN:-quimera}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 300 --http-api-update --http-api-periodic-polls --http-api-token quimera quimerareader
+    command: --interval 300 --http-api-update --http-api-periodic-polls quimerareader
     restart: unless-stopped

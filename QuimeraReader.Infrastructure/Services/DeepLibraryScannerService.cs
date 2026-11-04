@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -96,6 +96,23 @@ public class DeepLibraryScannerService
                     {
                         book.ProcessingStatus = "PENDING_SYNC";
                     }
+                }
+            }
+            else
+            {
+                // Si no se encontró libro con certeza suficiente, registrar en UnmatchedAudioTracks si no existe ya
+                bool alreadyInUnmatched = await _dbContext.UnmatchedAudioTracks.AnyAsync(u => u.PhysicalPath == audioPath, cancellationToken);
+                if (!alreadyInUnmatched)
+                {
+                    var fileInfo = new FileInfo(audioPath);
+                    _dbContext.UnmatchedAudioTracks.Add(new UnmatchedAudioTrack
+                    {
+                        OriginalFileName = Path.GetFileName(audioPath),
+                        PhysicalPath = audioPath,
+                        FileSizeBytes = fileInfo.Exists ? fileInfo.Length : 0,
+                        UploadedAt = DateTime.UtcNow
+                    });
+                    _logger.LogInformation("Audio sin coincidencia segura guardado en bandeja de huérfanos: {Path}", audioPath);
                 }
             }
         }

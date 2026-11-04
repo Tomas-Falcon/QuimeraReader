@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
+using System.Net.Http.Json;
 using QuimeraReader.Shared.Models;
 using QuimeraReader.Shared.Services;
 
@@ -10,17 +12,27 @@ public partial class SettingsPanel : ComponentBase
     [Inject] public IScanService ScanService { get; set; } = default!;
     [Inject] public ISettingsService SettingsService { get; set; } = default!;
     [Inject] public ToastService ToastService { get; set; } = default!;
+    [Inject] public IServerConfigService ServerConfig { get; set; } = default!;
+    [Inject] public NavigationManager NavManager { get; set; } = default!;
+    [Inject] public HttpClient HttpClient { get; set; } = default!;
+    [Inject] public ILogger<SettingsPanel> Logger { get; set; } = default!;
 
     private bool _isLoading = true;
     private bool _isSaving = false;
+    private bool _isTestingClientConnection = false;
+    private bool _isSendingLogs = false;
     private string _message = string.Empty;
+    private string _clientServerUrl = string.Empty;
+    private string _clientApiKey = string.Empty;
     private bool _isSuccess = false;
     private bool _isScanning = false;
     private ScanStatus? _scanStatus;
     private CancellationTokenSource _cts = new();
 
     private string _libraryRootPath = "/media";
-    private string _outgoingLibraryPath = "/app/media/books";
+    // /library es el volumen de Docker; el valor anterior (/app/media/books) estaba dentro del contenedor y se perdía al actualizar
+    private string _outgoingLibraryPath = "/library";
+    private bool _serverSettingsLoaded;
     private string _ingestionMode = "Move";
     private string _openAiKey = string.Empty;
     private string _googleBooksKey = string.Empty;
@@ -31,12 +43,26 @@ public partial class SettingsPanel : ComponentBase
     private string _openAiEndpoint = "https://api.openai.com/v1/";
     private bool _isDownloadingWhisper = false;
     private bool _isWhisperDownloaded = false;
+    private bool _showAdvancedServerSettings = false;
+
+    private bool IsMobileClient => ServerConfig?.GetType().Name.Contains("Mobile", StringComparison.OrdinalIgnoreCase) == true;
+    private bool ShowServerAdminTabs => !IsMobileClient || _showAdvancedServerSettings;
 
     private class OptionItem
     {
         public string Text { get; set; } = string.Empty;
         public string Value { get; set; } = string.Empty;
     }
+
+    private List<OptionItem> _languageOptions = new()
+    {
+        new OptionItem { Text = "Español (ES)", Value = "es" },
+        new OptionItem { Text = "English (EN)", Value = "en" },
+        new OptionItem { Text = "Deutsch (DE)", Value = "de" },
+        new OptionItem { Text = "Français (FR)", Value = "fr" },
+        new OptionItem { Text = "Italiano (IT)", Value = "it" },
+        new OptionItem { Text = "Português (PT)", Value = "pt" }
+    };
 
     private List<OptionItem> _ingestionModes = new()
     {
@@ -50,8 +76,37 @@ public partial class SettingsPanel : ComponentBase
         new OptionItem { Text = "API Externa: Conectar a OpenAI o red local (Ollama / LLMStudio)", Value = "ExternalApi" }
     };
 
+    private void OnForceOfflineChanged(bool value)
+    {
+        NetworkStateService.SetForceOffline(value);
+        ToastService.ShowSuccess(value ? "Modo sin conexión activado." : "Modo en línea restaurado.");
+        StateHasChanged();
+    }
+
+    private async Task OnLanguageChanged(object value)
+    {
+        if (value is string lang && !string.IsNullOrEmpty(lang))
+        {
+            await TranslationService.LoadLanguageAsync(lang);
+            StateHasChanged();
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
+        if (ServerConfig?.ServerUrl != null)
+        {
+            _clientServerUrl = ServerConfig.ServerUrl;
+            _clientApiKey = ServerConfig.ApiKey ?? string.Empty;
+        }
+
+        // En móvil, mostrar las preferencias del cliente de inmediato sin esperar al servidor
+        if (IsMobileClient)
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+
         try
         {
             var settings = await SettingsService.GetSettingsAsync();
@@ -65,19 +120,66 @@ public partial class SettingsPanel : ComponentBase
             if (settings.TryGetValue("WhisperModelPath", out var whisper)) _whisperModelPath = whisper;
             if (settings.TryGetValue("WhisperMode", out var wMode)) _whisperMode = wMode;
             if (settings.TryGetValue("OpenAIEndpoint", out var wEndpoint)) _openAiEndpoint = wEndpoint;
+            _serverSettingsLoaded = true;
 
-            _isWhisperDownloaded = await SettingsService.CheckWhisperModelStatusAsync();
+            if (ShowServerAdminTabs)
+            {
+                _isWhisperDownloaded = await SettingsService.CheckWhisperModelStatusAsync();
+            }
         }
         catch (Exception ex)
         {
-            ShowMessage("Error cargando ajustes: " + ex.Message, false);
+            if (!IsMobileClient)
+            {
+                ShowMessage("Error cargando ajustes: " + ex.Message, false);
+            }
         }
         finally
         {
             _isLoading = false;
+            StateHasChanged();
         }
 
         _ = PollStatusAsync();
+    }
+
+    private async Task SendDiagnosticLogAsync()
+    {
+        _isSendingLogs = true;
+        StateHasChanged();
+
+        try
+        {
+            Logger.LogInformation("Reporte de diagnóstico manual enviado desde el cliente móvil. ServerUrl={Url}", _clientServerUrl);
+            var payload = new List<ClientLogDto>
+            {
+                new ClientLogDto
+                {
+                    Level = "Information",
+                    Message = $"[DiagnosticReport] Ping manual desde Ajustes del Cliente Android (ServerUrl={_clientServerUrl}, ForceOffline={NetworkStateService.IsForceOffline})",
+                    CreatedAt = DateTime.UtcNow
+                }
+            };
+            var response = await HttpClient.PostAsJsonAsync("api/Logs", payload);
+            if (response.IsSuccessStatusCode)
+            {
+                ToastService.ShowSuccess("Logs enviados correctamente al servidor (/api/Logs).");
+            }
+            else
+            {
+                ToastService.ShowError($"El servidor respondió con código {(int)response.StatusCode}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al enviar reporte de diagnóstico manual.");
+            ToastService.ShowError("No se pudo conectar al servidor para enviar los logs; se enviarán en segundo plano.");
+        }
+        finally
+        {
+            _isSendingLogs = false;
+            StateHasChanged();
+        }
     }
 
     private async Task PollStatusAsync()
@@ -87,8 +189,11 @@ public partial class SettingsPanel : ComponentBase
             while (!_cts.Token.IsCancellationRequested)
             {
                 await Task.Delay(2000, _cts.Token);
-                _scanStatus = await ScanService.GetScanStatusAsync();
-                StateHasChanged();
+                if (ShowServerAdminTabs && !NetworkStateService.IsOffline)
+                {
+                    _scanStatus = await ScanService.GetScanStatusAsync();
+                    StateHasChanged();
+                }
             }
         }
         catch { }
@@ -102,6 +207,13 @@ public partial class SettingsPanel : ComponentBase
 
     private async Task SaveSettingsAsync()
     {
+        // Guardar sin haber leído los ajustes del servidor pisaría las rutas y claves reales con los valores por defecto
+        if (!_serverSettingsLoaded)
+        {
+            ShowMessage("No se pudieron leer los ajustes del servidor; no se guarda nada para no sobrescribirlos. Recarga la página.", false);
+            return;
+        }
+
         _isSaving = true;
         _message = string.Empty;
         StateHasChanged();
@@ -130,6 +242,63 @@ public partial class SettingsPanel : ComponentBase
             _isSaving = false;
             StateHasChanged();
         }
+    }
+
+    private async Task SaveClientConfig()
+    {
+        if (string.IsNullOrWhiteSpace(_clientServerUrl)) return;
+
+        var rawUrl = _clientServerUrl.Trim();
+        if (!rawUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && 
+            !rawUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            rawUrl = "http://" + rawUrl;
+        }
+        if (!rawUrl.EndsWith("/")) rawUrl += "/";
+
+        if (!Uri.TryCreate(rawUrl, UriKind.Absolute, out var testUri))
+        {
+            ToastService.ShowError(TranslationService["Settings_InvalidUrl"]);
+            return;
+        }
+
+        _isTestingClientConnection = true;
+        StateHasChanged();
+
+        bool canConnect = false;
+        try
+        {
+            using var testClient = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            var pingUri = new Uri(testUri, "api/health"); // público: no requiere la API key
+            using var response = await testClient.GetAsync(pingUri);
+            if (response.IsSuccessStatusCode)
+            {
+                canConnect = true;
+            }
+        }
+        catch
+        {
+            canConnect = false;
+        }
+        finally
+        {
+            _isTestingClientConnection = false;
+        }
+
+        ServerConfig.SaveServerUrl(rawUrl);
+        ServerConfig.SaveApiKey(_clientApiKey);
+
+        if (canConnect)
+        {
+            ToastService.ShowSuccess(TranslationService["Settings_ConnectionSuccess"]);
+        }
+        else
+        {
+            ToastService.ShowError(TranslationService["Settings_ConnectionFailed"]);
+        }
+
+        await Task.Delay(1500);
+        NavManager.NavigateTo(NavManager.Uri, forceLoad: true);
     }
 
     private async Task DownloadWhisperModelAsync()
@@ -215,6 +384,218 @@ public partial class SettingsPanel : ComponentBase
         catch (Exception ex)
         {
             ShowMessage("Error al fusionar duplicados: " + ex.Message, false);
+        }
+    }
+
+    private bool _isRestoring;
+    private bool _dedupRunning;
+    private bool _dedupAnalyzed;
+    private string? _dedupStatus;
+
+    private async Task RestoreBackupAsync(Microsoft.AspNetCore.Components.Forms.InputFileChangeEventArgs e)
+    {
+        _isRestoring = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            // Un ZIP completo puede pesar varios GB
+            var stream = e.File.OpenReadStream(maxAllowedSize: 20L * 1024 * 1024 * 1024);
+            content.Add(new StreamContent(stream), "file", e.File.Name);
+            // El cliente general corta a los 25 s: subir y restaurar un ZIP grande lleva más
+            using var uploadClient = new HttpClient { BaseAddress = HttpClient.BaseAddress, Timeout = Timeout.InfiniteTimeSpan };
+            if (!string.IsNullOrEmpty(ServerConfig.ApiKey)) uploadClient.DefaultRequestHeaders.Add("X-Api-Key", ServerConfig.ApiKey);
+            var response = await uploadClient.PostAsync("api/maintenance/backup/restore", content);
+            var report = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            if (!response.IsSuccessStatusCode)
+            {
+                ShowMessage(report.TryGetProperty("error", out var error) ? error.GetString() ?? "Error al restaurar." : "Error al restaurar.", false);
+                return;
+            }
+
+            int Get(string name) => report.TryGetProperty(name, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.Number ? v.GetInt32() : 0;
+            int Count(string name) => report.TryGetProperty(name, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.Array ? v.GetArrayLength() : 0;
+            int found = Get("matchedByHash") + Get("matchedByIsbn") + Get("matchedByTitle");
+            ShowMessage($"Copia restaurada: {found} libros encontrados, {Get("imported")} importados, {Get("annotationsAdded")} notas y {Get("audioTracksAdded")} pistas añadidas, {Count("notFound")} no encontrados.", Count("errors") == 0);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage("Error al restaurar: " + ex.Message, false);
+        }
+        finally
+        {
+            _isRestoring = false;
+        }
+    }
+
+    private bool _resetBusy;
+    private bool _resetPlanReady;
+    private string _resetConfirm = "";
+    private string? _resetStatus;
+
+    /// <summary>Lanza un trabajo de mantenimiento y espera a que termine, mostrando fase y progreso.</summary>
+    private async Task<System.Text.Json.JsonElement?> RunJobAsync(string startUrl, string statusUrl, Func<System.Text.Json.JsonElement, System.Text.Json.JsonElement> pick, string label)
+    {
+        var start = await HttpClient.PostAsync(startUrl, null);
+        if (!start.IsSuccessStatusCode && start.StatusCode != System.Net.HttpStatusCode.Conflict)
+        {
+            var body = await start.Content.ReadAsStringAsync();
+            _resetStatus = $"Error: {body}";
+            return null;
+        }
+        while (true)
+        {
+            await Task.Delay(3000, _cts.Token);
+            var status = pick(await HttpClient.GetFromJsonAsync<System.Text.Json.JsonElement>(statusUrl, _cts.Token));
+            if (!status.GetProperty("running").GetBoolean()) return status;
+            var phase = status.TryGetProperty("phase", out var p) && p.ValueKind == System.Text.Json.JsonValueKind.String ? p.GetString() : label;
+            var count = status.GetProperty("progress").GetInt32();
+            var elapsed = status.TryGetProperty("startedAt", out var s) && s.ValueKind == System.Text.Json.JsonValueKind.String ? DateTime.UtcNow - s.GetDateTime().ToUniversalTime() : TimeSpan.Zero;
+            _resetStatus = $"{phase}...{(count > 0 ? $" {count:N0} libros" : "")} ({(int)elapsed.TotalMinutes}:{elapsed.Seconds:D2})";
+            StateHasChanged();
+        }
+    }
+
+    private async Task PlanResetAsync()
+    {
+        _resetBusy = true;
+        _resetPlanReady = false;
+        _resetStatus = "Revisando la biblioteca...";
+        try
+        {
+            var status = await RunJobAsync("api/maintenance/reset/plan", "api/maintenance/reset", s => s.GetProperty("plan"), "Revisando");
+            if (status == null) return;
+            if (status.Value.TryGetProperty("error", out var err) && err.ValueKind == System.Text.Json.JsonValueKind.String) { _resetStatus = "Error: " + err.GetString(); return; }
+
+            var r = status.Value.GetProperty("result");
+            int Get(string name) => r.GetProperty(name).GetInt32();
+            var blockers = r.GetProperty("blockers").EnumerateArray().Select(b => "⚠ " + b.GetString()).ToList();
+            _resetStatus =
+                $"{Get("totalBooks"):N0} libros: {Get("booksWithFile"):N0} con archivo y {Get("booksWithoutFile"):N0} sin él (no volverán).\n" +
+                $"Hashes calculados: {Get("booksWithHash"):N0} (caché de metadatos).\n" +
+                $"{Get("booksWithUserData")} libros con datos tuyos se restaurarán primero; {Get("universes")} universos se recrearán.\n" +
+                $"{Get("libraryOnlyEpubs"):N0} EPUB solo están en la biblioteca (subidos o del modo mover) y se reimportarán desde ahí.\n" +
+                $"Se conservan {Get("settingsKept")} ajustes y {Get("unmatchedAudiosKept")} audios huérfanos." +
+                (blockers.Count > 0 ? "\n" + string.Join("\n", blockers) : "");
+            _resetPlanReady = r.GetProperty("canRun").GetBoolean();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _resetStatus = "Error: " + ex.Message; }
+        finally
+        {
+            _resetBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RunResetAsync()
+    {
+        _resetBusy = true;
+        _resetStatus = "Empezando...";
+        try
+        {
+            var status = await RunJobAsync($"api/maintenance/reset/run?confirm={_resetConfirm}", "api/maintenance/reset", s => s.GetProperty("reset"), "Vaciando");
+            if (status == null) return;
+            if (status.Value.TryGetProperty("error", out var err) && err.ValueKind == System.Text.Json.JsonValueKind.String) { _resetStatus = "Error: " + err.GetString(); return; }
+
+            var r = status.Value.GetProperty("result");
+            var restore = r.GetProperty("restore");
+            int found = restore.GetProperty("matchedByHash").GetInt32() + restore.GetProperty("imported").GetInt32();
+            _resetStatus =
+                $"Hecho. {r.GetProperty("booksDeleted").GetInt32():N0} libros vaciados, {r.GetProperty("metadataCached").GetInt32():N0} metadatos en caché.\n" +
+                $"{found} libros con datos tuyos restaurados; {r.GetProperty("libraryOnlyImported").GetInt32():N0} EPUB de la biblioteca reimportados.\n" +
+                $"El escáner reimporta ahora la carpeta de entrada; el estado y los universos que falten se reaplican al terminar cada pasada.\n" +
+                $"Copia de la base de datos: {r.GetProperty("databaseSnapshot").GetString()}";
+            _resetPlanReady = false;
+            _resetConfirm = "";
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _resetStatus = "Error: " + ex.Message; }
+        finally
+        {
+            _resetBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private bool _coversRunning;
+    private string? _coversStatus;
+
+    private async Task RepairCoversAsync()
+    {
+        _coversRunning = true;
+        _coversStatus = "Reparando portadas...";
+        try
+        {
+            await HttpClient.PostAsync("api/maintenance/covers/run?online=true", null);
+            System.Text.Json.JsonElement status;
+            while (true)
+            {
+                await Task.Delay(3000, _cts.Token);
+                status = await HttpClient.GetFromJsonAsync<System.Text.Json.JsonElement>("api/maintenance/covers", _cts.Token);
+                if (!status.GetProperty("running").GetBoolean()) break;
+                _coversStatus = $"Reparando portadas... {status.GetProperty("progress").GetInt32():N0} libros revisados";
+                StateHasChanged();
+            }
+
+            if (status.TryGetProperty("error", out var error) && error.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                _coversStatus = "Error: " + error.GetString();
+                return;
+            }
+            var r = status.GetProperty("result");
+            int Get(string name) => r.GetProperty(name).GetInt32();
+            _coversStatus = $"Hecho: {Get("fromEpub")} del EPUB, {Get("fromOnline")} de internet, {Get("notFound")} sin encontrar. {Get("alreadyOk")} ya estaban bien; {Get("skippedMissingEpub")} libros sin EPUB no se tocaron.";
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _coversStatus = "Error: " + ex.Message;
+        }
+        finally
+        {
+            _coversRunning = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RunDuplicatesAsync(bool apply)
+    {
+        _dedupRunning = true;
+        _dedupStatus = apply ? "Uniendo libros repetidos..." : "Analizando...";
+        try
+        {
+            await HttpClient.PostAsync($"api/maintenance/duplicates/run?apply={apply.ToString().ToLowerInvariant()}", null);
+            System.Text.Json.JsonElement status;
+            do
+            {
+                await Task.Delay(2000, _cts.Token);
+                status = await HttpClient.GetFromJsonAsync<System.Text.Json.JsonElement>("api/maintenance/duplicates", _cts.Token);
+            } while (status.GetProperty("running").GetBoolean());
+
+            if (status.TryGetProperty("error", out var error) && error.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                _dedupStatus = "Error: " + error.GetString();
+                return;
+            }
+
+            var r = status.GetProperty("result");
+            int Get(string name) => r.GetProperty(name).GetInt32();
+            int same = Get("hashDuplicates"), missing = Get("missingMergedIntoCopy");
+            int kept = r.GetProperty("missingKeptWithUserData").GetArrayLength();
+            _dedupStatus = apply
+                ? $"Hecho: {Get("deleted")} libros unidos en su copia ({Get("transferredUserData")} con datos tuyos). Se guardó una copia de la base de datos antes."
+                : $"{same} copias del mismo EPUB y {missing} libros sin archivo con copia ({Get("transferredUserData")} con datos tuyos que se conservarán). {Get("missingOrphans")} sin archivo ni copia, {kept} sin copia pero con datos tuyos (se mantienen). Hashes calculados: {Get("booksWithHash")} de {Get("totalBooks")}.";
+            _dedupAnalyzed = !apply;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _dedupStatus = "Error: " + ex.Message;
+        }
+        finally
+        {
+            _dedupRunning = false;
+            StateHasChanged();
         }
     }
 

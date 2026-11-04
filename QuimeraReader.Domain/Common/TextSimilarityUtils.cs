@@ -58,4 +58,43 @@ public static class TextSimilarityUtils
 
         return trigrams;
     }
+
+    /// <summary>
+    /// Normaliza un nombre quitando caracteres especiales, guiones y espacios duplicados.
+    /// </summary>
+    public static string NormalizeComparableText(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+        var spaced = input.Replace('_', ' ').Replace('-', ' ');
+        var chars = spaced.Where(c => char.IsLetterOrDigit(c) || char.IsWhiteSpace(c)).ToArray();
+        var words = new string(chars).Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(" ", words).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Determina si un nombre de archivo contiene explícitamente el título de un libro como palabra/frase completa y no genérica.
+    /// </summary>
+    public static bool TitleMatchesFileName(string fileName, string bookTitle)
+    {
+        var normFile = NormalizeComparableText(fileName);
+        var normTitle = NormalizeComparableText(bookTitle);
+
+        if (string.IsNullOrWhiteSpace(normFile) || string.IsNullOrWhiteSpace(normTitle)) return false;
+        if (normTitle.Length < 4) return false;
+
+        // Palabras demasiado genéricas que nunca deben causar match por sí solas
+        var genericWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase) 
+        { 
+            "audio", "track", "capitulo", "chapter", "parte", "part", "disco", "cd", "libro", "book" 
+        };
+
+        if (genericWords.Contains(normTitle)) return false;
+
+        // Si son exactamente iguales tras normalización
+        if (normFile == normTitle) return true;
+
+        // Si es una frase completa dentro del archivo con límites de palabra
+        string pattern = $@"(^|\s){System.Text.RegularExpressions.Regex.Escape(normTitle)}(\s|$)";
+        return System.Text.RegularExpressions.Regex.IsMatch(normFile, pattern);
+    }
 }

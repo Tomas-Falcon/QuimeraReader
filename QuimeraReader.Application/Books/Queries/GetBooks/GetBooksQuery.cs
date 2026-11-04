@@ -13,4 +13,10 @@ public record GetBooksQuery : IRequest<PaginatedListDto<BookDto>>
     public string? ReadingStatus { get; init; }
     public System.Collections.Generic.List<int>? CategoryIds { get; init; }
     public bool? IsAvailableOffline { get; init; }
+    /// <summary>"Recent" (por defecto), "Title" o "Author".</summary>
+    public string? SortBy { get; init; }
+    /// <summary>Filtro exacto por nombre de autor (páginas /author/{name}).</summary>
+    public string? AuthorName { get; init; }
+    /// <summary>Filtro exacto por nombre de categoría (páginas /category/{name}).</summary>
+    public string? CategoryName { get; init; }
 }

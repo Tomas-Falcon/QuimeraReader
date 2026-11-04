@@ -41,8 +41,7 @@ public class GlobalExceptionMiddleware
             var errorResponse = new
             {
                 error = "Se produjo un error interno en el servidor.",
-                traceId,
-                detail = ex.Message
+                traceId
             };
 
             var json = JsonSerializer.Serialize(errorResponse, new JsonSerializerOptions

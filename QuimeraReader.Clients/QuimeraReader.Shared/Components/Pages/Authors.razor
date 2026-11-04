@@ -1,4 +1,4 @@
-﻿@page "/authors"
+@page "/authors"
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Components
 @using Radzen
@@ -26,7 +26,7 @@
                 <RadzenButton Text="Seleccionar" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Icon="check_box" />
             }
             <div class="search-box" style="flex: 1 1 250px;">
-                <RadzenTextBox Placeholder="Buscar autor..." Value="@_searchQuery" Change="OnSearchInput" class="w-100" />
+                <RadzenTextBox Placeholder="Buscar autor..." Value="@_searchQuery" @oninput="@(args => OnSearchInput(args.Value?.ToString() ?? ""))" class="w-100" />
             </div>
         </div>
     </div>
@@ -52,7 +52,7 @@
             @foreach (var author in FilteredAuthors)
             {
                 var isSelected = _selectedAuthorIds.Contains(author.Id);
-                <div class="col position-relative">
+                <div class="col position-relative" @key="author.Id">
                     @if (_selectionMode)
                     {
                         <div class="position-absolute" style="top: 10px; right: 20px; z-index: 10;">
@@ -67,7 +67,7 @@
                         <div class="author-cover position-relative" style="aspect-ratio: 1; background: #222;">
                             @if (!string.IsNullOrEmpty(author.SampleCoverUrl))
                             {
-                                <img src="@(BookService.BaseAddress + author.SampleCoverUrl)" alt="@author.Name" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.6; filter: blur(2px);" />
+                                <img src="@BookService.GetMediaUrl(author.SampleCoverUrl)" alt="@author.Name" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.6; filter: blur(2px);" />
                                 <div class="position-absolute top-50 start-50 translate-middle text-center">
                                     <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-lg mx-auto" style="width: 70px; height: 70px;">
                                         <span class="fw-bold fs-3">@(author.Name.FirstOrDefault())</span>
@@ -91,6 +91,13 @@
                 </div>
             }
         </div>
+
+        @if (_hasMore)
+        {
+            <div class="text-center my-4">
+                <RadzenButton Text="Mostrar más" Click="LoadMoreAsync" IsBusy="@_isLoadingMore" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" />
+            </div>
+        }
     }
 </div>
 
@@ -100,37 +107,71 @@
 </style>
 
 @code {
+    // Los autores (decenas de miles) se piden al servidor por páginas y la búsqueda también se hace allí:
+    // antes se descargaban los 5000 primeros por orden alfabético y solo se podía buscar entre ellos.
+    private const int PageSize = 100;
     private List<Author>? authors;
     private string _searchQuery = "";
+    private bool _hasMore = false;
+    private bool _isLoadingMore = false;
+    private int _searchVersion = 0;
+    private CancellationTokenSource? _searchDebounce;
 
     private bool _selectionMode = false;
     private HashSet<int> _selectedAuthorIds = new();
 
-    private IEnumerable<Author> FilteredAuthors => authors?
-        .Where(a => string.IsNullOrWhiteSpace(_searchQuery) || a.Name.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))
-        ?? Enumerable.Empty<Author>();
+    private IEnumerable<Author> FilteredAuthors => authors ?? Enumerable.Empty<Author>();
 
     protected override async Task OnInitializedAsync()
     {
         await LoadDataAsync();
     }
-    
+
     private async Task LoadDataAsync()
     {
+        int version = ++_searchVersion;
         try
         {
-            var result = await BookService.GetAuthorsAsync();
-            authors = result.ToList();
+            var result = (await BookService.GetAuthorsAsync(_searchQuery, 0, PageSize)).ToList();
+            if (version != _searchVersion) return; // llegó la respuesta de una búsqueda anterior
+            authors = result;
+            _hasMore = result.Count == PageSize;
         }
-        catch (Exception ex)
+        catch
         {
-            authors = new List<Author>();
+            if (version == _searchVersion) authors = new List<Author>();
         }
     }
 
-    private void OnSearchInput(string value)
+    private async Task LoadMoreAsync()
+    {
+        if (_isLoadingMore || authors == null) return;
+        _isLoadingMore = true;
+        int version = _searchVersion;
+        try
+        {
+            var more = (await BookService.GetAuthorsAsync(_searchQuery, authors.Count, PageSize)).ToList();
+            if (version != _searchVersion) return;
+            var known = authors.Select(a => a.Id).ToHashSet();
+            authors.AddRange(more.Where(a => known.Add(a.Id)));
+            _hasMore = more.Count == PageSize;
+        }
+        finally
+        {
+            _isLoadingMore = false;
+        }
+    }
+
+    private async Task OnSearchInput(string value)
     {
         _searchQuery = value ?? "";
+        // Esperar a que el usuario deje de escribir para no lanzar una petición por tecla
+        _searchDebounce?.Cancel();
+        _searchDebounce = new CancellationTokenSource();
+        var token = _searchDebounce.Token;
+        try { await Task.Delay(300, token); } catch (TaskCanceledException) { return; }
+        await LoadDataAsync();
+        StateHasChanged();
     }
 
     private void ToggleSelectionMode()

@@ -1,14 +1,15 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:QuimeraReader.Mobile"
              xmlns:components="clr-namespace:QuimeraReader.Mobile.Components"
              xmlns:ios="clr-namespace:Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;assembly=Microsoft.Maui.Controls"
              ios:Page.UseSafeArea="True"
+             BackgroundColor="#09090b"
              x:Class="QuimeraReader.Mobile.MainPage">
 
-    <Grid>
-        <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html" Margin="{OnPlatform Android='0,24,0,0', iOS='0,0,0,0'}">
+    <Grid BackgroundColor="#09090b">
+        <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html" Margin="0">
             <BlazorWebView.RootComponents>
                 <RootComponent Selector="#app" ComponentType="{x:Type components:Routes}" />
             </BlazorWebView.RootComponents>

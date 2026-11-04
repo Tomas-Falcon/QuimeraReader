@@ -83,11 +83,17 @@ public class MaintenanceBackgroundService : BackgroundService
         _logger.LogInformation("1. Ejecutando Deep Scan...");
         await deepScanner.ScanLibraryForOrphanAudioAsync(stoppingToken);
 
+        // Reconstruir los índices de búsqueda por si algún cambio no se reflejó (cuesta unos segundos)
+        _logger.LogInformation("1b. Reconstruyendo índices de búsqueda...");
+        await SqliteSearchIndex.EnsureUpToDateAsync(dbContext, forceRebuild: true, stoppingToken);
+        await SeriesMaintenance.MergeCaseDuplicatesAsync(dbContext, stoppingToken);
+
         // 2. Armar la cola de procesamiento de Whisper priorizando el libro actual y su saga
         _logger.LogInformation("2. Organizando cola de procesamiento de Audio Whisper...");
         
         var pendingAudioBooks = await dbContext.Books
-            .Where(b => b.AudioTracks.Any() && b.SyncMap == null && b.ProcessingStatus != "PROCESSING")
+            // Los libros en ERROR no se reintentan solos cada noche (Whisper tarda horas): se reencolan a mano o al descargar el modelo
+            .Where(b => b.AudioTracks.Any() && b.SyncMap == null && b.ProcessingStatus != "PROCESSING" && b.ProcessingStatus != "ERROR")
             .ToListAsync(stoppingToken);
 
         if (pendingAudioBooks.Any())

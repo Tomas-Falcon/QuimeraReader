@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using QuimeraReader.API.Security;
 
 namespace QuimeraReader.API.Controllers;
 
@@ -6,29 +8,47 @@ namespace QuimeraReader.API.Controllers;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
-    // Mock endpoints to satisfy the Storyteller frontend
+    private readonly ApiKeyAuth _auth;
 
-    [HttpPost("/api/token")]
-    public IActionResult Login()
+    public AuthController(ApiKeyAuth auth)
     {
-        // Return a mock token
-        return Ok(new 
-        { 
-            access_token = "mock-token", 
-            token_type = "bearer" 
+        _auth = auth;
+    }
+
+    public class LoginRequest
+    {
+        public string ApiKey { get; set; } = string.Empty;
+    }
+
+    [HttpGet("status")]
+    public IActionResult GetStatus()
+    {
+        return Ok(new { AuthRequired = _auth.IsEnabled, Authenticated = _auth.IsAuthenticated(HttpContext) });
+    }
+
+    [HttpPost("login")]
+    [EnableRateLimiting("login")]
+    public IActionResult Login([FromBody] LoginRequest request)
+    {
+        if (!_auth.IsEnabled) return Ok(new { AuthRequired = false });
+        if (!_auth.IsValidKey(request.ApiKey)) return Unauthorized(new { error = "Clave de acceso incorrecta." });
+
+        // Cookie HttpOnly para el cliente web (mismo origen): cubre también <img>, <audio> y epub.js
+        Response.Cookies.Append(ApiKeyAuth.CookieName, _auth.CookieValue, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = Request.IsHttps,
+            SameSite = SameSiteMode.Lax,
+            Expires = DateTimeOffset.UtcNow.AddYears(1),
+            Path = "/"
         });
+        return Ok(new { AuthRequired = true });
     }
 
-    [HttpGet("/api/validate")]
-    public IActionResult ValidateToken()
+    [HttpPost("logout")]
+    public IActionResult Logout()
     {
-        // Always valid
+        Response.Cookies.Delete(ApiKeyAuth.CookieName, new CookieOptions { Path = "/" });
         return Ok();
-    }
-
-    [HttpGet("/api/statuses")]
-    public IActionResult GetStatuses()
-    {
-        return Ok(new object[] { });
     }
 }

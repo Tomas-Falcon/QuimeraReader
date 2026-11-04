@@ -59,4 +59,19 @@ public class TextSimilarityUtilsTests
         trigrams.Should().Contain("hombre de negro");
         trigrams.Should().Contain("negro huía a");
     }
+
+    [Theory]
+    [InlineData("Dune - Parte 1.mp3", "Dune", true)]
+    [InlineData("Elantris_capitulo_01.mp3", "Elantris", true)]
+    [InlineData("Brandon Sanderson - El Aliento de los Dioses - CD 1.mp3", "El Aliento de los Dioses", true)]
+    [InlineData("track_01.mp3", "Track", false)]
+    [InlineData("audio01.mp3", "Audio", false)]
+    [InlineData("capitulo_primero.mp3", "El Capitulo", false)]
+    [InlineData("Random Song.mp3", "Dune", false)]
+    [InlineData("01 - Track 1.mp3", "Harry Potter", false)]
+    public void TitleMatchesFileName_ShouldDistinguishLegitimateTitlesFromGenericNoise(string fileName, string bookTitle, bool expected)
+    {
+        var result = TextSimilarityUtils.TitleMatchesFileName(fileName, bookTitle);
+        result.Should().Be(expected);
+    }
 }

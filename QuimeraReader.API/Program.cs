@@ -8,13 +8,14 @@ using QuimeraReader.Infrastructure;
 using QuimeraReader.Infrastructure.Services;
 using QuimeraReader.Infrastructure.Providers;
 using QuimeraReader.Domain.Interfaces;
-
 using QuimeraReader.API.BackgroundServices;
 using QuimeraReader.API.Middleware;
+using QuimeraReader.API.Security;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configurar logging: JSON para producci�n (Docker), texto simple para desarrollo
+// Configurar logging: JSON para producción (Docker), texto simple para desarrollo
 if (builder.Environment.IsProduction())
 {
     builder.Logging.AddJsonConsole(options =>
@@ -24,10 +25,25 @@ if (builder.Environment.IsProduction())
 }
 
 var dbPath = Environment.GetEnvironmentVariable("QUIMERA_DB_PATH") ?? "quimerareader.db";
+// Nota: sin Cache=Shared (en modo WAL provoca bloqueos SQLITE_LOCKED entre lectores y escritores)
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite($"Data Source={dbPath}"));
+    options.UseSqlite($"Data Source={dbPath};Default Timeout=30;"));
 
-// Enlazar la interfaz de Aplicaci�n con la implementaci�n de Infraestructura
+// Compresión Brotli/Gzip para los ~25 MB de .wasm/.js/.css de Blazor y las respuestas JSON
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProvider>();
+    options.Providers.Add<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProvider>();
+    options.MimeTypes = Microsoft.AspNetCore.ResponseCompression.ResponseCompressionDefaults.MimeTypes.Concat(new[]
+    {
+        "application/wasm", "application/octet-stream", "application/javascript", "text/javascript", "image/svg+xml"
+    });
+});
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProviderOptions>(o => o.Level = System.IO.Compression.CompressionLevel.Fastest);
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProviderOptions>(o => o.Level = System.IO.Compression.CompressionLevel.Fastest);
+
+// Enlazar la interfaz de Aplicación con la implementación de Infraestructura
 builder.Services.AddScoped<QuimeraReader.Application.Interfaces.IAppDbContext>(provider => 
     provider.GetRequiredService<AppDbContext>());
 
@@ -48,16 +64,25 @@ builder.Services.AddScoped<IMetadataProvider, StoryGraphScraperProvider>();
 builder.Services.AddSingleton<LibraryScanState>();
 builder.Services.AddSingleton<AudioAlignmentQueue>();
 builder.Services.AddScoped<EpubScannerService>();
+builder.Services.AddScoped<BackupService>();
+builder.Services.AddScoped<CoverRepairService>();
+builder.Services.AddScoped<LibraryResetService>();
+builder.Services.AddScoped<QuimeraReader.Application.Interfaces.IEpubScannerService>(sp => sp.GetRequiredService<EpubScannerService>());
 builder.Services.AddScoped<AudioAlignmentService>();
 builder.Services.AddScoped<AudioMatchingService>();
+builder.Services.AddScoped<QuimeraReader.Application.Interfaces.IAudioMatchingService>(sp => sp.GetRequiredService<AudioMatchingService>());
 builder.Services.AddScoped<DeepLibraryScannerService>();
 builder.Services.AddScoped<MediaPackagerService>();
 builder.Services.AddScoped<QuimeraReader.Infrastructure.Services.HardcoverSyncService>();
+builder.Services.AddScoped<QuimeraReader.Application.Interfaces.ISearchIndex, SqliteSearchIndex>();
 
-// Registrar el Background Service
+// Registrar los Background Services
 builder.Services.AddHostedService<LibraryScanBackgroundService>();
 builder.Services.AddHostedService<AudioAlignmentBackgroundService>();
 builder.Services.AddHostedService<MaintenanceBackgroundService>();
+builder.Services.AddHostedService<SeriesBackfillBackgroundService>();
+builder.Services.AddHostedService<ContentHashBackfillBackgroundService>();
+builder.Services.AddSingleton<MaintenanceJobRunner>();
 
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(QuimeraReader.Application.Interfaces.IAppDbContext).Assembly));
 
@@ -66,31 +91,108 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
-builder.Services.AddEndpointsApiExplorer();
+
+// /api/health comprueba de verdad la base de datos (antes siempre respondía "Healthy")
+builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
+
+// Autenticación por API key (QUIMERA_API_KEY). Sin clave definida la API queda abierta, como en versiones anteriores.
+var apiKeyAuth = new ApiKeyAuth(builder.Configuration["QUIMERA_API_KEY"]);
+builder.Services.AddSingleton(apiKeyAuth);
+
+// Limitar intentos de login para evitar fuerza bruta sobre la API key
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("login", o =>
+    {
+        o.PermitLimit = 10;
+        o.Window = TimeSpan.FromMinutes(1);
+    });
+});
+
+// CORS: la web se sirve desde el mismo origen y no lo necesita. Solo se permiten los orígenes de los WebView
+// de MAUI/Photino (fetch del EPUB desde epub.js) y los que se añadan en QUIMERA_CORS_ORIGINS (separados por comas).
+var corsOrigins = new List<string> { "https://0.0.0.0", "https://0.0.0.1", "app://0.0.0.0", "app://localhost", "http://localhost" };
+corsOrigins.AddRange((builder.Configuration["QUIMERA_CORS_ORIGINS"] ?? string.Empty)
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("Clients", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        if (builder.Environment.IsDevelopment())
+            policy.AllowAnyOrigin();
+        else
+            policy.WithOrigins(corsOrigins.ToArray());
+
+        policy.AllowAnyMethod().AllowAnyHeader();
     });
 });
 
 var app = builder.Build();
 
-app.UseCors("AllowAll");
+app.UseCors("Clients");
 
 // Middleware de logging y manejo de errores
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
+app.UseRateLimiter();
+app.UseMiddleware<ApiKeyAuthMiddleware>();
 
-// Asegurar que la BD se migra correctamente en cada arranque
+if (!apiKeyAuth.IsEnabled)
+{
+    app.Logger.LogWarning("QUIMERA_API_KEY no está definida: la API es accesible sin autenticación para cualquiera que alcance este puerto.");
+}
+
+// Asegurar que la BD se migra correctamente en cada arranque y habilitar WAL para concurrencia lectora/escritora
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     dbContext.Database.Migrate();
+    try
+    {
+        dbContext.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000;");
+    }
+    catch { }
+
+    // Índices que faltaban sobre Books (138k filas): estados de lectura, offline, título (escáner), etc.
+    string[] indexSql =
+    {
+        "CREATE INDEX IF NOT EXISTS IX_Books_ReadingStatus_LastReadAt ON Books (ReadingStatus, LastReadAt);",
+        "CREATE INDEX IF NOT EXISTS IX_Books_LastReadAt ON Books (LastReadAt);",
+        "CREATE INDEX IF NOT EXISTS IX_Books_IsAvailableOffline ON Books (IsAvailableOffline);",
+        "CREATE INDEX IF NOT EXISTS IX_Books_Title ON Books (Title);",
+        "CREATE INDEX IF NOT EXISTS IX_Books_SourceFilePath ON Books (SourceFilePath);",
+        "CREATE INDEX IF NOT EXISTS IX_Books_ProcessingStatus ON Books (ProcessingStatus);",
+        "CREATE INDEX IF NOT EXISTS IX_Books_AverageRating ON Books (AverageRating);",
+        "CREATE INDEX IF NOT EXISTS IX_BookAuthors_AuthorId ON BookAuthors (AuthorId);",
+        "CREATE INDEX IF NOT EXISTS IX_BookCategories_CategoryId ON BookCategories (CategoryId);",
+        "CREATE INDEX IF NOT EXISTS IX_BookAudioTracks_BookId ON BookAudioTracks (BookId);"
+    };
+    foreach (var sql in indexSql)
+    {
+        try { dbContext.Database.ExecuteSqlRaw(sql); } catch (Exception ex) { Console.WriteLine($"[Startup] No se pudo crear índice: {ex.Message}"); }
+    }
+    try { dbContext.Database.ExecuteSqlRaw("PRAGMA optimize;"); } catch { }
 }
+// Índices de búsqueda (FTS5): se crean/reconstruyen en segundo plano para no retrasar el arranque
+// (la primera vez indexa toda la biblioteca; después solo si están descuadrados con Books/Authors)
+_ = Task.Run(async () =>
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        await SqliteSearchIndex.EnsureUpToDateAsync(db);
+        app.Logger.LogInformation("Índices de búsqueda listos en {Ms} ms", sw.ElapsedMilliseconds);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "No se pudieron preparar los índices de búsqueda");
+    }
+});
+
+app.UseResponseCompression();
 
 // Configurar los Content Types para que la API pueda servir los archivos de Blazor WebAssembly sin dar Error 404
 var provider = new FileExtensionContentTypeProvider();
@@ -100,7 +202,15 @@ provider.Mappings[".dll"] = "application/octet-stream";
 
 app.UseStaticFiles(new StaticFileOptions
 {
-    ContentTypeProvider = provider
+    ContentTypeProvider = provider,
+    OnPrepareResponse = ctx =>
+    {
+        // index.html nunca debe cachearse (evita importmaps obsoletos tras un redeploy)
+        if (ctx.File.Name.Equals("index.html", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+        }
+    }
 }); // Servir wwwroot (Blazor WebAssembly)
 
 app.UseAuthorization();
@@ -110,5 +220,3 @@ app.MapHealthChecks("/api/health");
 app.MapFallbackToFile("index.html"); // SPA Fallback para enrutamiento Blazor
 
 app.Run();
-
-

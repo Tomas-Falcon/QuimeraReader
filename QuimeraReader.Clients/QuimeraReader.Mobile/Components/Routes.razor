@@ -1,6 +1,8 @@
-﻿<Router AppAssembly="typeof(MauiProgram).Assembly" AdditionalAssemblies="new[] { typeof(QuimeraReader.Shared.Components.Layout.MainLayout).Assembly }" NotFoundPage="typeof(Pages.NotFound)">
+@using QuimeraReader.Shared.Components.Layout
+@using QuimeraReader.Shared.Components.Pages
+<Router AppAssembly="typeof(MauiProgram).Assembly" AdditionalAssemblies="new[] { typeof(MainLayout).Assembly }" NotFoundPage="typeof(NotFound)">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(QuimeraReader.Shared.Components.Layout.MainLayout)" />
+        <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>

@@ -1,4 +1,4 @@
-﻿@page "/read-books"
+@page "/read-books"
 @using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @inject IBookService BookService
@@ -44,6 +44,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var cachedRead = BookService.GetCachedStatusBooks("Read");
+        if (cachedRead != null && cachedRead.Count > 0)
+        {
+            _books = cachedRead.ToList();
+            _isLoading = false;
+            StateHasChanged();
+        }
+
         // STRICT CONDITION: Only fetch books explicitly marked as 'Read'
         var result = await BookService.GetBooksAsync(1, 1000, readingStatus: "Read");
         if (result != null && result.Data != null)

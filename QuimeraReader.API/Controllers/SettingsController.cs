@@ -22,16 +22,32 @@ public class SettingsController : ControllerBase
         _logger = logger;
     }
 
+    // Los secretos nunca salen del servidor: se devuelve una máscara y, si el cliente la reenvía al guardar, se conserva el valor actual
+    public const string SecretMask = "••••••••";
+    private static readonly HashSet<string> SecretKeys = new() { "HardcoverApiKey", "GoogleBooksApiKey", "OpenAIApiKey" };
+
     [HttpGet]
     public async Task<IActionResult> GetSettings()
     {
         var settings = await _dbContext.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
+        foreach (var key in SecretKeys)
+        {
+            if (settings.TryGetValue(key, out var value) && !string.IsNullOrEmpty(value)) settings[key] = SecretMask;
+        }
         return Ok(settings);
     }
 
     [HttpPost]
     public async Task<IActionResult> SaveSetting([FromBody] SystemSetting setting)
     {
+        if (SecretKeys.Contains(setting.Key) && setting.Value == SecretMask) return Ok();
+
+        if ((setting.Key == "LibraryRootPath" || setting.Key == "IncomingScanFolder")
+            && QuimeraReader.Application.Common.LibraryPathUtils.IsEphemeralContainerPath(setting.Value))
+        {
+            return BadRequest(new { Error = $"\"{setting.Value}\" está dentro del contenedor y se borraría al actualizarlo. Usa una carpeta montada como volumen (/library o /media)." });
+        }
+
         if (setting.Key == "LibraryRootPath" && !string.IsNullOrWhiteSpace(setting.Value))
         {
             if (!Directory.Exists(setting.Value))
@@ -69,24 +85,47 @@ public class SettingsController : ControllerBase
 
         var settingsDict = await _dbContext.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
         settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
-        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
         
         System.IO.Directory.CreateDirectory(libraryRoot);
         string targetPath = Path.Combine(libraryRoot, "ggml-base.bin");
+
+        // Un modelo de menos de 1 MB es un resto de una descarga fallida de versiones anteriores
+        if (System.IO.File.Exists(targetPath) && new FileInfo(targetPath).Length < 1024 * 1024)
+        {
+            System.IO.File.Delete(targetPath);
+        }
 
         bool wasAlreadyDownloaded = System.IO.File.Exists(targetPath);
 
         if (!wasAlreadyDownloaded)
         {
+            // Descarga atómica: se escribe en un .part y solo se renombra si se completó entera
+            string partPath = targetPath + ".part";
             try
             {
-                using var httpClient = new System.Net.Http.HttpClient();
-                using var stream = await httpClient.GetStreamAsync(modelUrl);
-                using var fileStream = new System.IO.FileStream(targetPath, System.IO.FileMode.CreateNew);
-                await stream.CopyToAsync(fileStream);
+                // El modelo pesa ~150 MB: el timeout por defecto de 100 s no basta en conexiones lentas
+                using var httpClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(30) };
+                using var response = await httpClient.GetAsync(modelUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, HttpContext.RequestAborted);
+                response.EnsureSuccessStatusCode();
+                long? expectedLength = response.Content.Headers.ContentLength;
+
+                await using (var stream = await response.Content.ReadAsStreamAsync(HttpContext.RequestAborted))
+                await using (var fileStream = new System.IO.FileStream(partPath, System.IO.FileMode.Create))
+                {
+                    await stream.CopyToAsync(fileStream, HttpContext.RequestAborted);
+                }
+
+                if (expectedLength.HasValue && new FileInfo(partPath).Length != expectedLength.Value)
+                {
+                    throw new IOException("La descarga del modelo quedó incompleta.");
+                }
+
+                System.IO.File.Move(partPath, targetPath, true);
             }
             catch (System.Exception ex)
             {
+                try { if (System.IO.File.Exists(partPath)) System.IO.File.Delete(partPath); } catch (Exception cleanupEx) { _logger.LogWarning(cleanupEx, "No se pudo borrar la descarga parcial {Path}", partPath); }
                 _logger.LogError(ex, "Error al descargar el modelo Whisper");
                 return StatusCode(500, new { Message = "Error al descargar el modelo: " + ex.Message });
             }
@@ -146,63 +185,50 @@ public class SettingsController : ControllerBase
         return Ok(new { Message = "Reiniciando servidor..." });
     }
     [HttpPost("update-container")]
-    public IActionResult UpdateContainer([FromServices] Microsoft.Extensions.Hosting.IHostApplicationLifetime appLifetime)
+    public IActionResult UpdateContainer([FromServices] Microsoft.Extensions.Hosting.IHostApplicationLifetime appLifetime, [FromServices] IConfiguration configuration)
     {
         _logger.LogWarning("Se recibió comando de ACTUALIZACIÓN de contenedor desde los ajustes.");
-        
-        // Ejecutamos en un hilo separado
+
+        // Token de la API HTTP de Watchtower (--http-api-token). "quimera" se mantiene solo por compatibilidad con el compose antiguo.
+        var watchtowerToken = configuration["WATCHTOWER_TOKEN"];
+        if (string.IsNullOrWhiteSpace(watchtowerToken))
+        {
+            _logger.LogWarning("WATCHTOWER_TOKEN no está definida; se usa el token por defecto. Defínela en docker-compose.yml.");
+            watchtowerToken = "quimera";
+        }
+        var watchtowerUrl = configuration["WATCHTOWER_URL"] ?? "http://watchtower:8080";
+
+        // Ejecutamos en un hilo separado para que la respuesta HTTP llegue al cliente antes del reinicio
         _ = Task.Run(async () =>
         {
             bool watchtowerTriggered = false;
             try
             {
                 using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "quimera");
-                var response = await httpClient.PostAsync("http://watchtower:8080/v1/update", null);
+                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", watchtowerToken);
+                var response = await httpClient.PostAsync($"{watchtowerUrl.TrimEnd('/')}/v1/update", null);
                 if (response.IsSuccessStatusCode)
                 {
                     _logger.LogInformation("Actualización solicitada con éxito a Watchtower HTTP API.");
                     watchtowerTriggered = true;
                 }
+                else
+                {
+                    _logger.LogWarning("Watchtower respondió {Status} a la petición de actualización.", response.StatusCode);
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogInformation("No se detectó servicio Watchtower HTTP API ({Message}), intentando script local...", ex.Message);
-            }
-
-            try 
-            {
-                // Si existe un script de actualización (ej. un webhook local o script de watchtower), intentamos ejecutarlo
-                if (System.IO.File.Exists("/app/update_container.sh"))
-                {
-                    var process = new System.Diagnostics.Process()
-                    {
-                        StartInfo = new System.Diagnostics.ProcessStartInfo
-                        {
-                            FileName = "/bin/bash",
-                            Arguments = "/app/update_container.sh",
-                            RedirectStandardOutput = true,
-                            UseShellExecute = false,
-                            CreateNoWindow = true,
-                        }
-                    };
-                    process.Start();
-                }
-            }
-            catch (System.Exception ex)
-            {
-                _logger.LogError(ex, "Error al ejecutar script de actualización");
+                _logger.LogInformation("No se detectó servicio Watchtower HTTP API ({Message}).", ex.Message);
             }
 
             if (!watchtowerTriggered)
             {
                 await Task.Delay(1000);
-                appLifetime.StopApplication(); // Esto detiene el contenedor, permitiendo que Watchtower o el host lo reinicie/actualice
+                appLifetime.StopApplication(); // Detiene el contenedor; restart: unless-stopped lo vuelve a levantar
             }
         });
 
         return Ok(new { Message = "Iniciando proceso de actualización y reinicio..." });
     }
 }
-
-

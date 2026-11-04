@@ -1,14 +1,10 @@
-﻿@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Models
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @inject QuimeraReader.Shared.Interfaces.INetworkStateService NetworkStateService
 @using QuimeraReader.Shared.Services
-
-
-
-
 @namespace QuimeraReader.Shared.Components
 
-<div class="container mt-4 mb-5">
+<div class="container mt-4 mb-5 pb-mobile-nav">
     <RadzenCard class="mb-4 rz-background-color-transparent rz-border-radius-0" style="padding:0; border: none; background: transparent;">
         <h2 class="text-light fw-bold mb-0">@TranslationService["Settings_ServerConfig"]</h2>
     </RadzenCard>
@@ -24,31 +20,103 @@
     {
         <RadzenTabs>
             <Tabs>
+                @if (IsMobileClient)
+                {
+                    <RadzenTabsItem Text="@TranslationService["Settings_ClientApp"]" Icon="devices">
+                        <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
+                            <h4 class="text-primary"><RadzenIcon Icon="dns" /> @TranslationService["Settings_ServerConnection"]</h4>
+                            <p class="text-white-50 small mb-4">@TranslationService["Settings_ServerConnectionDesc"]</p>
+                
+                            <div class="mb-4">
+                                <RadzenLabel Text="@TranslationService["Settings_ServerUrl"]" class="fw-bold mb-2 d-block" />
+                                <RadzenTextBox @bind-Value="_clientServerUrl" class="w-100 bg-secondary text-light border-0" />
+                                <div class="form-text text-white-50 mt-1">@TranslationService["Settings_ServerUrlPlaceholder"]</div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <RadzenLabel Text="@TranslationService["Settings_AccessKey"]" class="fw-bold mb-2 d-block" />
+                                <RadzenPassword @bind-Value="_clientApiKey" class="w-100 bg-secondary text-light border-0" AutoComplete="false" />
+                                <div class="form-text text-white-50 mt-1">@TranslationService["Settings_AccessKeyHelp"]</div>
+                            </div>
+                            
+                            <RadzenButton Text="@TranslationService["Settings_ApplyConnection"]" Icon="save" Click="SaveClientConfig" IsBusy="@_isTestingClientConnection" BusyText="@TranslationService["Settings_Connecting"]" ButtonStyle="Radzen.ButtonStyle.Primary" />
+                        </RadzenCard>
+                    </RadzenTabsItem>
+                }
+                
                 <RadzenTabsItem Text="@TranslationService["Settings_General"]" Icon="settings">
                     <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
-                        <h4 class="text-primary"><RadzenIcon Icon="folder" /> @TranslationService["Settings_ServerFolders"]</h4>
-                        <p class="text-white-50 small mb-4">@TranslationService["Settings_ServerFoldersDesc"]</p>
+                        <h4 class="text-primary"><RadzenIcon Icon="tune" /> Preferencias del Cliente</h4>
+                        <p class="text-white-50 small mb-4">Ajustes locales de idioma y conectividad en este dispositivo.</p>
 
-                        <div class="mb-4">
-                            <RadzenLabel Text="@TranslationService["Settings_SourceDirectory"]" class="fw-bold mb-2 d-block" />
-                            <RadzenTextBox @bind-Value="_libraryRootPath" class="w-100 bg-secondary text-light border-0" />
-                            <div class="form-text text-white-50 mt-1">@TranslationService["Settings_SourceDirectoryDesc"]</div>
+                        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary gap-3">
+                            <div>
+                                <h6 class="text-light fw-bold mb-1"><i class="bi bi-wifi-off me-2 text-warning"></i> Modo Sin Conexión Forzado (Offline)</h6>
+                                <p class="text-white-50 small mb-0">Trabaja únicamente con los libros y audios descargados localmente sin consultar el servidor.</p>
+                            </div>
+                            <RadzenSwitch Value="@NetworkStateService.IsForceOffline" Change="@OnForceOfflineChanged" />
                         </div>
 
-                        <div class="mb-4">
-                            <RadzenLabel Text="@TranslationService["Settings_OutputDirectory"]" class="fw-bold mb-2 d-block" />
-                            <RadzenTextBox @bind-Value="_outgoingLibraryPath" class="w-100 bg-secondary text-light border-0" />
-                            <div class="form-text text-white-50 mt-1">@TranslationService["Settings_OutputDirectoryDesc"]</div>
+                        <div class="@(IsMobileClient ? "mb-4 pb-3 border-bottom border-secondary" : "mb-2")">
+                            <RadzenLabel Text="Idioma de la interfaz" class="fw-bold mb-2 d-block" />
+                            <RadzenDropDown Value="@TranslationService.CurrentLanguage"
+                                            Data="@_languageOptions"
+                                            TextProperty="Text"
+                                            ValueProperty="Value"
+                                            Change="@OnLanguageChanged"
+                                            class="w-100 bg-secondary text-light border-0"
+                                            Style="max-width: 320px;" />
                         </div>
 
-                        <div class="mb-2">
-                            <RadzenLabel Text="@TranslationService["Settings_ImportMode"]" class="fw-bold mb-2 d-block" />
-                            <RadzenDropDown @bind-Value="_ingestionMode" Data="@_ingestionModes" TextProperty="Text" ValueProperty="Value" class="w-100 bg-secondary text-light border-0" />
-                            <div class="form-text text-white-50 mt-1">@TranslationService["Settings_ImportModeDesc"]</div>
-                        </div>
+                        @if (IsMobileClient)
+                        {
+                            <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary gap-3 pt-1">
+                                <div>
+                                    <h6 class="text-light fw-bold mb-1"><i class="bi bi-bug me-2 text-warning"></i> Diagnóstico y Logs Remotos</h6>
+                                    <p class="text-white-50 small mb-0">Los logs de Android se envían automáticamente al servidor cada 10s. También puedes enviar un evento de prueba ahora mismo.</p>
+                                </div>
+                                <RadzenButton Text="Enviar Logs" Icon="send" Click="SendDiagnosticLogAsync" IsBusy="@_isSendingLogs" ButtonStyle="Radzen.ButtonStyle.Info" Size="Radzen.ButtonSize.Small" />
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center gap-3 pt-1">
+                                <div>
+                                    <h6 class="text-light fw-bold mb-1"><i class="bi bi-shield-lock me-2 text-info"></i> Administración Avanzada del Servidor</h6>
+                                    <p class="text-white-50 small mb-0">Muestra carpetas del servidor, claves de IA/Whisper, tareas de escaneo y control del contenedor Docker.</p>
+                                </div>
+                                <RadzenSwitch @bind-Value="_showAdvancedServerSettings" />
+                            </div>
+                        }
                     </RadzenCard>
+
+                    @if (ShowServerAdminTabs)
+                    {
+                        <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
+                            <h4 class="text-primary"><RadzenIcon Icon="folder" /> @TranslationService["Settings_ServerFolders"]</h4>
+                            <p class="text-white-50 small mb-4">@TranslationService["Settings_ServerFoldersDesc"]</p>
+
+                            <div class="mb-4">
+                                <RadzenLabel Text="@TranslationService["Settings_SourceDirectory"]" class="fw-bold mb-2 d-block" />
+                                <RadzenTextBox @bind-Value="_libraryRootPath" class="w-100 bg-secondary text-light border-0" />
+                                <div class="form-text text-white-50 mt-1">@TranslationService["Settings_SourceDirectoryDesc"]</div>
+                            </div>
+
+                            <div class="mb-4">
+                                <RadzenLabel Text="@TranslationService["Settings_OutputDirectory"]" class="fw-bold mb-2 d-block" />
+                                <RadzenTextBox @bind-Value="_outgoingLibraryPath" class="w-100 bg-secondary text-light border-0" />
+                                <div class="form-text text-white-50 mt-1">@TranslationService["Settings_OutputDirectoryDesc"]</div>
+                            </div>
+
+                            <div class="mb-2">
+                                <RadzenLabel Text="@TranslationService["Settings_ImportMode"]" class="fw-bold mb-2 d-block" />
+                                <RadzenDropDown @bind-Value="_ingestionMode" Data="@_ingestionModes" TextProperty="Text" ValueProperty="Value" class="w-100 bg-secondary text-light border-0" />
+                                <div class="form-text text-white-50 mt-1">@TranslationService["Settings_ImportModeDesc"]</div>
+                            </div>
+                        </RadzenCard>
+                    }
                 </RadzenTabsItem>
 
+                @if (ShowServerAdminTabs)
+                {
                 <RadzenTabsItem Text="@TranslationService["Settings_IntegrationsAPI"]" Icon="api">
                     <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
                         <h4 class="text-primary"><RadzenIcon Icon="smart_toy" /> @TranslationService["Settings_AIAndTranscription"]</h4>
@@ -65,10 +133,10 @@
                                     <p class="text-white-50 small">@TranslationService["Settings_LocalConfigWhisperDesc"]</p>
                                     <div class="mb-3">
                                         <RadzenLabel Text="@TranslationService["Settings_BaseModelPath"]" class="small d-block mb-1" />
-                                        <div class="d-flex gap-2">
+                                        <div class="d-flex flex-column flex-sm-row gap-2">
                                             <RadzenTextBox @bind-Value="_whisperModelPath" class="flex-grow-1 bg-dark text-light border-0" />
                                             @if (_isWhisperDownloaded) {
-                                                <RadzenBadge BadgeStyle="Radzen.BadgeStyle.Success" Text="Modelo Listo" class="py-2 px-3 align-self-center" />
+                                                <RadzenBadge BadgeStyle="Radzen.BadgeStyle.Success" Text="Modelo Listo" class="py-2 px-3 align-self-start align-self-sm-center" />
                                             } else {
                                                 <RadzenButton Text="@TranslationService["Settings_DownloadNow"]" Click="DownloadWhisperModelAsync" IsBusy="@_isDownloadingWhisper" ButtonStyle="Radzen.ButtonStyle.Primary" Variant="Radzen.Variant.Outlined" />
                                             }
@@ -157,6 +225,60 @@
                             <RadzenButton Text="@TranslationService["Settings_Merge"]" Icon="auto_fix_high" Click="MergeDuplicatesAsync" ButtonStyle="Radzen.ButtonStyle.Light" Variant="Radzen.Variant.Outlined" />
                         </div>
                     </RadzenCard>
+
+                    <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
+                        <h4 class="text-primary"><RadzenIcon Icon="backup" /> Copias de seguridad y limpieza</h4>
+                        <p class="text-white-50 small mb-4">Incluyen los libros con algo tuyo: estado, progreso, sin conexión, notas y audio.</p>
+
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 border-bottom border-secondary py-3">
+                            <div>
+                                <h6 class="mb-1 fw-bold">Descargar copia</h6>
+                                <p class="mb-0 text-white-50 small">Estado (JSON, pocos KB): basta si los archivos siguen en el servidor. Completa (ZIP): además los EPUB, audios y portadas de esos libros.</p>
+                            </div>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <a class="btn btn-outline-light btn-sm text-nowrap" href="@BookService.GetMediaUrl("api/maintenance/backup?format=json")" download target="_blank"><i class="bi bi-filetype-json me-1"></i> Estado</a>
+                                <a class="btn btn-outline-light btn-sm text-nowrap" href="@BookService.GetMediaUrl("api/maintenance/backup?format=zip")" download target="_blank"><i class="bi bi-file-zip me-1"></i> Completa</a>
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 border-bottom border-secondary py-3">
+                            <div>
+                                <h6 class="mb-1 fw-bold">Restaurar copia</h6>
+                                <p class="mb-0 text-white-50 small">Completa los libros que ya existen (gana el progreso más reciente, las notas no se duplican). Con un ZIP, importa los que falten. Antes se guarda una copia de la base de datos.</p>
+                            </div>
+                            <label class="btn btn-outline-light btn-sm text-nowrap mb-0 @(_isRestoring ? "disabled" : "")">
+                                <i class="bi bi-upload me-1"></i> @(_isRestoring ? "Restaurando..." : "Elegir archivo")
+                                <InputFile OnChange="RestoreBackupAsync" accept=".json,.zip" class="d-none" />
+                            </label>
+                        </div>
+
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 border-bottom border-secondary py-3">
+                            <div>
+                                <h6 class="mb-1 fw-bold">Reparar portadas</h6>
+                                <p class="mb-0 text-white-50 small">Recupera las portadas que faltan sacándolas del EPUB o, si no trae, de OpenLibrary y Google Books. Se guardan siempre en la biblioteca.</p>
+                                @if (_coversStatus != null)
+                                {
+                                    <p class="mb-0 mt-2 small text-info">@_coversStatus</p>
+                                }
+                            </div>
+                            <RadzenButton Text="Reparar" Icon="image" Click="RepairCoversAsync" Disabled="@_coversRunning" ButtonStyle="Radzen.ButtonStyle.Light" Variant="Radzen.Variant.Outlined" Size="Radzen.ButtonSize.Small" />
+                        </div>
+
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 py-3">
+                            <div>
+                                <h6 class="mb-1 fw-bold">Libros repetidos</h6>
+                                <p class="mb-0 text-white-50 small">Une el mismo EPUB importado varias veces y los libros sin archivo con su copia del mismo título y autor, conservando lo tuyo. Analizar no cambia nada.</p>
+                                @if (_dedupStatus != null)
+                                {
+                                    <p class="mb-0 mt-2 small text-info">@_dedupStatus</p>
+                                }
+                            </div>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <RadzenButton Text="Analizar" Icon="search" Click="@(() => RunDuplicatesAsync(false))" Disabled="@_dedupRunning" ButtonStyle="Radzen.ButtonStyle.Light" Variant="Radzen.Variant.Outlined" Size="Radzen.ButtonSize.Small" />
+                                <RadzenButton Text="Unir" Icon="call_merge" Click="@(() => RunDuplicatesAsync(true))" Disabled="@(_dedupRunning || !_dedupAnalyzed)" ButtonStyle="Radzen.ButtonStyle.Warning" Size="Radzen.ButtonSize.Small" />
+                            </div>
+                        </div>
+                    </RadzenCard>
                 </RadzenTabsItem>
                 <RadzenTabsItem Text="@TranslationService["Settings_System"]" Icon="settings_applications">
                     <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
@@ -179,13 +301,38 @@
                             <RadzenButton Text="Actualizar y Reiniciar" Icon="system_update_alt" Click="UpdateContainerAsync" ButtonStyle="Radzen.ButtonStyle.Danger" />
                         </div>
                     </RadzenCard>
+
+                    <RadzenCard class="mb-4 bg-dark text-light border-danger shadow-sm">
+                        <h4 class="text-danger"><RadzenIcon Icon="restart_alt" /> Vaciar biblioteca y volver a escanear</h4>
+                        <p class="text-white-50 small mb-3">
+                            Borra los libros de la base de datos para reimportarlos desde cero. Se conservan los ajustes y claves, los audios huérfanos y los archivos en disco.
+                            Antes se guardan una copia de la base de datos, una copia completa de tus libros en lectura, sin conexión y con notas (que se restauran primero) y una caché de metadatos
+                            para no volver a consultar Google Books y compañía. Los universos y el estado de los demás libros se reaplican a medida que el escáner los reimporta.
+                        </p>
+                        <div class="d-flex gap-2 flex-wrap align-items-center">
+                            <RadzenButton Text="Ver qué haría" Icon="search" Click="PlanResetAsync" Disabled="@_resetBusy" ButtonStyle="Radzen.ButtonStyle.Light" Variant="Radzen.Variant.Outlined" Size="Radzen.ButtonSize.Small" />
+                            @if (_resetPlanReady)
+                            {
+                                <RadzenTextBox @bind-Value="_resetConfirm" Placeholder="Escribe VACIAR" class="bg-secondary text-light border-0" Style="max-width: 160px;" />
+                                <RadzenButton Text="Vaciar y reescanear" Icon="delete_sweep" Click="RunResetAsync" Disabled="@(_resetBusy || _resetConfirm != "VACIAR")" ButtonStyle="Radzen.ButtonStyle.Danger" Size="Radzen.ButtonSize.Small" />
+                            }
+                        </div>
+                        @if (_resetStatus != null)
+                        {
+                            <pre class="small text-info mt-3 mb-0" style="white-space: pre-wrap;">@_resetStatus</pre>
+                        }
+                    </RadzenCard>
                 </RadzenTabsItem>
+                }
             </Tabs>
         </RadzenTabs>
 
-        <div class="d-flex justify-content-end mt-4">
-            <RadzenButton Text="@TranslationService["Settings_SaveAllChanges"]" Icon="save" Click="SaveSettingsAsync" IsBusy="@_isSaving" ButtonStyle="Radzen.ButtonStyle.Success" Size="Radzen.ButtonSize.Large" class="px-5 shadow" />
-        </div>
+        @if (ShowServerAdminTabs)
+        {
+            <div class="d-flex justify-content-end mt-4">
+                <RadzenButton Text="@TranslationService["Settings_SaveAllChanges"]" Icon="save" Click="SaveSettingsAsync" IsBusy="@_isSaving" ButtonStyle="Radzen.ButtonStyle.Success" Size="Radzen.ButtonSize.Large" class="px-5 shadow" />
+            </div>
+        }
     }
 </div>
 

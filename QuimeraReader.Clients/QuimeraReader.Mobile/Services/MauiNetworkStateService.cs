@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Maui.Networking;
 using QuimeraReader.Shared.Interfaces;
@@ -8,7 +8,10 @@ namespace QuimeraReader.Mobile.Services
 {
     public class MauiNetworkStateService : INetworkStateService
     {
-        public bool IsOffline => IsForceOffline || Connectivity.Current.NetworkAccess != NetworkAccess.Internet;
+        public bool IsOffline => IsForceOffline || 
+            (Connectivity.Current.NetworkAccess != NetworkAccess.Internet && 
+             Connectivity.Current.NetworkAccess != NetworkAccess.Local && 
+             Connectivity.Current.NetworkAccess != NetworkAccess.ConstrainedInternet);
         public bool IsForceOffline { get; private set; }
 
         public event Action? OnNetworkStateChanged;

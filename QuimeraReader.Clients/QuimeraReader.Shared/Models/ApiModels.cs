@@ -1,4 +1,4 @@
-namespace QuimeraReader.Shared.Models;
+﻿namespace QuimeraReader.Shared.Models;
 
 public record Book
 {
@@ -12,6 +12,9 @@ public record Book
     public List<string> Categories { get; init; } = new();
     public string? Series { get; init; }
     public string? Universe { get; init; }
+    public int? SeriesId { get; init; }
+    public double? SeriesVolume { get; init; }
+    public int? UniverseId { get; init; }
     
     public bool HasCover { get; init; }
     public bool IsAvailableOffline { get; set; }
@@ -26,6 +29,7 @@ public record Book
     public System.Collections.Generic.List<AudioTrackDto> AudioTracks { get; set; } = new();
     public double? PercentageCompleted { get; set; }
     public string? ReadingStatus { get; set; }
+    public string? SyncMapJson { get; set; }
     public string? EpubLocationsCache { get; set; }
     public int? TotalPages { get; set; }
     
@@ -46,6 +50,8 @@ public class AudioTrackDto
     public int Id { get; set; }
     public int TrackNumber { get; set; }
     public string FileName { get; set; } = "";
+    // Copia offline de la pista en este dispositivo (ruta local o marcador blob: de IndexedDB); null si no se descargó
+    public string? LocalPath { get; set; }
 }
 
 public class UpdatePositionRequest
@@ -55,7 +61,10 @@ public class UpdatePositionRequest
     public int? CurrentAudioTrackNumber { get; set; }
     public System.Collections.Generic.List<AudioTrackDto> AudioTracks { get; set; } = new();
     public double? PercentageCompleted { get; set; }
+    // Hora real de lectura (UTC) para que el servidor no acepte progreso más antiguo que el que ya tiene
+    public DateTime? ReadAt { get; set; }
     public string? ReadingStatus { get; set; }
+    public string? SyncMapJson { get; set; }
     public string? EpubLocationsCache { get; set; }
     public int? TotalPages { get; set; }
 }
@@ -111,6 +120,7 @@ public class UpdateMetadataRequest
 {
     public string Title { get; set; } = string.Empty;
     public string? ReadingStatus { get; set; }
+    public string? SyncMapJson { get; set; }
     public List<string> Categories { get; set; } = new();
 }
 
@@ -144,3 +154,65 @@ public class ManagedAudioDto
     public string BookTitle { get; set; } = string.Empty;
 }
 
+
+
+// Sagas y universos
+public class SeriesSummary
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int? UniverseId { get; set; }
+    public string? UniverseName { get; set; }
+    public int BookCount { get; set; }
+    public List<string> Authors { get; set; } = new();
+    public string? SampleCoverUrl { get; set; }
+}
+
+public class SeriesBook
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public double? SeriesVolume { get; set; }
+    public List<string> Authors { get; set; } = new();
+    public bool HasCover { get; set; }
+    public bool HasEpub { get; set; }
+    public bool HasAudio { get; set; }
+    public double? PercentageCompleted { get; set; }
+    public string? ReadingStatus { get; set; }
+    public string CoverUrl => $"api/media/books/{Id}/cover";
+}
+
+public class SeriesDetail
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int? UniverseId { get; set; }
+    public string? UniverseName { get; set; }
+    public List<SeriesBook> Books { get; set; } = new();
+}
+
+public class UniverseSummary
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public int SeriesCount { get; set; }
+    public int BookCount { get; set; }
+    public List<string> SeriesNames { get; set; } = new();
+    public string? SampleCoverUrl { get; set; }
+}
+
+public class UniverseDetail
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public List<SeriesDetail> Series { get; set; } = new();
+    public List<SeriesBook> StandaloneBooks { get; set; } = new();
+}
+
+public class UniverseSuggestion
+{
+    public string Author { get; set; } = string.Empty;
+    public List<SeriesSummary> Series { get; set; } = new();
+}

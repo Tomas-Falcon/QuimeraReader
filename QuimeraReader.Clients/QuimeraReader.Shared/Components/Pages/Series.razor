@@ -1,0 +1,125 @@
+@page "/series"
+@inject CollectionsService Collections
+@inject IBookService BookService
+@inject NavigationManager NavManager
+@inject ToastService ToastService
+@implements IDisposable
+
+<PageTitle>Sagas</PageTitle>
+
+<div class="library-container">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <h2 class="mb-0"><span class="bi bi-collection-fill text-primary me-2"></span> Sagas</h2>
+        <div class="w-100" style="max-width: 360px;">
+            <RadzenTextBox Placeholder="Buscar saga..." Value="@_search" @oninput="@(args => OnSearchInput(args.Value?.ToString() ?? ""))" class="w-100" />
+        </div>
+    </div>
+
+    @if (_series == null)
+    {
+        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    }
+    else if (_series.Count == 0)
+    {
+        <div class="text-center py-5">
+            <i class="bi bi-collection fs-1 opacity-50"></i>
+            <h4 class="mt-3">@(string.IsNullOrWhiteSpace(_search) ? "Todavía no hay sagas" : "Sin resultados")</h4>
+            @if (string.IsNullOrWhiteSpace(_search))
+            {
+                <p class="collection-meta">Las sagas se leen de los EPUB al importarlos. Los libros ya importados se están revisando en segundo plano.</p>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="collection-row">
+            @foreach (var s in _series)
+            {
+                <div class="collection-card" @key="s.Id" @onclick="@(() => NavManager.NavigateTo($"/series/{s.Id}"))">
+                    <div class="collection-cover">
+                        @if (!string.IsNullOrEmpty(s.SampleCoverUrl))
+                        {
+                            <img src="@BookService.GetMediaUrl(s.SampleCoverUrl)" alt="@s.Name" loading="lazy" />
+                        }
+                        else
+                        {
+                            <i class="bi bi-collection fs-1 opacity-50"></i>
+                        }
+                    </div>
+                    <div class="p-2">
+                        <div class="fw-semibold text-truncate" title="@s.Name">@s.Name</div>
+                        <div class="collection-meta text-truncate">@string.Join(", ", s.Authors)</div>
+                        <div class="collection-meta">@s.BookCount @(s.BookCount == 1 ? "libro" : "libros")</div>
+                        @if (!string.IsNullOrEmpty(s.UniverseName))
+                        {
+                            <span class="badge bg-secondary mt-1 text-truncate mw-100"><i class="bi bi-globe2 me-1"></i>@s.UniverseName</span>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        @if (_hasMore)
+        {
+            <div class="text-center my-4">
+                <RadzenButton Text="Mostrar más" Click="LoadMoreAsync" IsBusy="@_loadingMore" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" />
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private const int PageSize = 60;
+    private List<SeriesSummary>? _series;
+    private string _search = "";
+    private bool _hasMore;
+    private bool _loadingMore;
+    private int _version;
+    private CancellationTokenSource? _debounce;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        int version = ++_version;
+        try
+        {
+            var page = await Collections.GetSeriesAsync(_search, 0, PageSize);
+            if (version != _version) return;
+            _series = page;
+            _hasMore = page.Count == PageSize;
+        }
+        catch
+        {
+            if (version == _version) _series = new();
+            ToastService.ShowError("No se pudieron cargar las sagas.");
+        }
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        if (_series == null || _loadingMore) return;
+        _loadingMore = true;
+        int version = _version;
+        try
+        {
+            var page = await Collections.GetSeriesAsync(_search, _series.Count, PageSize);
+            if (version != _version) return;
+            _series.AddRange(page);
+            _hasMore = page.Count == PageSize;
+        }
+        finally { _loadingMore = false; }
+    }
+
+    private async Task OnSearchInput(string value)
+    {
+        _search = value;
+        _debounce?.Cancel();
+        _debounce = new CancellationTokenSource();
+        try { await Task.Delay(300, _debounce.Token); } catch (TaskCanceledException) { return; }
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    public void Dispose() => _debounce?.Cancel();
+}

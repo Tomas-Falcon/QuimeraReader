@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using QuimeraReader.Shared.Interfaces;
 using QuimeraReader.Shared.Models;
+using QuimeraReader.Shared.Services;
 
 namespace QuimeraReader.Web.Services
 {
@@ -18,15 +19,23 @@ namespace QuimeraReader.Web.Services
         private readonly HttpClient _httpClient;
         private readonly ILogger<WebOfflineSyncWorker> _logger;
         private readonly IJSRuntime _jsRuntime;
+        private readonly INetworkStateService _networkState;
+        private readonly SemaphoreSlim _syncLock = new(1, 1);
         private Timer? _timer;
         public bool IsSyncing { get; private set; } = false;
 
-        public WebOfflineSyncWorker(ILocalBookRepository localRepo, HttpClient httpClient, ILogger<WebOfflineSyncWorker> logger, IJSRuntime jsRuntime)
+        public WebOfflineSyncWorker(
+            ILocalBookRepository localRepo,
+            HttpClient httpClient,
+            ILogger<WebOfflineSyncWorker> logger,
+            IJSRuntime jsRuntime,
+            INetworkStateService networkState)
         {
             _localRepo = localRepo;
             _httpClient = httpClient;
             _logger = logger;
             _jsRuntime = jsRuntime;
+            _networkState = networkState;
         }
 
         public void Start()
@@ -36,13 +45,14 @@ namespace QuimeraReader.Web.Services
 
         public async Task SyncNowAsync()
         {
-            if (IsSyncing) return;
+            if (_networkState.IsOffline) return;
+            if (!await _syncLock.WaitAsync(0)) return;
             IsSyncing = true;
 
             try
             {
                 bool isOnline = await _jsRuntime.InvokeAsync<bool>("window.quimeraNetwork.isOnline");
-                if (!isOnline) return;
+                if (!isOnline || _networkState.IsOffline) return;
 
                 await SyncUpToApiAsync();
                 await SyncDownToLocalAsync();
@@ -54,14 +64,13 @@ namespace QuimeraReader.Web.Services
             finally
             {
                 IsSyncing = false;
+                _syncLock.Release();
             }
         }
 
         private async Task SyncUpToApiAsync()
         {
             var queue = await _localRepo.GetQueuedAnnotationsAsync();
-            if (!queue.Any()) return;
-
             foreach (var item in queue)
             {
                 try
@@ -75,20 +84,8 @@ namespace QuimeraReader.Web.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"[WebOfflineSyncWorker] Error enviando nota {item.Id}");
+                    _logger.LogError(ex, "[WebOfflineSyncWorker] Error enviando nota {Id}", item.Id);
                 }
-            }
-
-            // Sync progress
-            var books = await _localRepo.GetOfflineBooksAsync();
-            foreach (var book in books)
-            {
-                try
-                {
-                    var payload = new { CurrentEpubCfi = book.CurrentEpubCfi, PercentageCompleted = book.PercentageCompleted, CurrentAudioPosition = book.CurrentAudioPosition, CurrentAudioTrackNumber = book.CurrentAudioTrackNumber };
-                    await _httpClient.PostAsJsonAsync($"api/Books/{book.Id}/positions", payload);
-                }
-                catch { }
             }
         }
 
@@ -105,31 +102,93 @@ namespace QuimeraReader.Web.Services
                 foreach (var serverBook in serverBooks)
                 {
                     var localBook = localBooks.FirstOrDefault(b => b.Id == serverBook.Id);
+
+                    // Comparar progreso por LastReadAt y PercentageCompleted antes de decidir dirección de sincronización
+                    if (localBook != null)
+                    {
+                        // Solo gana el progreso local si se leyó después (el porcentaje no cuenta: retroceder también es válido)
+                        if (ProgressSync.ShouldPushLocalProgress(localBook, serverBook))
+                        {
+                            try
+                            {
+                                if (await ProgressSync.PushLocalProgressAsync(_httpClient, localBook))
+                                {
+                                    serverBook.CurrentEpubCfi = localBook.CurrentEpubCfi;
+                                    serverBook.PercentageCompleted = localBook.PercentageCompleted;
+                                    serverBook.CurrentAudioPosition = localBook.CurrentAudioPosition;
+                                    serverBook.CurrentAudioTrackNumber = localBook.CurrentAudioTrackNumber;
+                                    serverBook.LastReadAt = localBook.LastReadAt;
+                                }
+                            }
+                            catch { }
+                        }
+
+                        if (string.IsNullOrEmpty(serverBook.EpubLocationsCache) && !string.IsNullOrEmpty(localBook.EpubLocationsCache))
+                        {
+                            serverBook.EpubLocationsCache = localBook.EpubLocationsCache;
+                        }
+                    }
+
                     var baseUrl = _httpClient.BaseAddress?.ToString().TrimEnd('/');
                     
                     var epubPath = localBook?.LocalEpubPath;
-                    if (string.IsNullOrEmpty(epubPath) || !epubPath.StartsWith("blob:")) {
+                    if (serverBook.HasEpub && (string.IsNullOrEmpty(epubPath) || !epubPath.StartsWith("blob:")))
+                    {
                         epubPath = await DownloadFileToDbAsync(serverBook.Id, "epub", serverBook.EpubUrl, baseUrl);
                     }
-                    if (!string.IsNullOrEmpty(epubPath) && epubPath.StartsWith("blob:")) serverBook.LocalEpubPath = epubPath;
+                    if (!string.IsNullOrEmpty(epubPath)) serverBook.LocalEpubPath = epubPath;
 
                     var coverPath = localBook?.LocalCoverPath;
-                    if (string.IsNullOrEmpty(coverPath) || !coverPath.StartsWith("blob:")) {
+                    if (serverBook.HasCover && (string.IsNullOrEmpty(coverPath) || (!coverPath.StartsWith("blob:") && !coverPath.StartsWith("data:"))))
+                    {
                         coverPath = await DownloadFileToDbAsync(serverBook.Id, "cover", serverBook.CoverUrl, baseUrl);
                     }
-                    if (!string.IsNullOrEmpty(coverPath) && coverPath.StartsWith("blob:")) serverBook.LocalCoverPath = coverPath;
+                    if (!string.IsNullOrEmpty(coverPath)) serverBook.LocalCoverPath = coverPath;
 
                     var audioPath = localBook?.LocalAudioPath;
-                    if (serverBook.HasAudio && (string.IsNullOrEmpty(audioPath) || !audioPath.StartsWith("blob:"))) {
+                    if (serverBook.HasAudio && (string.IsNullOrEmpty(audioPath) || !audioPath.StartsWith("blob:")))
+                    {
                         audioPath = await DownloadFileToDbAsync(serverBook.Id, "audio", serverBook.AudioUrl, baseUrl);
                     }
-                    if (!string.IsNullOrEmpty(audioPath) && audioPath.StartsWith("blob:")) serverBook.LocalAudioPath = audioPath;
+                    if (!string.IsNullOrEmpty(audioPath)) serverBook.LocalAudioPath = audioPath;
 
+                    if (serverBook.HasAudio)
+                    {
+                        foreach (var track in OfflineAudio.ExtraTracks(serverBook))
+                        {
+                            var trackPath = localBook?.AudioTracks.FirstOrDefault(t => t.TrackNumber == track.TrackNumber)?.LocalPath;
+                            if (string.IsNullOrEmpty(trackPath) || !trackPath.StartsWith("blob:"))
+                            {
+                                trackPath = await DownloadFileToDbAsync(serverBook.Id, OfflineAudio.FileType(serverBook, track.TrackNumber),
+                                    OfflineAudio.TrackServerPath(serverBook.Id, track.TrackNumber), baseUrl);
+                            }
+                            // downloadFileToDb devuelve la URL original si falla: solo cuenta como descargada si es un blob:
+                            if (!string.IsNullOrEmpty(trackPath) && trackPath.StartsWith("blob:")) track.LocalPath = trackPath;
+                        }
+                    }
+
+                    var existingMap = localBook?.SyncMapJson;
+                    if (!string.IsNullOrEmpty(existingMap))
+                    {
+                        serverBook.SyncMapJson = existingMap;
+                    }
+                    else if (serverBook.HasAudio && serverBook.IsAligned)
+                    {
+                        try
+                        {
+                            using var syncResp = await _httpClient.GetAsync($"api/Books/{serverBook.Id}/syncmap");
+                            if (syncResp.IsSuccessStatusCode)
+                            {
+                                serverBook.SyncMapJson = await syncResp.Content.ReadAsStringAsync();
+                            }
+                        }
+                        catch { }
+                    }
                     await _localRepo.SaveBookAsync(serverBook);
                 }
 
                 // Delete local books that are no longer available offline
-                var serverBookIds = serverBooks.Select(b => b.Id).ToList();
+                var serverBookIds = serverBooks.Select(b => b.Id).ToHashSet();
                 var toDelete = localBooks.Where(b => !serverBookIds.Contains(b.Id)).ToList();
                 foreach (var book in toDelete)
                 {
@@ -151,14 +210,16 @@ namespace QuimeraReader.Web.Services
 
             if (fileType == "cover")
             {
-                try {
+                try
+                {
                     var bytes = await _httpClient.GetByteArrayAsync(fullUrl);
                     var b64 = Convert.ToBase64String(bytes);
                     var ext = System.IO.Path.GetExtension(serverPath).TrimStart('.').ToLower();
-                    if (ext == "jpg") ext = "jpeg";
+                    if (ext == "jpg" || ext.Contains("cover")) ext = "jpeg";
                     if (string.IsNullOrEmpty(ext)) ext = "jpeg";
                     return $"data:image/{ext};base64,{b64}";
-                } catch { return ""; }
+                }
+                catch { return ""; }
             }
 
             return await _jsRuntime.InvokeAsync<string>("window.quimeraIndexedDb.downloadFileToDb", bookId, fileType, fullUrl);
@@ -167,7 +228,7 @@ namespace QuimeraReader.Web.Services
         public void Dispose()
         {
             _timer?.Dispose();
+            _syncLock.Dispose();
         }
     }
 }
-

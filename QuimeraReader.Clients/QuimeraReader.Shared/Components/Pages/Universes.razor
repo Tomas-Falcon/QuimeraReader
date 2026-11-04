@@ -1,0 +1,125 @@
+@page "/universes"
+@inject CollectionsService Collections
+@inject IBookService BookService
+@inject NavigationManager NavManager
+@inject ToastService ToastService
+
+<PageTitle>Universos</PageTitle>
+
+<div class="library-container">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+        <h2 class="mb-0"><span class="bi bi-globe2 text-primary me-2"></span> Universos</h2>
+        <div class="d-flex gap-2 w-100" style="max-width: 420px;">
+            <input class="form-control" placeholder="Nombre del nuevo universo" @bind="_newName" @bind:event="oninput" />
+            <button class="btn btn-primary text-nowrap" disabled="@string.IsNullOrWhiteSpace(_newName)" @onclick="@(() => CreateAsync(_newName, null))">
+                <i class="bi bi-plus-lg me-1"></i> Crear
+            </button>
+        </div>
+    </div>
+    <p class="collection-meta mb-4">
+        Un universo agrupa varias sagas que comparten mundo (por ejemplo <em>Percy Jackson</em> y <em>Magnus Chase</em>) y libros sueltos de ese mundo.
+        Los EPUB no traen este dato: créalos aquí o desde la página de una saga.
+    </p>
+
+    @if (_universes == null)
+    {
+        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    }
+    else
+    {
+        @if (_universes.Count == 0)
+        {
+            <div class="text-center py-4 collection-meta">Todavía no has creado ningún universo.</div>
+        }
+        else
+        {
+            <div class="collection-row mb-5">
+                @foreach (var u in _universes)
+                {
+                    <div class="collection-card" @key="u.Id" @onclick="@(() => NavManager.NavigateTo($"/universe/{u.Id}"))">
+                        <div class="collection-cover">
+                            @if (!string.IsNullOrEmpty(u.SampleCoverUrl))
+                            {
+                                <img src="@BookService.GetMediaUrl(u.SampleCoverUrl)" alt="@u.Name" loading="lazy" />
+                            }
+                            else
+                            {
+                                <i class="bi bi-globe2 fs-1 opacity-50"></i>
+                            }
+                        </div>
+                        <div class="p-2">
+                            <div class="fw-semibold text-truncate" title="@u.Name">@u.Name</div>
+                            <div class="collection-meta">@u.SeriesCount @(u.SeriesCount == 1 ? "saga" : "sagas") · @u.BookCount @(u.BookCount == 1 ? "libro" : "libros")</div>
+                            <div class="collection-meta text-truncate">@string.Join(", ", u.SeriesNames)</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_suggestions.Count > 0)
+        {
+            <h4 class="rz-color-primary fw-bold mb-2">Sugerencias</h4>
+            <p class="collection-meta">Autores con varias sagas que todavía no están en ningún universo.</p>
+            <div class="d-flex flex-column gap-2">
+                @foreach (var s in _suggestions)
+                {
+                    <div class="collection-card p-3" style="cursor: default;" @key="s.Author">
+                        <div class="d-flex flex-column flex-md-row justify-content-between gap-2 align-items-md-center">
+                            <div style="min-width: 0;">
+                                <div class="fw-semibold">@s.Author</div>
+                                <div class="collection-meta">@string.Join(" · ", s.Series.Select(x => x.Name))</div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary text-nowrap" @onclick="@(() => CreateAsync($"Universo de {s.Author}", s.Series.Select(x => x.Id)))">
+                                <i class="bi bi-plus-lg me-1"></i> Crear universo con estas sagas
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<UniverseSummary>? _universes;
+    private List<UniverseSuggestion> _suggestions = new();
+    private string _newName = "";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var universesTask = Collections.GetUniversesAsync();
+            var suggestionsTask = Collections.GetSuggestionsAsync();
+            _universes = await universesTask;
+            _suggestions = await suggestionsTask;
+        }
+        catch
+        {
+            _universes ??= new();
+            ToastService.ShowError("No se pudieron cargar los universos.");
+        }
+    }
+
+    private async Task CreateAsync(string name, IEnumerable<int>? seriesIds)
+    {
+        try
+        {
+            var id = await Collections.CreateUniverseAsync(name, seriesIds);
+            _newName = "";
+            // Se abre para poder renombrarlo o añadir más sagas y libros sueltos
+            NavManager.NavigateTo($"/universe/{id}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            ToastService.ShowError(ex.Message);
+        }
+        catch
+        {
+            ToastService.ShowError("No se pudo crear el universo.");
+        }
+    }
+}

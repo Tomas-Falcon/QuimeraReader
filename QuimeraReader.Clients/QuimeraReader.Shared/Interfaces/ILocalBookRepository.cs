@@ -11,7 +11,7 @@ public interface ILocalBookRepository
     Task SaveBookAsync(Book book);
     Task SaveBooksAsync(IEnumerable<Book> books);
     Task DeleteBookAsync(int id);
-    Task UpdateProgressAsync(int id, string cfi, double? audioPosition, double? percentage);
+    Task UpdateProgressAsync(int id, string cfi, double? audioPosition, double? percentage, int? audioTrackNumber = null);
     Task QueueAnnotationAsync(int bookId, string cfiRange, string selectedText, string colorHex, string note);
     Task<List<AnnotationQueueItem>> GetQueuedAnnotationsAsync();
     Task RemoveQueuedAnnotationAsync(string id);

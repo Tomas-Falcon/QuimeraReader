@@ -37,7 +37,7 @@
                 </div>
             }
                 <div class="text-center mt-3">
-                    <img src="@(BookService.BaseAddress + Book.CoverUrl)" alt="Cover" style="max-height: 200px; object-fit: contain;" />
+                    <img src="@BookService.GetMediaUrl(Book.CoverUrl)" alt="Cover" style="max-height: 200px; object-fit: contain;" />
                 </div>
             }
         </RadzenTabsItem>

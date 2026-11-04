@@ -4,8 +4,10 @@ using QuimeraReader.Infrastructure.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Threading;
 
@@ -14,7 +16,6 @@ namespace QuimeraReader.API.BackgroundServices;
 public class AudioAlignmentBackgroundService : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
-    // Umbral de cobertura de trigramas (transcripción completa vs EPUB) para aceptar el emparejamiento.
     private const double MinCoverage = 0.30;
     private readonly AudioAlignmentQueue _queue;
     private readonly ILogger<AudioAlignmentBackgroundService> _logger;
@@ -53,6 +54,21 @@ public class AudioAlignmentBackgroundService : BackgroundService
         {
             using var scope = _serviceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            // Recuperar tanto los pendientes como los que quedaron interrumpidos en "PROCESSING" por un reinicio previo
+            var interruptedBooks = await dbContext.Books
+                .Where(b => b.ProcessingStatus == "PROCESSING")
+                .ToListAsync(stoppingToken);
+
+            foreach (var b in interruptedBooks)
+            {
+                b.ProcessingStatus = "PENDING_SYNC";
+            }
+            if (interruptedBooks.Count > 0)
+            {
+                await dbContext.SaveChangesAsync(stoppingToken);
+            }
+
             var pendingBooks = await dbContext.Books
                 .Where(b => b.ProcessingStatus == "PENDING_SYNC")
                 .Select(b => b.Id)
@@ -64,7 +80,7 @@ public class AudioAlignmentBackgroundService : BackgroundService
             }
             _logger.LogInformation("Loaded {Count} pending jobs into the queue.", pendingBooks.Count);
         }
-        catch(Exception e)
+        catch (Exception e)
         {
             _logger.LogError(e, "Error loading pending jobs on startup");
         }
@@ -87,10 +103,12 @@ public class AudioAlignmentBackgroundService : BackgroundService
             return;
         }
 
-        var audioTrack = bookToSync.AudioTracks.OrderBy(t => t.TrackNumber).FirstOrDefault();
-        var audioFilePath = audioTrack?.FilePath;
+        var orderedTracks = bookToSync.AudioTracks
+            .Where(t => !string.IsNullOrEmpty(t.FilePath))
+            .OrderBy(t => t.TrackNumber)
+            .ToList();
 
-        if (string.IsNullOrEmpty(audioFilePath) || string.IsNullOrEmpty(bookToSync.EpubFilePath))
+        if (orderedTracks.Count == 0 || string.IsNullOrEmpty(bookToSync.EpubFilePath))
         {
             _logger.LogWarning("El libro {Id} no es válido para sincronización (falta audio o epub).", bookId);
             return;
@@ -98,18 +116,18 @@ public class AudioAlignmentBackgroundService : BackgroundService
 
         if (bookToSync.ProcessingStatus == "SYNCED" || bookToSync.ProcessingStatus == "PROCESSING")
         {
-            return; // Ya fue procesado o está en proceso por alguna otra razón
+            return;
         }
 
-        _logger.LogInformation("Iniciando procesamiento Whisper para el libro: {Title} (ID: {Id})", bookToSync.Title, bookToSync.Id);
-                    
-        // Marcar como procesando
+        _logger.LogInformation("Iniciando procesamiento Whisper multipista ({TrackCount} pistas) para el libro: {Title} (ID: {Id})",
+            orderedTracks.Count, bookToSync.Title, bookToSync.Id);
+
         bookToSync.ProcessingStatus = "PROCESSING";
         await dbContext.SaveChangesAsync(stoppingToken);
 
-        string textContent = ExtractTextFromEpub(bookToSync.EpubFilePath);
+        var (fullTextContent, spineChapters) = ExtractChaptersFromEpub(bookToSync.EpubFilePath);
 
-        if (string.IsNullOrEmpty(textContent))
+        if (string.IsNullOrEmpty(fullTextContent))
         {
             _logger.LogWarning("No se pudo extraer texto del EPUB para el libro {Id}. Cancelando sync.", bookToSync.Id);
             bookToSync.ProcessingStatus = "ERROR";
@@ -117,8 +135,8 @@ public class AudioAlignmentBackgroundService : BackgroundService
             return;
         }
 
-        // Invocar Whisper (bloqueante, sincrónico en este hilo para cumplir la regla FIFO 1x1)
-        var alignmentResult = await alignmentService.GenerateSyncMapAsync(audioFilePath, textContent);
+        var trackTuples = orderedTracks.Select(t => (t.TrackNumber, t.FilePath)).ToList();
+        var alignmentResult = await alignmentService.GenerateMultiTrackSyncMapAsync(trackTuples, fullTextContent, spineChapters, stoppingToken);
 
         if (!alignmentResult.Success)
         {
@@ -128,31 +146,40 @@ public class AudioAlignmentBackgroundService : BackgroundService
             return;
         }
 
-        // Validación definitiva: ¿la transcripción completa coincide con este libro?
+        // Si solo tiene 1 pista y la cobertura es muy baja, devolver a huérfanos; si es multipista con cobertura muy baja, marcar como ERROR sin destruir pistas
         if (alignmentResult.Coverage < MinCoverage)
         {
-            _logger.LogWarning(
-                "Audio '{Audio}' RECHAZADO para el libro '{Title}' (ID: {Id}): cobertura de trigramas {Coverage:P1} < {Min:P0}. Se devuelve a huérfanos.",
-                audioTrack!.FileName, bookToSync.Title, bookToSync.Id, alignmentResult.Coverage, MinCoverage);
-
-            long size = File.Exists(audioFilePath) ? new FileInfo(audioFilePath).Length : 0;
-            dbContext.UnmatchedAudioTracks.Add(new QuimeraReader.Domain.Entities.UnmatchedAudioTrack
+            if (orderedTracks.Count == 1)
             {
-                OriginalFileName = string.IsNullOrEmpty(audioTrack.FileName) ? Path.GetFileName(audioFilePath) : audioTrack.FileName,
-                PhysicalPath = audioFilePath,
-                FileSizeBytes = size,
-                UploadedAt = DateTime.UtcNow
-            });
-            dbContext.BookAudioTracks.Remove(audioTrack);
-            if (bookToSync.SyncMap != null) dbContext.Remove(bookToSync.SyncMap);
-            bookToSync.ProcessingStatus = "NONE";
-            await dbContext.SaveChangesAsync(stoppingToken);
-            return;
+                var singleTrack = orderedTracks[0];
+                _logger.LogWarning(
+                    "Audio '{Audio}' RECHAZADO para el libro '{Title}' (ID: {Id}): cobertura de trigramas {Coverage:P1} < {Min:P0}. Se devuelve a huérfanos.",
+                    singleTrack.FileName, bookToSync.Title, bookToSync.Id, alignmentResult.Coverage, MinCoverage);
+
+                long size = File.Exists(singleTrack.FilePath) ? new FileInfo(singleTrack.FilePath).Length : 0;
+                dbContext.UnmatchedAudioTracks.Add(new QuimeraReader.Domain.Entities.UnmatchedAudioTrack
+                {
+                    OriginalFileName = string.IsNullOrEmpty(singleTrack.FileName) ? Path.GetFileName(singleTrack.FilePath) : singleTrack.FileName,
+                    PhysicalPath = singleTrack.FilePath,
+                    FileSizeBytes = size,
+                    UploadedAt = DateTime.UtcNow
+                });
+                dbContext.BookAudioTracks.Remove(singleTrack);
+                if (bookToSync.SyncMap != null) dbContext.Remove(bookToSync.SyncMap);
+                bookToSync.ProcessingStatus = "NONE";
+                await dbContext.SaveChangesAsync(stoppingToken);
+                return;
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Baja cobertura de trigramas ({Coverage:P1}) en audiolibro multipista '{Title}' (ID: {Id}), pero se conserva el SyncMap.",
+                    alignmentResult.Coverage, bookToSync.Title, bookToSync.Id);
+            }
         }
 
         _logger.LogInformation("Cobertura de trigramas audio/EPUB para '{Title}': {Coverage:P1}", bookToSync.Title, alignmentResult.Coverage);
 
-        // Guardar resultado
         if (bookToSync.SyncMap == null)
         {
             bookToSync.SyncMap = new QuimeraReader.Domain.Entities.SyncMap { BookId = bookToSync.Id, SyncMapJson = alignmentResult.SyncMapJson! };
@@ -161,30 +188,42 @@ public class AudioAlignmentBackgroundService : BackgroundService
         {
             bookToSync.SyncMap.SyncMapJson = alignmentResult.SyncMapJson!;
         }
-        
-        bookToSync.ProcessingStatus = "SYNCED"; // Mapearemos a ALIGNED en el DTO
-        
+
+        bookToSync.ProcessingStatus = "SYNCED";
+
         await dbContext.SaveChangesAsync(stoppingToken);
         _logger.LogInformation("Finalizó correctamente el procesamiento de Whisper para el libro: {Title}", bookToSync.Title);
     }
 
-    private string ExtractTextFromEpub(string epubPath)
+    private (string FullText, List<EpubSpineChapter> Chapters) ExtractChaptersFromEpub(string epubPath)
     {
+        var chapters = new List<EpubSpineChapter>();
         try
         {
             var book = VersOne.Epub.EpubReader.ReadBook(epubPath);
             var sb = new System.Text.StringBuilder();
+            int spineIdx = 0;
+
             foreach (var textContentFile in book.ReadingOrder)
             {
-                sb.AppendLine(textContentFile.Content); 
+                var rawHtml = textContentFile.Content ?? string.Empty;
+                var plain = Regex.Replace(rawHtml, "<.*?>", " ");
+                sb.AppendLine(plain);
+
+                chapters.Add(new EpubSpineChapter
+                {
+                    SpineIndex = spineIdx,
+                    ChapterHref = textContentFile.FilePath ?? textContentFile.Key ?? string.Empty,
+                    PlainText = plain
+                });
+                spineIdx++;
             }
-            return System.Text.RegularExpressions.Regex.Replace(sb.ToString(), "<.*?>", string.Empty);
+            return (sb.ToString(), chapters);
         }
-        catch(Exception e)
+        catch (Exception e)
         {
             _logger.LogError(e, "Error extrayendo texto del EPUB");
-            return string.Empty;
+            return (string.Empty, chapters);
         }
     }
 }
-

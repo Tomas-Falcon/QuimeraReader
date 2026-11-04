@@ -47,8 +47,11 @@ public static class MauiProgram
         builder.Services.AddScoped(sp => 
         {
             var config = sp.GetRequiredService<QuimeraReader.Shared.Services.IServerConfigService>();
-            var url = config.ServerUrl ?? "http://localhost:5000/";
-            return new HttpClient { BaseAddress = new Uri(url) };
+            var defaultUrl = DeviceInfo.Platform == DevicePlatform.Android ? "http://10.0.2.2:5000/" : "http://localhost:5000/";
+            var url = config.ServerUrl ?? defaultUrl;
+            var client = new HttpClient { BaseAddress = new Uri(url), Timeout = TimeSpan.FromSeconds(25) };
+            if (!string.IsNullOrEmpty(config.ApiKey)) client.DefaultRequestHeaders.Add("X-Api-Key", config.ApiKey);
+            return client;
         });
 
         builder.Services.AddScoped<QuimeraReader.Shared.Services.IBookService, QuimeraReader.Shared.Services.BookService>();
@@ -56,14 +59,17 @@ public static class MauiProgram
         builder.Services.AddScoped<QuimeraReader.Shared.Services.IScanService, QuimeraReader.Shared.Services.ScanService>();
         builder.Services.AddScoped<QuimeraReader.Shared.Interfaces.ITranslationService, QuimeraReader.Shared.Services.TranslationService>();
         builder.Services.AddScoped<QuimeraReader.Shared.Services.ToastService>();
+        builder.Services.AddScoped<QuimeraReader.Shared.Services.CollectionsService>();
 
         builder.Services.AddDbContext<QuimeraReader.Mobile.Data.LocalAppDbContext>();
         builder.Services.AddScoped<QuimeraReader.Shared.Interfaces.ILocalBookRepository, QuimeraReader.Mobile.Data.LocalBookRepository>();
         builder.Services.AddSingleton<QuimeraReader.Shared.Interfaces.IOfflineSyncWorker, QuimeraReader.Mobile.Services.MauiOfflineSyncWorker>();
+        builder.Services.AddSingleton<QuimeraReader.Shared.Interfaces.ILocalMediaServer, QuimeraReader.Mobile.Services.MobileLocalMediaServer>();
 
 
 		return builder.Build();
 	}
 }
+
 
 

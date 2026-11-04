@@ -1,4 +1,4 @@
-﻿namespace QuimeraReader.Domain.Entities;
+namespace QuimeraReader.Domain.Entities;
 
 public class Book
 {
@@ -14,6 +14,8 @@ public class Book
     // Local File Paths
     public string EpubFilePath { get; set; } = string.Empty;
     public string? SourceFilePath { get; set; } // Tracks original path for LeaveInPlace mode
+    /// <summary>SHA-256 del EPUB: identifica el mismo archivo aunque cambie de ruta o se descargue dos veces.</summary>
+    public string? ContentHash { get; set; }
     public string? CoverImagePath { get; set; }
     
     // Reading Progress
@@ -30,17 +32,22 @@ public class Book
     public Series? Series { get; set; }
     public double? SeriesVolume { get; set; } // Puede ser 1.5, etc.
 
+    // Universo de un libro suelto (sin saga) p. ej. "Animales fantásticos" en el mundo de Harry Potter.
+    // Los libros de una saga heredan el universo de la saga (Series.UniverseId).
+    public int? UniverseId { get; set; }
+    public Universe? Universe { get; set; }
+
     // Metadata Tracking
     public bool IsMetadataComplete { get; set; } = false;
     
-    // Sincronizacin
+    // Sincronización
     public bool IsReadInHardcover { get; set; }
 
     // Relations
     public ICollection<BookAuthor> Authors { get; set; } = new List<BookAuthor>();
     public ICollection<BookCategory> Categories { get; set; } = new List<BookCategory>();
     public ICollection<BookAudioTrack> AudioTracks { get; set; } = new List<BookAudioTrack>();
-        public ICollection<BookAnnotation> Annotations { get; set; } = new List<BookAnnotation>();
-        public bool IsAvailableOffline { get; set; } = false;
+    public ICollection<BookAnnotation> Annotations { get; set; } = new List<BookAnnotation>();
+    public bool IsAvailableOffline { get; set; } = false;
     public SyncMap? SyncMap { get; set; }
 }

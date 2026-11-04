@@ -1,4 +1,4 @@
-﻿@using QuimeraReader.Shared.Models
+@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 @using Radzen
 @using Radzen.Blazor
@@ -12,44 +12,58 @@
 @inject QuimeraReader.Shared.Interfaces.ITranslationService TranslationService
 @namespace QuimeraReader.Shared.Components
 
-<div class="library-container" style="height: calc(100vh - 120px); overflow-y: auto; overflow-x: hidden;">
-    <div class="library-toolbar d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3 mb-4">
+<div class="library-container">
+    <div class="library-toolbar d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-2 gap-md-3 mb-3 mb-md-4">
         <div class="search-box w-100" style="max-width: 500px;">
             <RadzenTextBox Placeholder="Buscar libros, autores..." @bind-Value="@_searchQuery" @oninput="@(args => OnSearchInput(args.Value?.ToString() ?? string.Empty))" class="w-100" />
         </div>
-        <div class="filters d-flex flex-column flex-sm-row flex-wrap gap-2 align-items-stretch align-items-sm-center w-100">
+        <div class="filters d-flex flex-wrap gap-2 align-items-center w-100">
             @if (_selectionMode)
             {
-                                <span class="text-primary fw-bold me-2">@_selectedBookIds.Count seleccionados</span>
-                <RadzenDropDown TValue="string" Placeholder="Marcar como..." Data="@_bulkActions" ValueProperty="Value" TextProperty="Text" Change="OnBulkActionSelected" Style="width: 180px;" />
-                <RadzenButton Text="Cancelar Selección" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Size="ButtonSize.Small" />
+                <span class="text-primary fw-bold me-1 small">@_selectedBookIds.Count seleccionados</span>
+                <RadzenDropDown TValue="string" Placeholder="Marcar como..." Data="@_bulkActions" ValueProperty="Value" TextProperty="Text" Change="OnBulkActionSelected" Style="width: 165px;" />
+                <RadzenButton Text="Cancelar" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Size="ButtonSize.Small" />
                 <RadzenButton Text="Borrar" Click="DeleteSelected" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Icon="delete" Disabled="@(_selectedBookIds.Count == 0)" />
             }
             else
             {
-                <RadzenButton Text="Seleccionar" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Icon="check_box" />
-                <div class="d-flex align-items-center gap-2">
+                <RadzenButton Text="Seleccionar" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Size="ButtonSize.Small" Icon="check_box" />
+                <div class="d-none d-sm-flex align-items-center gap-2">
                     @if (_isUploading)
                     {
                         <span class="text-muted small me-2"><RadzenIcon Icon="refresh" class="rz-spin" /> Subiendo...</span>
                     }
-                    <label class="rz-button rz-button-md rz-variant-filled rz-primary rz-shade-default m-0 d-flex align-items-center gap-2" style="cursor: pointer;">
+                    <label class="rz-button rz-button-sm rz-variant-filled rz-primary rz-shade-default m-0 d-flex align-items-center gap-1" style="cursor: pointer;">
                         <RadzenIcon Icon="cloud_upload" /> Subir EPUB
                         <InputFile @key='"fileUploadInput"' OnChange="HandleFileUpload" accept=".epub,.mp3,.m4b,.m4a,.wav" class="d-none" multiple />
                     </label>
                 </div>
-                                <RadzenDropDown Multiple="true" Placeholder="Categorías" Data="@_availableCategories" TextProperty="Name" ValueProperty="Id" @bind-Value="_selectedCategories"  Style="min-width: 200px; max-width: 100%;" AllowClear="true" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
-                <RadzenDropDown TValue="string" Data="@_sortOptions" @bind-Value="_selectedSort" Style="width: auto;" />
+                <RadzenDropDown Multiple="true"
+                                Placeholder="Categorías"
+                                Data="@_availableCategories"
+                                TextProperty="Name"
+                                ValueProperty="Id"
+                                @bind-Value="_selectedCategories"
+                                Change="@OnCategoryChanged"
+                                Style="min-width: 150px; flex: 1; max-width: 260px;"
+                                AllowClear="true"
+                                AllowFiltering="true"
+                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
+                <RadzenDropDown TValue="string"
+                                Data="@_sortOptions"
+                                @bind-Value="_selectedSort"
+                                Change="@OnSortChanged"
+                                Style="min-width: 160px;" />
             }
         </div>
     </div>
 
-    @if (string.IsNullOrWhiteSpace(_searchQuery))
+    @if (string.IsNullOrWhiteSpace(_searchQuery) && !IsCatalogPage)
     {
         @if (_readingBooks != null && _readingBooks.Any())
         {
-            <h3 class="rz-color-primary rz-mt-4 mb-3">@TranslationService["Status_Reading"]</h3>
-            <div class="netflix-row mb-5">
+            <h4 class="rz-color-primary mt-2 mb-2 fw-bold">@TranslationService["Status_Reading"]</h4>
+            <div class="netflix-row mb-4">
                 @foreach (var book in _readingBooks)
                 {
                     <div class="netflix-item"><BookCard Book="book" /></div>
@@ -63,10 +77,10 @@
             </div>
         }
 
-                @if (_nextToReadBooks != null && _nextToReadBooks.Any())
+        @if (_nextToReadBooks != null && _nextToReadBooks.Any())
         {
-            <h3 class="rz-color-primary rz-mt-4 mb-3">@TranslationService["Status_NextToRead"]</h3>
-            <div class="netflix-row mb-5">
+            <h4 class="rz-color-primary mt-2 mb-2 fw-bold">@TranslationService["Status_NextToRead"]</h4>
+            <div class="netflix-row mb-4">
                 @foreach (var book in _nextToReadBooks)
                 {
                     <div class="netflix-item"><BookCard Book="book" /></div>
@@ -79,10 +93,11 @@
                 }
             </div>
         }
-                @if (_readBooks != null && _readBooks.Any())
+
+        @if (_readBooks != null && _readBooks.Any())
         {
-            <h3 class="rz-color-primary rz-mt-4 mb-3">@TranslationService["Status_Read"]</h3>
-            <div class="netflix-row mb-5">
+            <h4 class="rz-color-primary mt-2 mb-2 fw-bold">@TranslationService["Status_Read"]</h4>
+            <div class="netflix-row mb-4">
                 @foreach (var book in _readBooks)
                 {
                     <div class="netflix-item"><BookCard Book="book" /></div>
@@ -95,10 +110,11 @@
                 }
             </div>
         }
+
         @if (_recommendations != null && _recommendations.Any())
         {
-            <h3 class="rz-color-primary rz-mt-4 mb-3">@TranslationService["Status_Recommended"]</h3>
-            <div class="netflix-row mb-5">
+            <h4 class="rz-color-primary mt-2 mb-2 fw-bold">@TranslationService["Status_Recommended"]</h4>
+            <div class="netflix-row mb-4">
                 @foreach (var book in _recommendations)
                 {
                     <div class="netflix-item"><BookCard Book="book" /></div>
@@ -107,39 +123,23 @@
         }
     }
 
-    <h3 class="rz-color-primary rz-mt-4 mb-3">@(string.IsNullOrWhiteSpace(_searchQuery) ? TranslationService["Library_AllBooks"] : TranslationService["Library_SearchResults"])</h3>
+    <h4 class="rz-color-primary mt-2 mb-3 fw-bold">@(string.IsNullOrWhiteSpace(_searchQuery) ? TranslationService["Library_AllBooks"] : TranslationService["Library_SearchResults"])</h4>
     
-    @if (false)
+    @* Scroll infinito en lugar de Virtualize: con ~138k libros la altura virtual superaba el máximo del navegador
+       y aparecían huecos en blanco y saltos al desplazarse. Se cargan bloques de 48 al acercarse al final. *@
+    <div class="row m-0 row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-4 row-cols-xl-6 g-2 g-md-4 mb-3 mb-md-4 all-books-grid">
+        @foreach (var book in _allBooks)
+        {
+            <div class="col" @key="book.Id">
+                <BookCard Book="book" SelectionMode="_selectionMode" IsSelected="_selectedBookIds.Contains(book.Id)" IsSelectedChanged="@(isSelected => OnBookSelectionChanged(book.Id, isSelected))" />
+            </div>
+        }
+    </div>
+    @if (_hasMoreAll)
     {
-        <div class="text-center p-5">
-            <RadzenIcon Icon="library_books" Style="font-size: 3rem; color: var(--rz-text-disabled-color);" />
-            <p class="text-muted mt-2">No hay libros en la biblioteca.</p>
+        <div @ref="_loadMoreAllElement" class="d-flex justify-content-center py-4">
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Medium" />
         </div>
-    }
-    else
-    {
-        <Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize ItemsProvider="ProvideBookChunks" Context="chunk" OverscanCount="3" @ref="_virtualizeComponent">
-            <ItemContent>
-                <div class="row m-0 row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-4 row-cols-xl-5 g-4 mb-4">
-                    @foreach (var book in chunk)
-                    {
-                        <div class="col">
-                            <BookCard Book="book" SelectionMode="_selectionMode" IsSelected="_selectedBookIds.Contains(book.Id)" IsSelectedChanged="@(isSelected => OnBookSelectionChanged(book.Id, isSelected))" />
-                        </div>
-                    }
-                </div>
-            </ItemContent>
-            <Placeholder>
-                <div class="row m-0 row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-4 row-cols-xl-5 g-4 mb-4">
-                    @for (int i = 0; i < 5; i++)
-                    {
-                        <div class="col">
-                            <div style="height: 350px; background: var(--bg-card); border-radius: 8px; opacity: 0.5;"></div>
-                        </div>
-                    }
-                </div>
-            </Placeholder>
-        </Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize>
     }
 </div>
 
@@ -147,6 +147,8 @@
     .library-container {
         max-width: 100%;
         overflow-x: hidden;
+        padding: 4px 0 24px 0 !important;
+        min-height: auto !important;
     }
     .netflix-row {
         width: 100%;
@@ -154,17 +156,25 @@
         display: flex;
         overflow-x: auto;
         scroll-snap-type: x mandatory;
-        gap: 1.5rem;
-        padding-bottom: 1rem;
-        padding-top: 0.5rem;
+        gap: 0.85rem;
+        padding-bottom: 0.75rem;
+        padding-top: 0.25rem;
     }
     .netflix-item {
         flex: 0 0 auto;
         scroll-snap-align: start;
-        width: 220px;
+        width: 150px;
+    }
+    @@media (min-width: 768px) {
+        .netflix-row {
+            gap: 1.35rem;
+        }
+        .netflix-item {
+            width: 200px;
+        }
     }
     .netflix-row::-webkit-scrollbar {
-        height: 8px;
+        height: 6px;
     }
     .netflix-row::-webkit-scrollbar-thumb {
         background-color: var(--rz-primary-light);
@@ -179,35 +189,74 @@
     [Parameter]
     public string? QueryParam { get; set; }
 
-    private Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize<List<Book>> _virtualizeComponent;
+    /// <summary>"author" o "category": filtra por ese campo exacto en lugar de buscar por texto.</summary>
+    [Parameter]
+    public string? FilterType { get; set; }
 
-    private async ValueTask<Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderResult<List<Book>>> ProvideBookChunks(Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderRequest request)
+    [Parameter]
+    public string? FilterValue { get; set; }
+
+    private bool IsCatalogPage => !string.IsNullOrWhiteSpace(FilterType) || !string.IsNullOrWhiteSpace(QueryParam);
+    private string? _lastQueryParam;
+    private string? _lastFilterValue;
+
+    private const int AllBooksPageSize = 48;
+    private List<Book> _allBooks = new();
+    private bool _hasMoreAll = true;
+    private bool _isLoadingAll = false;
+    private int _allBooksVersion = 0;
+    private ElementReference _loadMoreAllElement;
+    private bool _allScrollInitialized = false;
+
+    // Vuelve a cargar "Toda la biblioteca" desde el principio (búsqueda, filtros, orden o cambios en los libros)
+    private async Task ReloadAllBooksAsync()
     {
-        try 
+        _allBooksVersion++;
+        _allBooks = new List<Book>();
+        _hasMoreAll = true;
+        _isLoadingAll = false;
+        _allScrollInitialized = false;
+        await LoadMoreAllRequested();
+    }
+
+    [JSInvokable]
+    public async Task LoadMoreAllRequested()
+    {
+        if (_isLoadingAll || !_hasMoreAll) return;
+        _isLoadingAll = true;
+        int version = _allBooksVersion;
+        try
         {
-            int chunkSize = 5;
-            int skip = request.StartIndex * chunkSize;
-            int take = request.Count * chunkSize;
+            // Ordenación en servidor
+            string? sortBy = _selectedSort == "Título (A-Z)" ? "Title" : _selectedSort == "Autor (A-Z)" ? "Author" : null;
+            // En páginas de autor/categoría se filtra exactamente por ese campo; la caja de búsqueda sigue funcionando encima
+            string? search = _searchQuery;
+            if (!string.IsNullOrWhiteSpace(FilterValue) && search == FilterValue) search = null;
+            var result = await BookService.GetBooksAsync(1, AllBooksPageSize, search, _selectedCategories?.ToArray(), null, _allBooks.Count, AllBooksPageSize,
+                sortBy: sortBy,
+                author: FilterType == "author" ? FilterValue : null,
+                category: FilterType == "category" ? FilterValue : null);
 
-            var result = await BookService.GetBooksAsync(1, 50, _searchQuery, _selectedCategories?.ToArray(), null, skip, take);
-            var totalChunks = (int)Math.Ceiling((double)result.Total / chunkSize);
+            // Si mientras tanto cambió la búsqueda o el filtro, esta respuesta ya no sirve
+            if (version != _allBooksVersion) return;
 
-            var chunks = new List<List<Book>>();
-            for (int i = 0; i < result.Data.Length; i += chunkSize)
-            {
-                chunks.Add(result.Data.Skip(i).Take(chunkSize).ToList());
-            }
-
-            return new Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderResult<List<Book>>(chunks, totalChunks);
+            var page = result.Data ?? Array.Empty<Book>();
+            var known = _allBooks.Select(b => b.Id).ToHashSet();
+            _allBooks.AddRange(page.Where(b => known.Add(b.Id)));
+            _hasMoreAll = page.Length == AllBooksPageSize && _allBooks.Count < result.Total;
+            _allScrollInitialized = false; // re-observar: si el centinela sigue visible se carga el siguiente bloque
         }
-        catch (Exception ex)
+        catch
         {
-            return new Microsoft.AspNetCore.Components.Web.Virtualization.ItemsProviderResult<List<Book>>(new List<List<Book>>(), 0);
+            if (version == _allBooksVersion) _hasMoreAll = false;
+        }
+        finally
+        {
+            if (version == _allBooksVersion) _isLoadingAll = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
-    
-    // Pagination fields for carousels
     private List<Book> _readingBooks = new();
     private int _readingPage = 1;
     private bool _hasMoreReading = false;
@@ -243,7 +292,7 @@
     private List<string> _sortOptions = new List<string> { "Añadidos recientemente", "Título (A-Z)", "Autor (A-Z)" };
     private string _selectedSort = "Añadidos recientemente";
 
-        private List<dynamic> _bulkActions = new List<dynamic>
+    private List<dynamic> _bulkActions = new List<dynamic>
     {
         new { Text = "Marcar Leído", Value = "Read" },
         new { Text = "Marcar No Leído", Value = "Unread" },
@@ -259,9 +308,9 @@
             await BookService.BulkUpdateStatusAsync(_selectedBookIds.ToList(), status);
             ToastService.ShowSuccess("Libros actualizados");
             ToggleSelectionMode();
-            if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync(); // Reload
+            await ReloadAllBooksAsync();
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             ToastService.ShowError("Error al actualizar: " + ex.Message);
         }
@@ -289,9 +338,9 @@
         if (_selectedBookIds.Count == 0) return;
         
         var result = await _dialogService.Confirm(
-            $"ATENCION! Vas a borrar {_selectedBookIds.Count} libros. Esta accion ELIMINARA PERMANENTEMENTE los archivos fisicos (EPUBs, audios, portadas).", 
-            "Eliminar Libros", 
-            new ConfirmOptions() { OkButtonText = "Si, ELIMINAR", CancelButtonText = "Cancelar" });
+            $"ATENCIÓN: Vas a borrar {_selectedBookIds.Count} libros. Esta acción ELIMINARÁ PERMANENTEMENTE los archivos físicos del servidor (EPUBs, audios, portadas).", 
+            "Eliminar Libros del Servidor", 
+            new ConfirmOptions() { OkButtonText = "Sí, ELIMINAR", CancelButtonText = "Cancelar" });
 
         if (result == true)
         {
@@ -300,8 +349,8 @@
                 await BookService.DeleteBooksAsync(_selectedBookIds.ToArray());
                 _selectedBookIds.Clear();
                 _selectionMode = false;
-                ToastService.ShowSuccess("Libros borrados correctamente de forma permanente");
-                if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync(); 
+                ToastService.ShowSuccess("Libros borrados correctamente");
+                await ReloadAllBooksAsync(); 
                 StateHasChanged();
             }
             catch (Exception ex)
@@ -344,7 +393,7 @@
             if (successCount > 0)
             {
                 ToastService.ShowSuccess($"{successCount} libro(s) subido(s) correctamente!");
-                                if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
+                await ReloadAllBooksAsync();
             }
         }
         catch (Exception ex)
@@ -357,79 +406,154 @@
             StateHasChanged();
         }
     }
+
     private IEnumerable<QuimeraReader.Shared.Models.Category> _availableCategories = Array.Empty<QuimeraReader.Shared.Models.Category>();
     private IEnumerable<int> _selectedCategories = new List<int>();
-
-    
     private bool _isInitialized = false;
-
-    protected override bool ShouldRender() => _isInitialized;
 
     protected override async Task OnInitializedAsync()
     {
         if (_isInitialized) return;
-
-        try
-        {
-            _availableCategories = await BookService.GetCategoriesAsync();
-        }
-        catch { }
         _objRef = DotNetObjectReference.Create(this);
-        
-        try
+
+        // 1. Pintar de forma instantánea desde la caché en memoria si venimos de vuelta desde otra pantalla
+        var cachedCats = BookService.GetCachedCategories();
+        if (cachedCats != null) _availableCategories = cachedCats;
+
+        var cachedRecs = BookService.GetCachedRecommendations();
+        if (cachedRecs != null) _recommendations = cachedRecs;
+
+        var cachedReading = BookService.GetCachedStatusBooks("Reading");
+        if (cachedReading != null)
         {
-            _recommendations = await BookService.GetRecommendationsAsync();
+            _readingBooks = cachedReading.ToList();
+            _hasMoreReading = _readingBooks.Count >= 20;
         }
-        catch { }
-        
-        _debounceTimer = new System.Timers.Timer(500);
+
+        var cachedNext = BookService.GetCachedStatusBooks("NextToRead");
+        if (cachedNext != null)
+        {
+            _nextToReadBooks = cachedNext.ToList();
+            _hasMoreNextToRead = _nextToReadBooks.Count >= 20;
+        }
+
+        var cachedRead = BookService.GetCachedStatusBooks("Read");
+        if (cachedRead != null)
+        {
+            _readBooks = cachedRead.ToList();
+            _hasMoreRead = _readBooks.Count >= 20;
+        }
+
+        _debounceTimer = new System.Timers.Timer(400);
         _debounceTimer.AutoReset = false;
         _debounceTimer.Elapsed += async (sender, args) =>
         {
             await InvokeAsync(async () => {
-                if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync(); StateHasChanged();
+                await ReloadAllBooksAsync();
+                StateHasChanged(); // necesario: muestra/oculta las filas superiores según haya búsqueda
             });
         };
-        
+
+        _isInitialized = true;
+
+        // Primer bloque de "Toda la biblioteca" (antes lo pedía Virtualize al renderizar)
+        _ = ReloadAllBooksAsync();
+
+        // 2. Cargar/refrescar filas y categorías en paralelo sin bloquear la lista principal.
+        //    En páginas de autor/categoría las filas Netflix no se muestran: solo hacen falta las categorías del filtro.
+        if (IsCatalogPage)
+        {
+            _ = LoadCategoriesOnlyAsync();
+        }
+        else
+        {
+            _ = LoadSecondarySectionsAsync();
+        }
+        await Task.CompletedTask;
+    }
+
+    private async Task LoadCategoriesOnlyAsync()
+    {
         try
         {
+            var cats = await BookService.GetCategoriesAsync();
+            var list = cats ?? Array.Empty<Category>();
+            if (!ReferenceEquals(list, _availableCategories))
+            {
+                _availableCategories = list;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch { }
+    }
+
+    private async Task LoadSecondarySectionsAsync()
+    {
+        try
+        {
+            var catsTask = BookService.GetCategoriesAsync();
+            var recsTask = BookService.GetRecommendationsAsync();
             var readingTask = BookService.GetBooksAsync(1, 20, "", readingStatus: "Reading");
             var nextToReadTask = BookService.GetBooksAsync(1, 20, "", readingStatus: "NextToRead");
             var readTask = BookService.GetBooksAsync(1, 20, "", readingStatus: "Read");
-            
-            await Task.WhenAll(readingTask, nextToReadTask, readTask);
-            
-            _readingBooks = readingTask.Result?.Data?.ToList() ?? new List<Book>();
-            _hasMoreReading = readingTask.Result?.Data?.Length >= 20;
 
-            _nextToReadBooks = nextToReadTask.Result?.Data?.ToList() ?? new List<Book>();
-            _hasMoreNextToRead = nextToReadTask.Result?.Data?.Length >= 20;
+            await Task.WhenAll(catsTask, recsTask, readingTask, nextToReadTask, readTask);
 
-            _readBooks = readTask.Result?.Data?.ToList() ?? new List<Book>();
-            _hasMoreRead = readTask.Result?.Data?.Length >= 20;
+            var newReading = readingTask.Result?.Data?.ToList() ?? new List<Book>();
+            var newNext = nextToReadTask.Result?.Data?.ToList() ?? new List<Book>();
+            var newRead = readTask.Result?.Data?.ToList() ?? new List<Book>();
+            var newRecs = recsTask.Result ?? new List<Book>();
+            var newCats = catsTask.Result ?? Array.Empty<Category>();
+
+            // Solo re-renderizar si algo cambió de verdad (evita el "titileo" al volver con caché ya pintada)
+            bool changed = !SameIds(_readingBooks, newReading) || !SameIds(_nextToReadBooks, newNext) ||
+                           !SameIds(_readBooks, newRead) || !SameIds(_recommendations, newRecs) ||
+                           _availableCategories.Count() != newCats.Count();
+
+            _availableCategories = newCats;
+            _recommendations = newRecs;
+            if (_readingPage == 1) { _readingBooks = newReading; _hasMoreReading = newReading.Count >= 20; }
+            if (_nextToReadPage == 1) { _nextToReadBooks = newNext; _hasMoreNextToRead = newNext.Count >= 20; }
+            if (_readPage == 1) { _readBooks = newRead; _hasMoreRead = newRead.Count >= 20; }
+
+            if (changed) await InvokeAsync(StateHasChanged);
         }
         catch { }
+    }
 
-        _ = PollNewBooksAsync();
-        _isInitialized = true;
+    private static bool SameIds(IEnumerable<Book>? a, IEnumerable<Book>? b)
+    {
+        if (a == null || b == null) return a == null && b == null;
+        return a.Select(x => x.Id).SequenceEqual(b.Select(x => x.Id));
     }
 
     protected override async Task OnParametersSetAsync()
     {
-        if (!string.IsNullOrWhiteSpace(QueryParam) && QueryParam != _searchQuery)
+        // Solo reaccionar cuando el parámetro cambia de verdad: antes cada re-render del padre pisaba lo que el usuario escribía
+        bool changed = false;
+        if (QueryParam != _lastQueryParam)
         {
-            _searchQuery = QueryParam;
-            if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
+            _lastQueryParam = QueryParam;
+            if (!string.IsNullOrWhiteSpace(QueryParam)) _searchQuery = QueryParam;
+            changed = true;
         }
-        else if (string.IsNullOrWhiteSpace(QueryParam) && _virtualizeComponent != null)
+        if (FilterValue != _lastFilterValue)
         {
-            // await _virtualizeComponent.RefreshDataAsync();
+            _lastFilterValue = FilterValue;
+            changed = true;
         }
+        if (changed) await ReloadAllBooksAsync();
     }
 
-        private async Task OnCategoryChanged(object value)
+    // ReloadAllBooksAsync ya re-renderiza la lista: un StateHasChanged adicional provocaba doble parpadeo
+    private async Task OnCategoryChanged(object value)
     {
-        if (_virtualizeComponent != null) await _virtualizeComponent.RefreshDataAsync();
+        await ReloadAllBooksAsync();
+    }
+
+    private async Task OnSortChanged(object value)
+    {
+        await ReloadAllBooksAsync();
     }
 
     private void OnSearchInput(string value)
@@ -446,8 +570,6 @@
     {
         try
         {
-            
-
             if (_hasMoreReading && _loadMoreReadingElement.Id != null && !_readingScrollInitialized)
             {
                 await JSRuntime.InvokeVoidAsync("infiniteScroll.initialize", _loadMoreReadingElement, _objRef, "LoadMoreReadingRequested");
@@ -463,10 +585,14 @@
                 await JSRuntime.InvokeVoidAsync("infiniteScroll.initialize", _loadMoreReadElement, _objRef, "LoadMoreReadRequested");
                 _readScrollInitialized = true;
             }
+            if (_hasMoreAll && !_isLoadingAll && _loadMoreAllElement.Id != null && !_allScrollInitialized)
+            {
+                await JSRuntime.InvokeVoidAsync("infiniteScroll.initialize", _loadMoreAllElement, _objRef, "LoadMoreAllRequested");
+                _allScrollInitialized = true;
+            }
         }
         catch { }
     }
-
 
     [JSInvokable]
     public async Task LoadMoreReadingRequested()
@@ -479,7 +605,7 @@
             var result = await BookService.GetBooksAsync(_readingPage, 20, "", readingStatus: "Reading");
             if (result.Data.Length > 0) _readingBooks.AddRange(result.Data);
             _hasMoreReading = result.Data.Length >= 20;
-            _readingScrollInitialized = false; // re-init on next render if needed
+            _readingScrollInitialized = false;
         }
         catch { }
         finally { _isLoadingReading = false; StateHasChanged(); }
@@ -519,29 +645,6 @@
         finally { _isLoadingRead = false; StateHasChanged(); }
     }
 
-
-
-    private async Task PollNewBooksAsync()
-    {
-        try
-        {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
-            while (await timer.WaitForNextTickAsync(_cts.Token))
-            {
-                // We could poll to check for new books, but Virtualize handles its own data loading.
-                // We'll just refresh it periodically if not searching.
-                if (string.IsNullOrWhiteSpace(_searchQuery) && _virtualizeComponent != null)
-                {
-                    // For performance, we shouldn't force refresh every 10s if user is scrolling. 
-                    // Let's omit aggressive polling for the virtualized list.
-                }
-            }
-        }
-        catch (OperationCanceledException) { }
-    }
-
-
-
     public async ValueTask DisposeAsync()
     {
         _cts.Cancel();
@@ -552,5 +655,3 @@
         _objRef?.Dispose();
     }
 }
-
-

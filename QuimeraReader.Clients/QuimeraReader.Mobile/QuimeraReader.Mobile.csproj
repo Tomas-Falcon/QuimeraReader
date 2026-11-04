@@ -61,7 +61,6 @@
 
         <!-- Images -->
         <MauiImage Include="Resources\Images\*" />
-        <MauiImage Update="Resources\Images\dotnet_bot.svg" BaseSize="168,208" />
 
         <!-- Custom Fonts -->
         <MauiFont Include="Resources\Fonts\*" />
@@ -88,6 +87,10 @@
       <ProjectReference Include="..\..\QuimeraReader.Domain\QuimeraReader.Domain.csproj" />
     </ItemGroup>
 
+  <ItemGroup>
+    <!-- Esquema de la BD local de los clientes: un único archivo compartido entre Mobile, Desktop y los tests -->
+    <Compile Include="..\Common\LocalSchemaSync.cs" Link="Data\LocalSchemaSync.cs" />
+  </ItemGroup>
 </Project>
 
 

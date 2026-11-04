@@ -1,4 +1,4 @@
-name: Build & Release Clients (Android & Windows)
+name: Build & Release Clients (Android, Windows & Linux)
 
 on:
   workflow_dispatch:
@@ -12,14 +12,28 @@ on:
           - all
           - android
           - windows
+          - linux
       create_release:
         description: '¿Crear GitHub Release descargable?'
         required: true
         default: true
         type: boolean
   push:
+    # Tags v* -> Release estable. Push a dev con cambios en clientes -> pre-release "dev-latest" (se sobrescribe en cada build)
     tags:
       - 'v*'
+    branches:
+      - dev
+    paths:
+      - 'QuimeraReader.Clients/**'
+      - 'QuimeraReader.Domain/**'
+      - 'Directory.Build.props'
+      - '.github/workflows/build-clients.yml'
+
+# Un build de dev nuevo cancela el anterior que siga en curso (los de tags nunca se cancelan)
+concurrency:
+  group: build-clients-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/dev' }}
 
 permissions:
   contents: write
@@ -50,12 +64,23 @@ jobs:
       - name: Install MAUI Android Workload
         run: dotnet workload install maui-android
 
-      - name: Build Android APK
+      - name: Decode Android Keystore
+        shell: pwsh
         run: |
-          dotnet build QuimeraReader.Clients/QuimeraReader.Mobile/QuimeraReader.Mobile.csproj `
+          $bytes = [Convert]::FromBase64String("${{ secrets.ANDROID_KEYSTORE_BASE64 }}")
+          [IO.File]::WriteAllBytes("${{ github.workspace }}/release.keystore", $bytes)
+
+      - name: Publish & Sign Android APK
+        run: |
+          dotnet publish QuimeraReader.Clients/QuimeraReader.Mobile/QuimeraReader.Mobile.csproj `
             -f net10.0-android `
             -p:TargetPlatformOverride=net10.0-android `
             -c Release `
+            -p:AndroidKeyStore=true `
+            -p:AndroidSigningKeyStore="${{ github.workspace }}/release.keystore" `
+            -p:AndroidSigningKeyAlias="${{ secrets.ANDROID_KEY_ALIAS }}" `
+            -p:AndroidSigningKeyPass="${{ secrets.ANDROID_KEY_PASSWORD }}" `
+            -p:AndroidSigningStorePass="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" `
             -p:PublishTrimmed=false `
             -p:RunAOTCompilation=false `
             -nodeReuse:false
@@ -124,10 +149,49 @@ jobs:
           name: QuimeraReader-Windows-x64
           path: ./dist/QuimeraReader-Windows-x64.zip
 
+  build-linux:
+    name: Build Linux Desktop App
+    if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'linux'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build & Publish Linux Desktop App
+        run: |
+          dotnet publish QuimeraReader.Clients/QuimeraReader.Desktop/QuimeraReader.Desktop.csproj \
+            -c Release \
+            -r linux-x64 \
+            --self-contained true \
+            -p:PublishSingleFile=false \
+            -o ./publish/linux
+
+      - name: Package Linux Archive
+        shell: bash
+        run: |
+          mkdir -p ./dist
+          chmod +x ./publish/linux/QuimeraReader.Desktop
+          tar -czvf ./dist/QuimeraReader-Linux-x64.tar.gz -C ./publish/linux .
+          echo "Paquete Linux comprimido en ./dist/QuimeraReader-Linux-x64.tar.gz"
+
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuimeraReader-Linux-x64
+          path: ./dist/QuimeraReader-Linux-x64.tar.gz
+
   publish-release:
     name: Publish GitHub Release
-    needs: [build-android, build-windows]
-    if: always() && (github.event_name == 'push' || inputs.create_release == true) && (needs.build-android.result == 'success' || needs.build-windows.result == 'success')
+    needs: [build-android, build-windows, build-linux]
+    if: always() && (github.event_name == 'push' || inputs.create_release == true) && (needs.build-android.result == 'success' || needs.build-windows.result == 'success' || needs.build-linux.result == 'success')
     runs-on: ubuntu-latest
 
     steps:
@@ -144,21 +208,42 @@ jobs:
         id: tag_name
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            echo "TAG=dev-latest" >> $GITHUB_OUTPUT
+            echo "NAME=Dev build (${GITHUB_SHA::7})" >> $GITHUB_OUTPUT
+            echo "PRERELEASE=true" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "push" ]; then
             echo "TAG=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+            echo "NAME=Release ${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+            echo "PRERELEASE=false" >> $GITHUB_OUTPUT
           else
-            echo "TAG=client-build-$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+            TAG="client-build-$(date +'%Y%m%d-%H%M%S')"
+            echo "TAG=${TAG}" >> $GITHUB_OUTPUT
+            echo "NAME=Release ${TAG}" >> $GITHUB_OUTPUT
+            echo "PRERELEASE=false" >> $GITHUB_OUTPUT
           fi
+
+      # dev-latest es una pre-release "rodante": se borra (con su tag) para recrearla apuntando al commit actual
+      - name: Remove previous dev-latest pre-release
+        if: github.ref == 'refs/heads/dev'
+        shell: bash
+        run: gh release delete dev-latest --cleanup-tag --yes || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag_name.outputs.TAG }}
-          name: Release ${{ steps.tag_name.outputs.TAG }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ steps.tag_name.outputs.NAME }}
+          body: ${{ github.ref == 'refs/heads/dev' && format('Build automático de la rama dev ({0}). Solo para pruebas.', github.sha) || '' }}
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.tag_name.outputs.PRERELEASE }}
+          make_latest: ${{ steps.tag_name.outputs.PRERELEASE == 'true' && 'false' || 'true' }}
           files: |
             ./release-assets/*.apk
             ./release-assets/*.zip
+            ./release-assets/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

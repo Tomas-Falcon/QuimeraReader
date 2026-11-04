@@ -1,3 +1,4 @@
+using QuimeraReader.Application.Common;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -19,6 +20,9 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
     private readonly AppDbContext _dbContext;
     private readonly AudioAlignmentQueue _queue;
     private readonly ILogger<EpubScannerService> _logger;
+
+    /// <summary>Resultado del último ScanEpubAsync: Imported, Duplicate (se ignoró) o Relinked (recuperó un libro sin archivo).</summary>
+    public string LastScanOutcome { get; private set; } = "";
     private static readonly SemaphoreSlim _scanLock = new(1, 1);
 
     public EpubScannerService(IEnumerable<IMetadataProvider> providers, HttpClient httpClient, AppDbContext dbContext, AudioAlignmentQueue queue, ILogger<EpubScannerService> logger)
@@ -37,14 +41,101 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
             ? Path.GetFileNameWithoutExtension(originalFileName) 
             : (epubBook.Title ?? "Sin Título");
             
-        var book = await _dbContext.Books
+        // El mismo archivo (mismo hash) es el mismo libro aunque venga de otra ruta: si ya lo tenemos con su
+        // archivo no se toca; si su archivo se perdió, se vuelve a enlazar a este.
+        string contentHash = await BookFingerprint.ComputeAsync(sourceFilePath);
+        var settingsForRoot = await _dbContext.SystemSettings.Where(s => s.Key == "LibraryRootPath").Select(s => s.Value).FirstOrDefaultAsync();
+        var sameFile = await _dbContext.Books
             .Include(b => b.Authors).ThenInclude(ba => ba.Author)
             .Include(b => b.Categories).ThenInclude(bc => bc.Category)
-            .FirstOrDefaultAsync(b => b.Title == bookTitle) 
-            ?? new Book { Title = bookTitle };
-            
+            .Where(b => b.ContentHash == contentHash)
+            .OrderBy(b => b.Id)
+            .ToListAsync();
+        var present = sameFile.FirstOrDefault(b => LibraryPathResolver.Resolve(b.EpubFilePath, settingsForRoot) != null);
+        if (present != null)
+        {
+            LastScanOutcome = "Duplicate";
+            return present;
+        }
+
+        // Si no, el mismo título solo es el mismo libro si comparte algún autor (antes bastaba el título y se mezclaban ediciones y obras distintas)
+        var epubAuthors = (epubBook.AuthorList ?? new List<string>()).Select(a => a.Trim()).Where(a => a.Length > 0).ToList();
+        var book = sameFile.FirstOrDefault();
+        if (book == null)
+        {
+            var sameTitle = await _dbContext.Books
+                .Include(b => b.Authors).ThenInclude(ba => ba.Author)
+                .Include(b => b.Categories).ThenInclude(bc => bc.Category)
+                .Where(b => b.Title == bookTitle)
+                .OrderBy(b => b.Id)
+                .ToListAsync();
+            var candidates = sameTitle.Where(b => epubAuthors.Count == 0 || b.Authors.Count == 0
+                                                  || b.Authors.Any(ba => ba.Author != null && epubAuthors.Contains(ba.Author.Name, StringComparer.OrdinalIgnoreCase)))
+                                      .ToList();
+            // Preferir uno cuyo archivo se perdió: este EPUB lo recupera
+            book = candidates.FirstOrDefault(b => LibraryPathResolver.Resolve(b.EpubFilePath, settingsForRoot) == null) ?? candidates.FirstOrDefault();
+        }
+
+        if (book != null && book.Id != 0 && LibraryPathResolver.Resolve(book.EpubFilePath, settingsForRoot) == null)
+        {
+            LastScanOutcome = "Relinked";
+            // Este archivo pasa a ser el origen del libro recuperado
+            book.SourceFilePath = null;
+        }
+        else if (book != null && book.Id != 0)
+        {
+            // Mismo libro con su archivo en su sitio: otra copia (p. ej. el torrent la volvió a bajar), se ignora
+            LastScanOutcome = "Duplicate";
+            return book;
+        }
+        else
+        {
+            LastScanOutcome = "Imported";
+        }
+        book ??= new Book { Title = bookTitle };
+        book.ContentHash ??= contentHash;
+
+        // Este EPUB ya estuvo en la biblioteca (p. ej. antes de vaciarla): se reutilizan sus metadatos, con las
+        // correcciones a mano, en vez de volver a consultar los servicios externos
+        var cached = book.Id == 0 ? await MetadataCacheService.FindAsync(_dbContext, contentHash) : null;
+        if (cached != null)
+        {
+            book.Title = cached.Title;
+            book.Description = cached.Description;
+            book.AverageRating ??= cached.AverageRating;
+            book.TotalPages ??= cached.TotalPages;
+            foreach (var authorName in MetadataCacheService.Split(cached.Authors))
+            {
+                var author = _dbContext.ChangeTracker.Entries<Author>().Select(e => e.Entity).FirstOrDefault(a => a.Name == authorName)
+                             ?? await _dbContext.Authors.FirstOrDefaultAsync(a => a.Name == authorName);
+                if (author == null)
+                {
+                    author = new Author { Name = authorName, FileAs = authorName };
+                    _dbContext.Authors.Add(author);
+                }
+                book.Authors.Add(new BookAuthor { Author = author });
+            }
+            foreach (var catName in MetadataCacheService.Split(cached.Categories))
+            {
+                var category = _dbContext.ChangeTracker.Entries<Category>().Select(e => e.Entity).FirstOrDefault(c => c.Name == catName)
+                               ?? await _dbContext.Set<Category>().FirstOrDefaultAsync(c => c.Name == catName);
+                if (category == null)
+                {
+                    category = new Category { Name = catName, IsUserGenerated = false };
+                    _dbContext.Add(category);
+                }
+                book.Categories.Add(new BookCategory { Category = category });
+            }
+            if (!string.IsNullOrWhiteSpace(cached.SeriesName))
+            {
+                book.Series = await SeriesAssigner.FindOrCreateAsync(_dbContext, cached.SeriesName);
+                book.SeriesVolume = cached.SeriesVolume;
+            }
+            _logger.LogInformation("Metadatos de '{Title}' reutilizados de la caché (sin consultar servicios externos)", book.Title);
+        }
+
         // Evitamos duplicar autores ya existentes
-        if (epubBook.AuthorList != null)
+        if (cached == null && epubBook.AuthorList != null)
         {
             foreach (var authorName in epubBook.AuthorList)
             {
@@ -126,7 +217,7 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
         }
 
         // Extraer categorías/subjects directamente del EPUB (dc:subject)
-        if (epubBook.Schema?.Package?.Metadata?.Subjects != null)
+        if (cached == null && epubBook.Schema?.Package?.Metadata?.Subjects != null)
         {
             foreach (var subjectRaw in epubBook.Schema.Package.Metadata.Subjects)
             {
@@ -158,6 +249,18 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
             }
         }
 
+        // Saga declarada en el propio EPUB (calibre:series / belongs-to-collection). Antes no se leía y
+        // ningún proveedor la rellenaba, así que nunca se creaban sagas.
+        if (epubBook.Schema?.Package?.Metadata?.MetaItems != null)
+        {
+            var seriesInfo = EpubSeriesParser.Parse(epubBook.Schema.Package.Metadata.MetaItems
+                .Select(m => new EpubMeta(m.Name, m.Content, m.Id, m.Refines, m.Property)));
+            if (seriesInfo != null && await SeriesAssigner.ApplyAsync(_dbContext, book, seriesInfo))
+            {
+                _logger.LogInformation("Saga extraída del EPUB para '{Title}': {Series} #{Volume}", book.Title, seriesInfo.Name, seriesInfo.Volume);
+            }
+        }
+
         bool hasTitle = !string.IsNullOrWhiteSpace(book.Title);
         bool hasAuthor = book.Authors.Any();
         bool hasSynopsis = !string.IsNullOrWhiteSpace(book.Description);
@@ -167,7 +270,10 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
         var query = hasTitle ? book.Title : Path.GetFileNameWithoutExtension(fallbackName);
         var authorHint = book.Authors.FirstOrDefault()?.Author?.Name;
         
-        var orderedProviders = _providers.OrderByDescending(p => p.ProviderName == preferredProviderName);
+        // Con metadatos en caché no se consulta ningún servicio externo
+        var orderedProviders = cached != null
+            ? Enumerable.Empty<IMetadataProvider>()
+            : _providers.OrderByDescending(p => p.ProviderName == preferredProviderName);
 
         BookMetadata? metadata = null;
         foreach (var provider in orderedProviders)
@@ -191,6 +297,11 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
         }
 
         byte[]? apiCoverBytes = null;
+        if (cached != null)
+        {
+            if (!string.IsNullOrWhiteSpace(cached.Isbn)) book.Isbn = cached.Isbn;
+            apiCoverBytes = await MetadataCacheService.ReadCoverAsync(cached, settingsDict.GetValueOrDefault("LibraryRootPath"));
+        }
 
         if (metadata != null)
         {
@@ -275,7 +386,7 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
 
         // --- ORGANIZACION FÍSICA ---
         settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
-        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+        if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
 
         string mainAuthor = book.Authors.FirstOrDefault()?.Author.Name ?? "Unknown Author";
         string sagaName = book.Series?.Name;
@@ -304,7 +415,12 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
         settingsDict.TryGetValue("IngestionMode", out var ingestionMode);
         if (forceMove) ingestionMode = "MoveAndOrganize";
         
-        book.SourceFilePath = sourceFilePath;
+        // No sobrescribir el origen de un libro ya existente con el de un EPUB duplicado:
+        // hacerlo dejaba el archivo original "sin procesar" y provocaba un re-escaneo infinito cada 5 minutos.
+        if (book.Id == 0 || string.IsNullOrEmpty(book.SourceFilePath))
+        {
+            book.SourceFilePath = sourceFilePath;
+        }
 
         if (string.Equals(Path.GetFullPath(sourceFilePath), Path.GetFullPath(newEpubPath), StringComparison.OrdinalIgnoreCase))
         {
@@ -355,7 +471,7 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
                     {
                         if (File.Exists(newAudioPath)) File.Delete(newAudioPath);
                         File.CreateSymbolicLink(newAudioPath, possibleAudioPath);
-                        newAudioPath = newAudioPath; // keep same variable for next steps if needed
+                        // keep same variable for next steps if needed
                     }
                     catch (Exception ex)
                     {
@@ -545,7 +661,7 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
                     var imageBytes = await _httpClient.GetByteArrayAsync(metadata.CoverImageUri);
                     
                     settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
-                    if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = Path.Combine(Directory.GetCurrentDirectory(), "Library");
+                    if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
                     
                     string mainAuthor = book.Authors.FirstOrDefault()?.Author.Name ?? "Unknown Author";
                     string safeAuthor = GetSafeFilename(mainAuthor);
@@ -601,7 +717,7 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
 
     private string GetSafeFilename(string filename)
     {
-        return string.Join("_", filename.Split(Path.GetInvalidFileNameChars()));
+        return QuimeraReader.Application.Common.LibraryPathUtils.SafeFileName(filename, "Unknown");
     }
 }
 

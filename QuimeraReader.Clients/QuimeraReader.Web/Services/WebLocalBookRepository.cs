@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.JSInterop;
@@ -11,6 +12,12 @@ namespace QuimeraReader.Web.Services
     public class WebLocalBookRepository : ILocalBookRepository
     {
         private readonly IJSRuntime _jsRuntime;
+        
+        private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true
+        };
 
         public WebLocalBookRepository(IJSRuntime jsRuntime)
         {
@@ -22,18 +29,18 @@ namespace QuimeraReader.Web.Services
         public async Task<List<Book>> GetOfflineBooksAsync()
         {
             var json = await _jsRuntime.InvokeAsync<string>("window.quimeraIndexedDb.getAllBooks");
-            return string.IsNullOrEmpty(json) ? new List<Book>() : JsonSerializer.Deserialize<List<Book>>(json) ?? new List<Book>();
+            return string.IsNullOrEmpty(json) ? new List<Book>() : JsonSerializer.Deserialize<List<Book>>(json, _jsonOptions) ?? new List<Book>();
         }
 
         public async Task<Book?> GetBookByIdAsync(int id)
         {
             var json = await _jsRuntime.InvokeAsync<string>("window.quimeraIndexedDb.getBook", id);
-            return string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize<Book>(json);
+            return string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize<Book>(json, _jsonOptions);
         }
 
         public async Task SaveBookAsync(Book book)
         {
-            await _jsRuntime.InvokeVoidAsync("window.quimeraIndexedDb.saveBook", JsonSerializer.Serialize(book));
+            await _jsRuntime.InvokeVoidAsync("window.quimeraIndexedDb.saveBook", JsonSerializer.Serialize(book, _jsonOptions));
         }
 
         public async Task SaveBooksAsync(IEnumerable<Book> books)
@@ -48,7 +55,7 @@ namespace QuimeraReader.Web.Services
             await _jsRuntime.InvokeVoidAsync("window.quimeraIndexedDb.deleteBook", id);
         }
 
-        public async Task UpdateProgressAsync(int id, string cfi, double? audioPosition, double? percentage)
+        public async Task UpdateProgressAsync(int id, string cfi, double? audioPosition, double? percentage, int? audioTrackNumber = null)
         {
             var book = await GetBookByIdAsync(id);
             if (book != null)
@@ -56,11 +63,10 @@ namespace QuimeraReader.Web.Services
                 if (!string.IsNullOrEmpty(cfi)) book.CurrentEpubCfi = cfi;
                 if (audioPosition.HasValue) book.CurrentAudioPosition = audioPosition.Value;
                 if (percentage.HasValue) book.PercentageCompleted = percentage.Value;
+                if (audioTrackNumber.HasValue) book.CurrentAudioTrackNumber = audioTrackNumber.Value;
+                book.LastReadAt = DateTime.UtcNow;
                 await SaveBookAsync(book);
             }
-            
-            var syncAction = new { Type = "Progress", BookId = id, Cfi = cfi, AudioPosition = audioPosition, Percentage = percentage };
-            await _jsRuntime.InvokeVoidAsync("window.quimeraIndexedDb.enqueueSync", JsonSerializer.Serialize(syncAction));
         }
 
         public async Task QueueAnnotationAsync(int bookId, string cfiRange, string selectedText, string colorHex, string note)
@@ -73,18 +79,27 @@ namespace QuimeraReader.Web.Services
                 ColorHex = colorHex, 
                 Note = note 
             };
-            await _jsRuntime.InvokeVoidAsync("window.quimeraIndexedDb.enqueueSync", JsonSerializer.Serialize(syncAction));
+            await _jsRuntime.InvokeVoidAsync("window.quimeraIndexedDb.enqueueSync", JsonSerializer.Serialize(syncAction, _jsonOptions));
             
-            // Fetch current annotations for book and append
             var anns = await GetAnnotationsAsync(bookId);
-            anns.Add(new AnnotationDto {
-                
-                CfiRange = cfiRange,
-                SelectedText = selectedText,
-                ColorHex = colorHex,
-                Note = note,
-                CreatedAt = DateTime.UtcNow
-            });
+            var existing = anns.FirstOrDefault(a => a.CfiRange == cfiRange);
+            if (existing != null)
+            {
+                existing.ColorHex = colorHex;
+                existing.Note = note;
+            }
+            else
+            {
+                int tempId = -(int)(DateTime.UtcNow.Ticks % 1000000000);
+                anns.Add(new AnnotationDto {
+                    Id = tempId,
+                    CfiRange = cfiRange,
+                    SelectedText = selectedText,
+                    ColorHex = colorHex,
+                    Note = note,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
             await SyncAnnotationsAsync(bookId, anns);
         }
 
@@ -98,10 +113,10 @@ namespace QuimeraReader.Web.Services
             {
                 foreach (var el in doc.RootElement.EnumerateArray())
                 {
-                    if (el.TryGetProperty("Type", out var typeProp) && typeProp.GetString() == "Progress")
+                    if (el.TryGetProperty("type", out var typeProp) && typeProp.GetString() == "Progress")
                         continue;
                         
-                    items.Add(JsonSerializer.Deserialize<AnnotationQueueItem>(el.GetRawText())!);
+                    items.Add(JsonSerializer.Deserialize<AnnotationQueueItem>(el.GetRawText(), _jsonOptions)!);
                 }
             }
             return items;
@@ -115,12 +130,12 @@ namespace QuimeraReader.Web.Services
         public async Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId)
         {
             var json = await _jsRuntime.InvokeAsync<string>("window.localStorage.getItem", $"annotations_{bookId}");
-            return string.IsNullOrEmpty(json) ? new List<AnnotationDto>() : JsonSerializer.Deserialize<List<AnnotationDto>>(json) ?? new List<AnnotationDto>();
+            return string.IsNullOrEmpty(json) ? new List<AnnotationDto>() : JsonSerializer.Deserialize<List<AnnotationDto>>(json, _jsonOptions) ?? new List<AnnotationDto>();
         }
 
         public async Task SyncAnnotationsAsync(int bookId, List<AnnotationDto> annotations)
         {
-            await _jsRuntime.InvokeVoidAsync("window.localStorage.setItem", $"annotations_{bookId}", JsonSerializer.Serialize(annotations));
+            await _jsRuntime.InvokeVoidAsync("window.localStorage.setItem", $"annotations_{bookId}", JsonSerializer.Serialize(annotations, _jsonOptions));
         }
 
         public async Task<string?> GetBookFileUrlAsync(int bookId, string fileType)

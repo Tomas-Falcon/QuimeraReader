@@ -1,5 +1,6 @@
-﻿@using QuimeraReader.Shared.Components.Layout
-<Router AppAssembly="@typeof(App).Assembly" AdditionalAssemblies="new[] { typeof(MainLayout).Assembly }" NotFoundPage="typeof(Pages.NotFound)">
+@using QuimeraReader.Shared.Components.Layout
+@using QuimeraReader.Shared.Components.Pages
+<Router AppAssembly="@typeof(App).Assembly" AdditionalAssemblies="new[] { typeof(MainLayout).Assembly }" NotFoundPage="typeof(NotFound)">
     <Found Context="routeData">
         <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
