@@ -225,6 +225,48 @@
                             <RadzenButton Text="@TranslationService["Settings_Merge"]" Icon="auto_fix_high" Click="MergeDuplicatesAsync" ButtonStyle="Radzen.ButtonStyle.Light" Variant="Radzen.Variant.Outlined" />
                         </div>
                     </RadzenCard>
+
+                    <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">
+                        <h4 class="text-primary"><RadzenIcon Icon="backup" /> Copias de seguridad y limpieza</h4>
+                        <p class="text-white-50 small mb-4">Incluyen los libros con algo tuyo: estado, progreso, sin conexión, notas y audio.</p>
+
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 border-bottom border-secondary py-3">
+                            <div>
+                                <h6 class="mb-1 fw-bold">Descargar copia</h6>
+                                <p class="mb-0 text-white-50 small">Estado (JSON, pocos KB): basta si los archivos siguen en el servidor. Completa (ZIP): además los EPUB, audios y portadas de esos libros.</p>
+                            </div>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <a class="btn btn-outline-light btn-sm text-nowrap" href="@BookService.GetMediaUrl("api/maintenance/backup?format=json")" download target="_blank"><i class="bi bi-filetype-json me-1"></i> Estado</a>
+                                <a class="btn btn-outline-light btn-sm text-nowrap" href="@BookService.GetMediaUrl("api/maintenance/backup?format=zip")" download target="_blank"><i class="bi bi-file-zip me-1"></i> Completa</a>
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 border-bottom border-secondary py-3">
+                            <div>
+                                <h6 class="mb-1 fw-bold">Restaurar copia</h6>
+                                <p class="mb-0 text-white-50 small">Completa los libros que ya existen (gana el progreso más reciente, las notas no se duplican). Con un ZIP, importa los que falten. Antes se guarda una copia de la base de datos.</p>
+                            </div>
+                            <label class="btn btn-outline-light btn-sm text-nowrap mb-0 @(_isRestoring ? "disabled" : "")">
+                                <i class="bi bi-upload me-1"></i> @(_isRestoring ? "Restaurando..." : "Elegir archivo")
+                                <InputFile OnChange="RestoreBackupAsync" accept=".json,.zip" class="d-none" />
+                            </label>
+                        </div>
+
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 py-3">
+                            <div>
+                                <h6 class="mb-1 fw-bold">Libros repetidos</h6>
+                                <p class="mb-0 text-white-50 small">Une el mismo EPUB importado varias veces y los libros sin archivo con su copia del mismo título y autor, conservando lo tuyo. Analizar no cambia nada.</p>
+                                @if (_dedupStatus != null)
+                                {
+                                    <p class="mb-0 mt-2 small text-info">@_dedupStatus</p>
+                                }
+                            </div>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <RadzenButton Text="Analizar" Icon="search" Click="@(() => RunDuplicatesAsync(false))" Disabled="@_dedupRunning" ButtonStyle="Radzen.ButtonStyle.Light" Variant="Radzen.Variant.Outlined" Size="Radzen.ButtonSize.Small" />
+                                <RadzenButton Text="Unir" Icon="call_merge" Click="@(() => RunDuplicatesAsync(true))" Disabled="@(_dedupRunning || !_dedupAnalyzed)" ButtonStyle="Radzen.ButtonStyle.Warning" Size="Radzen.ButtonSize.Small" />
+                            </div>
+                        </div>
+                    </RadzenCard>
                 </RadzenTabsItem>
                 <RadzenTabsItem Text="@TranslationService["Settings_System"]" Icon="settings_applications">
                     <RadzenCard class="mb-4 bg-dark text-light border-secondary shadow-sm">

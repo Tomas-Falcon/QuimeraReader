@@ -377,6 +377,84 @@ public partial class SettingsPanel : ComponentBase
         }
     }
 
+    private bool _isRestoring;
+    private bool _dedupRunning;
+    private bool _dedupAnalyzed;
+    private string? _dedupStatus;
+
+    private async Task RestoreBackupAsync(Microsoft.AspNetCore.Components.Forms.InputFileChangeEventArgs e)
+    {
+        _isRestoring = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            // Un ZIP completo puede pesar varios GB
+            var stream = e.File.OpenReadStream(maxAllowedSize: 20L * 1024 * 1024 * 1024);
+            content.Add(new StreamContent(stream), "file", e.File.Name);
+            var response = await HttpClient.PostAsync("api/maintenance/backup/restore", content);
+            var report = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+            if (!response.IsSuccessStatusCode)
+            {
+                ShowMessage(report.TryGetProperty("error", out var error) ? error.GetString() ?? "Error al restaurar." : "Error al restaurar.", false);
+                return;
+            }
+
+            int Get(string name) => report.TryGetProperty(name, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.Number ? v.GetInt32() : 0;
+            int Count(string name) => report.TryGetProperty(name, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.Array ? v.GetArrayLength() : 0;
+            int found = Get("matchedByHash") + Get("matchedByIsbn") + Get("matchedByTitle");
+            ShowMessage($"Copia restaurada: {found} libros encontrados, {Get("imported")} importados, {Get("annotationsAdded")} notas y {Get("audioTracksAdded")} pistas añadidas, {Count("notFound")} no encontrados.", Count("errors") == 0);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage("Error al restaurar: " + ex.Message, false);
+        }
+        finally
+        {
+            _isRestoring = false;
+        }
+    }
+
+    private async Task RunDuplicatesAsync(bool apply)
+    {
+        _dedupRunning = true;
+        _dedupStatus = apply ? "Uniendo libros repetidos..." : "Analizando...";
+        try
+        {
+            await HttpClient.PostAsync($"api/maintenance/duplicates/run?apply={apply.ToString().ToLowerInvariant()}", null);
+            System.Text.Json.JsonElement status;
+            do
+            {
+                await Task.Delay(2000, _cts.Token);
+                status = await HttpClient.GetFromJsonAsync<System.Text.Json.JsonElement>("api/maintenance/duplicates", _cts.Token);
+            } while (status.GetProperty("running").GetBoolean());
+
+            if (status.TryGetProperty("error", out var error) && error.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                _dedupStatus = "Error: " + error.GetString();
+                return;
+            }
+
+            var r = status.GetProperty("result");
+            int Get(string name) => r.GetProperty(name).GetInt32();
+            int same = Get("hashDuplicates"), missing = Get("missingMergedIntoCopy");
+            int kept = r.GetProperty("missingKeptWithUserData").GetArrayLength();
+            _dedupStatus = apply
+                ? $"Hecho: {Get("deleted")} libros unidos en su copia ({Get("transferredUserData")} con datos tuyos). Se guardó una copia de la base de datos antes."
+                : $"{same} copias del mismo EPUB y {missing} libros sin archivo con copia ({Get("transferredUserData")} con datos tuyos que se conservarán). {Get("missingOrphans")} sin archivo ni copia, {kept} sin copia pero con datos tuyos (se mantienen). Hashes calculados: {Get("booksWithHash")} de {Get("totalBooks")}.";
+            _dedupAnalyzed = !apply;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _dedupStatus = "Error: " + ex.Message;
+        }
+        finally
+        {
+            _dedupRunning = false;
+            StateHasChanged();
+        }
+    }
+
     private void ShowMessage(string message, bool isSuccess)
     {
         if (isSuccess)

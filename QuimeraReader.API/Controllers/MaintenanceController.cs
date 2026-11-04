@@ -66,59 +66,81 @@ public class MaintenanceController : ControllerBase
         {
             var db = services.GetRequiredService<AppDbContext>();
             var (libraryRoot, _) = await GetFoldersAsync(db, token);
+            if (apply) await BackupService.SnapshotDatabaseAsync(db, "antes-de-unificar", cancellationToken: token);
             return await BookDeduplicator.RunAsync(db, libraryRoot, apply, deleteOrphans, token);
         });
         return started ? Accepted(_runner.GetStatus(DuplicatesJob)) : Conflict(_runner.GetStatus(DuplicatesJob));
     }
 
     /// <summary>
-    /// Copia de seguridad de todo lo que el usuario ha hecho con sus libros (estado, progreso, sin conexión, notas, audio).
-    /// Se devuelve y además se guarda junto a la base de datos, para poder reaplicarla tras una limpieza.
+    /// Copia de seguridad de los libros con algo del usuario. format=json: solo estado (KB). format=zip: además
+    /// EPUB, audios, portadas y sincronización de esos libros, para recuperarlos aunque se pierdan los archivos.
     /// </summary>
-    [HttpGet("reading-state")]
-    public async Task<IActionResult> ReadingState(CancellationToken cancellationToken)
+    [HttpGet("backup")]
+    public async Task<IActionResult> Backup([FromServices] BackupService backup, [FromQuery] string format = "json", CancellationToken cancellationToken = default)
     {
-        var settings = await _dbContext.SystemSettings.AsNoTracking().ToDictionaryAsync(s => s.Key, s => s.Value, cancellationToken);
-        settings.TryGetValue("LibraryRootPath", out var libraryRoot);
-
-        var books = await _dbContext.Books.AsNoTracking()
-            .Where(b => (b.ReadingStatus != null && b.ReadingStatus != "Unread") || b.IsAvailableOffline || b.LastReadAt != null
-                        || b.PercentageCompleted > 0 || b.CurrentAudioPosition > 0 || b.CurrentEpubCfi != null
-                        || b.Annotations.Any() || b.AudioTracks.Any())
-            .Select(b => new
-            {
-                b.Id, b.Title, b.Isbn, b.ReadingStatus, b.IsAvailableOffline, b.LastReadAt, b.PercentageCompleted,
-                b.CurrentEpubCfi, b.CurrentAudioPosition, b.CurrentAudioTrackNumber, b.EpubFilePath, b.SourceFilePath,
-                b.SeriesId, b.SeriesVolume, b.UniverseId
-            })
-            .ToListAsync(cancellationToken);
-        var ids = books.Select(b => b.Id).ToList();
-
-        var authors = (await _dbContext.BookAuthors.AsNoTracking().Where(ba => ids.Contains(ba.BookId)).Select(ba => new { ba.BookId, ba.Author.Name }).ToListAsync(cancellationToken))
-            .GroupBy(x => x.BookId).ToDictionary(g => g.Key, g => g.Select(x => x.Name).ToList());
-        var annotations = (await _dbContext.BookAnnotations.AsNoTracking().Where(a => ids.Contains(a.BookId)).ToListAsync(cancellationToken))
-            .GroupBy(a => a.BookId).ToDictionary(g => g.Key, g => g.ToList());
-        var tracks = (await _dbContext.BookAudioTracks.AsNoTracking().Where(t => ids.Contains(t.BookId)).Select(t => new { t.BookId, t.TrackNumber, t.FilePath, t.FileName }).ToListAsync(cancellationToken))
-            .GroupBy(t => t.BookId).ToDictionary(g => g.Key, g => g.OrderBy(t => t.TrackNumber).ToList());
-
-        var snapshot = new
+        var stamp = DateTime.UtcNow.ToString("yyyy-MM-dd-HHmm");
+        if (!string.Equals(format, "zip", StringComparison.OrdinalIgnoreCase))
         {
-            CreatedAt = DateTime.UtcNow,
-            Books = books.Select(b => new
-            {
-                Book = b,
-                Authors = authors.GetValueOrDefault(b.Id) ?? new(),
-                EpubExists = LibraryPathResolver.Resolve(b.EpubFilePath, libraryRoot) != null,
-                Annotations = annotations.GetValueOrDefault(b.Id),
-                AudioTracks = tracks.GetValueOrDefault(b.Id)
-            }).ToList()
-        };
+            var manifest = await backup.BuildManifestAsync(cancellationToken);
+            var json = JsonSerializer.SerializeToUtf8Bytes(manifest, BackupService.JsonOptions);
+            return File(json, "application/json", $"quimera-estado-{stamp}.json");
+        }
 
-        var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-        var dbPath = Environment.GetEnvironmentVariable("QUIMERA_DB_PATH") ?? "quimerareader.db";
-        var backupPath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(dbPath)) ?? ".", $"reading-state-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json");
-        await System.IO.File.WriteAllTextAsync(backupPath, json, cancellationToken);
-
-        return Content(json, "application/json");
+        // ZipArchive escribe de forma síncrona: se genera en un temporal que se borra al cerrar la descarga
+        var tempPath = Path.Combine(Path.GetTempPath(), $"quimera-backup-{Guid.NewGuid():N}.zip");
+        var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 1 << 16, FileOptions.DeleteOnClose);
+        try
+        {
+            await backup.WriteZipAsync(stream, cancellationToken);
+            stream.Position = 0;
+            return File(stream, "application/zip", $"quimera-copia-{stamp}.zip");
+        }
+        catch
+        {
+            await stream.DisposeAsync();
+            throw;
+        }
     }
+
+    /// <summary>Restaura una copia (.json o .zip). Lo que ya existe se completa; con ZIP, lo que falte se importa.</summary>
+    [HttpPost("backup/restore")]
+    [RequestSizeLimit(long.MaxValue)]
+    [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
+    public async Task<IActionResult> Restore([FromServices] BackupService backup, IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0) return BadRequest(new { Error = "No se recibió ningún archivo." });
+        bool isZip = file.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
+
+        await BackupService.SnapshotDatabaseAsync(_dbContext, "antes-de-restaurar", cancellationToken: cancellationToken);
+
+        var tempPath = Path.Combine(Path.GetTempPath(), $"quimera-restore-{Guid.NewGuid():N}");
+        try
+        {
+            await using (var target = new FileStream(tempPath, FileMode.CreateNew))
+            {
+                await file.CopyToAsync(target, cancellationToken);
+            }
+            await using var source = new FileStream(tempPath, FileMode.Open, FileAccess.Read);
+            var report = await backup.RestoreAsync(source, isZip, cancellationToken);
+            return Ok(report);
+        }
+        catch (InvalidDataException ex)
+        {
+            return BadRequest(new { Error = ex.Message });
+        }
+        catch (JsonException)
+        {
+            return BadRequest(new { Error = "El archivo no es una copia de seguridad válida." });
+        }
+        finally
+        {
+            try { System.IO.File.Delete(tempPath); } catch { }
+        }
+    }
+
+    /// <summary>Copia de la base de datos en /config/backups (se guardan las 5 últimas).</summary>
+    [HttpPost("db-snapshot")]
+    public async Task<IActionResult> DatabaseSnapshot(CancellationToken cancellationToken) =>
+        Ok(new { Path = await BackupService.SnapshotDatabaseAsync(_dbContext, "manual", cancellationToken: cancellationToken) });
 }
