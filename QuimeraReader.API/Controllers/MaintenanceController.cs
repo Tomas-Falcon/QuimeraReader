@@ -51,6 +51,24 @@ public class MaintenanceController : ControllerBase
         return started ? Accepted(_runner.GetStatus(MissingFilesJob)) : Conflict(_runner.GetStatus(MissingFilesJob));
     }
 
+    private const string CoversJob = "covers";
+
+    /// <summary>Estado de la reparación de portadas y su último informe.</summary>
+    [HttpGet("covers")]
+    public IActionResult CoversStatus() => Ok(_runner.GetStatus(CoversJob));
+
+    /// <summary>
+    /// Repara las portadas que no existen en disco: del EPUB y, con online=true, de OpenLibrary/Google Books.
+    /// Siempre quedan guardadas en la biblioteca.
+    /// </summary>
+    [HttpPost("covers/run")]
+    public IActionResult RunCovers([FromQuery] bool online = true)
+    {
+        var started = _runner.TryStart(CoversJob, new { online }, async (services, progress, token) =>
+            await services.GetRequiredService<CoverRepairService>().RepairAllAsync(online, progress, token));
+        return started ? Accepted(_runner.GetStatus(CoversJob)) : Conflict(_runner.GetStatus(CoversJob));
+    }
+
     /// <summary>Estado de la limpieza de duplicados y su último informe.</summary>
     [HttpGet("duplicates")]
     public IActionResult DuplicatesStatus() => Ok(_runner.GetStatus(DuplicatesJob));

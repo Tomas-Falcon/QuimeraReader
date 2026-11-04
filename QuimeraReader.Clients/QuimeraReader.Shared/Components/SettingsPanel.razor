@@ -252,6 +252,18 @@
                             </label>
                         </div>
 
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 border-bottom border-secondary py-3">
+                            <div>
+                                <h6 class="mb-1 fw-bold">Reparar portadas</h6>
+                                <p class="mb-0 text-white-50 small">Recupera las portadas que faltan sacándolas del EPUB o, si no trae, de OpenLibrary y Google Books. Se guardan siempre en la biblioteca.</p>
+                                @if (_coversStatus != null)
+                                {
+                                    <p class="mb-0 mt-2 small text-info">@_coversStatus</p>
+                                }
+                            </div>
+                            <RadzenButton Text="Reparar" Icon="image" Click="RepairCoversAsync" Disabled="@_coversRunning" ButtonStyle="Radzen.ButtonStyle.Light" Variant="Radzen.Variant.Outlined" Size="Radzen.ButtonSize.Small" />
+                        </div>
+
                         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 py-3">
                             <div>
                                 <h6 class="mb-1 fw-bold">Libros repetidos</h6>

@@ -44,47 +44,34 @@ public class MediaController : ControllerBase
     private async Task<string?> GetResolvedPathAsync(string? originalPath)
     {
         if (string.IsNullOrEmpty(originalPath)) return null;
-
-        // Si el archivo existe tal cual, lo devolvemos (ej. entorno local)
         if (System.IO.File.Exists(originalPath)) return originalPath;
-
-        // Si no existe, podría ser un problema de cruce de SO (Windows DB vs Linux Docker)
-        // Intentamos reconstruir la ruta relativa a la carpeta de la biblioteca actual
-        var setting = await _dbContext.SystemSettings.FirstOrDefaultAsync(s => s.Key == "LibraryRootPath");
-        string libraryRoot = setting?.Value ?? "/media";
-
-        var parts = originalPath.Replace("\\", "/").Split('/', System.StringSplitOptions.RemoveEmptyEntries);
-
-        // Probar con las últimas 4 partes (Autor/Saga/Libro/Archivo) y 3 partes (Autor/Libro/Archivo)
-        for (int depth = 4; depth >= 2; depth--)
-        {
-            if (parts.Length >= depth)
-            {
-                var relativeParts = parts.Skip(parts.Length - depth).ToArray();
-                var candidatePath = Path.Combine(new[] { libraryRoot }.Concat(relativeParts).ToArray());
-                if (System.IO.File.Exists(candidatePath))
-                {
-                    return candidatePath;
-                }
-            }
-        }
-
-        return null;
+        return LibraryPathResolver.Resolve(originalPath, await GetLibraryRootAsync());
     }
+
+    private Task<string?> GetLibraryRootAsync() =>
+        _dbContext.SystemSettings.Where(s => s.Key == "LibraryRootPath").Select(s => s.Value).FirstOrDefaultAsync();
 
     [HttpGet("books/{id}/cover")]
     [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
-    public async Task<IActionResult> GetCover(int id)
+    public async Task<IActionResult> GetCover(int id, [FromServices] CoverRepairService coverRepair)
     {
         var book = await _dbContext.Books.FindAsync(id);
         if (book == null) return NotFound();
 
-        if (!string.IsNullOrEmpty(book.CoverImagePath) && book.CoverImagePath.StartsWith("http"))
-        {
-            return Redirect(book.CoverImagePath);
-        }
-
         var resolvedPath = await GetResolvedPathAsync(book.CoverImagePath);
+        if (resolvedPath == null)
+        {
+            // Portada perdida o remota: se saca del EPUB y se guarda en la biblioteca para la próxima vez
+            if (await coverRepair.RepairAsync(book, await GetLibraryRootAsync(), online: false) != CoverRepairService.Source.None)
+            {
+                await _dbContext.SaveChangesAsync();
+                resolvedPath = book.CoverImagePath;
+            }
+            else if (!string.IsNullOrEmpty(book.CoverImagePath) && book.CoverImagePath.StartsWith("http"))
+            {
+                return Redirect(book.CoverImagePath);
+            }
+        }
         if (resolvedPath == null) return NotFound();
 
         var mimeType = GetMimeType(resolvedPath);

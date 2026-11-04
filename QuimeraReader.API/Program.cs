@@ -65,6 +65,7 @@ builder.Services.AddSingleton<LibraryScanState>();
 builder.Services.AddSingleton<AudioAlignmentQueue>();
 builder.Services.AddScoped<EpubScannerService>();
 builder.Services.AddScoped<BackupService>();
+builder.Services.AddScoped<CoverRepairService>();
 builder.Services.AddScoped<QuimeraReader.Application.Interfaces.IEpubScannerService>(sp => sp.GetRequiredService<EpubScannerService>());
 builder.Services.AddScoped<AudioAlignmentService>();
 builder.Services.AddScoped<AudioMatchingService>();

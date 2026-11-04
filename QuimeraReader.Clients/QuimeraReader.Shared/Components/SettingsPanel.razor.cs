@@ -427,6 +427,47 @@ public partial class SettingsPanel : ComponentBase
         }
     }
 
+    private bool _coversRunning;
+    private string? _coversStatus;
+
+    private async Task RepairCoversAsync()
+    {
+        _coversRunning = true;
+        _coversStatus = "Reparando portadas...";
+        try
+        {
+            await HttpClient.PostAsync("api/maintenance/covers/run?online=true", null);
+            System.Text.Json.JsonElement status;
+            while (true)
+            {
+                await Task.Delay(3000, _cts.Token);
+                status = await HttpClient.GetFromJsonAsync<System.Text.Json.JsonElement>("api/maintenance/covers", _cts.Token);
+                if (!status.GetProperty("running").GetBoolean()) break;
+                _coversStatus = $"Reparando portadas... {status.GetProperty("progress").GetInt32():N0} libros revisados";
+                StateHasChanged();
+            }
+
+            if (status.TryGetProperty("error", out var error) && error.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                _coversStatus = "Error: " + error.GetString();
+                return;
+            }
+            var r = status.GetProperty("result");
+            int Get(string name) => r.GetProperty(name).GetInt32();
+            _coversStatus = $"Hecho: {Get("fromEpub")} del EPUB, {Get("fromOnline")} de internet, {Get("notFound")} sin encontrar. {Get("alreadyOk")} ya estaban bien; {Get("skippedMissingEpub")} libros sin EPUB no se tocaron.";
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _coversStatus = "Error: " + ex.Message;
+        }
+        finally
+        {
+            _coversRunning = false;
+            StateHasChanged();
+        }
+    }
+
     private async Task RunDuplicatesAsync(bool apply)
     {
         _dedupRunning = true;
