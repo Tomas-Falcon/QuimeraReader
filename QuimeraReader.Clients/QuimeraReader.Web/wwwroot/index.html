@@ -58,10 +58,15 @@
             initialize: function () {
                 document.addEventListener('wheel', function(e) {
                     const row = e.target.closest('.netflix-row');
-                    if (row && Math.abs(e.deltaY) > 0) {
-                        e.preventDefault();
-                        row.scrollLeft += e.deltaY;
-                    }
+                    // Gestos horizontales (trackpad, Shift+rueda) los resuelve el navegador
+                    if (!row || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+                    // Solo se desvía la rueda a la fila si esta aún puede moverse en esa dirección;
+                    // si no tiene desbordamiento o ya llegó al borde, la página sigue bajando
+                    const maxScroll = row.scrollWidth - row.clientWidth;
+                    const canScroll = e.deltaY > 0 ? row.scrollLeft < maxScroll - 1 : row.scrollLeft > 0;
+                    if (!canScroll) return;
+                    e.preventDefault();
+                    row.scrollLeft += e.deltaY;
                 }, { passive: false });
             }
         };
