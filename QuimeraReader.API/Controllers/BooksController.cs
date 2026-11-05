@@ -202,6 +202,7 @@ public class BooksController : ControllerBase
             Isbn = book.Isbn,
             Description = book.Description,
             AverageRating = book.AverageRating,
+            RatingsCount = book.RatingsCount,
             ProcessingStatus = book.ProcessingStatus == "SYNCED" ? "ALIGNED" : book.ProcessingStatus,
             Authors = book.Authors.Where(a => a.Author != null).Select(a => a.Author!.Name).ToList(),
             Categories = book.Categories.Where(c => c.Category != null).Select(c => c.Category!.Name).ToList(),

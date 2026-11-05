@@ -74,6 +74,17 @@ public partial class BookEditModal : ComponentBase
         if (!string.IsNullOrWhiteSpace(_manualUrl)) _selected = null;
     }
 
+    // Con menos votos la media no dice nada (mismo mínimo que el servidor)
+    private const int MinRatingVotes = 5;
+
+    /// <summary>La puntuación con más votos entre los resultados del mismo autor, sea cual sea la portada elegida.</summary>
+    private CoverSearchResult? BestRated => _suggestedCovers
+        .Where(c => c.AuthorMatches && c.Rating > 0 && c.RatingsCount >= MinRatingVotes)
+        .OrderByDescending(c => c.RatingsCount)
+        .FirstOrDefault();
+
+    private bool CanFillMissing => _selected != null && (_selected.HasExtraMetadata || BestRated != null);
+
     private string ProviderLabel(string provider) =>
         _providers.FirstOrDefault(p => p.Value == provider)?.Label ?? provider;
 
@@ -137,7 +148,8 @@ public partial class BookEditModal : ComponentBase
             }
             else if (_selected != null)
             {
-                bool fill = _fillMissing && _selected.HasExtraMetadata;
+                bool fill = _fillMissing && CanFillMissing;
+                var best = BestRated;
                 cover = new UpdateCoverRequest
                 {
                     ImageUrl = _selected.ImageUrl,
@@ -145,7 +157,8 @@ public partial class BookEditModal : ComponentBase
                     FillMissingMetadata = fill,
                     Synopsis = fill ? _selected.Synopsis : null,
                     Categories = fill ? _selected.Categories : new List<string>(),
-                    Rating = fill ? _selected.Rating : null
+                    Rating = fill ? best?.Rating : null,
+                    RatingsCount = fill ? best?.RatingsCount : null
                 };
             }
 

@@ -86,11 +86,15 @@
                 }
             </div>
 
-            @if (_selected != null && _selected.HasExtraMetadata)
+            @if (CanFillMissing)
             {
                 <div class="mt-3">
                     <RadzenCheckBox @bind-Value="_fillMissing" Name="cover-fill" />
                     <RadzenLabel Text="@TranslationService["CoverSearch_FillMissing"]" Component="cover-fill" class="ms-2" />
+                    @if (BestRated is { } best)
+                    {
+                        <div class="cover-search-status mt-1">@string.Format(TranslationService["CoverSearch_BestRating"], best.Rating!.Value.ToString("0.0"), best.RatingsCount!.Value.ToString("N0"), ProviderLabel(best.Provider))</div>
+                    }
                 </div>
             }
 

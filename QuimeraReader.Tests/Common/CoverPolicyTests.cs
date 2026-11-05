@@ -79,6 +79,8 @@ public class CoverPolicyTests
     [InlineData("Martha Wells", new[] { "MARTHA WELLS" }, true)]
     [InlineData("María Elena Walsh", new[] { "Maria Elena Walsh" }, true)]   // sin tildes
     [InlineData("James S. A. Corey", new[] { "Florian Dalwigk" }, false)]    // "Drive" -> libro de hacking
+    [InlineData("James S. A. Corey", new[] { "James Q. Glenn" }, false)]     // mismo nombre, otro apellido
+    [InlineData("James S. A. Corey", new[] { "Corey, James S. A." }, true)]  // apellido primero
     [InlineData(null, new[] { "Quien sea" }, true)]                          // sin autor conocido no se puede descartar
     [InlineData("Dale Carnegie", new string[0], true)]                       // el resultado no trae autores
     public void AuthorsMatch_RejectsBooksByAnotherAuthor(string? known, string[] candidates, bool expected)

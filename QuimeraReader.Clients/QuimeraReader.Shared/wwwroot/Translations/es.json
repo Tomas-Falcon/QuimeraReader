@@ -238,11 +238,12 @@
   "CoverSearch_Current": "Actual",
   "CoverSearch_OtherAuthor": "Otro autor",
   "CoverSearch_Votes": "{0} votos",
-  "CoverSearch_FillMissing": "Completar con este resultado lo que le falte al libro (sinopsis, puntuación, categorías)",
+  "CoverSearch_FillMissing": "Completar lo que le falte al libro (sinopsis, categorías) y quedarse con la puntuación de más votos",
   "CoverSearch_ManualUrl": "O pegá la URL de una imagen",
   "CoverSearch_Error": "No se pudieron buscar portadas.",
   "CoverSearch_ApplyError": "No se pudo usar esa portada.",
   "Reader_ImmersiveEnter": "Lectura inmersiva (pantalla completa)",
   "Reader_ImmersiveExit": "Salir",
-  "Reader_ImmersiveShowControls": "Mostrar controles"
+  "Reader_ImmersiveShowControls": "Mostrar controles",
+  "CoverSearch_BestRating": "Puntuación: ★ {0} ({1} votos, {2}) — la de más votos de la búsqueda, sea cual sea la portada"
 }

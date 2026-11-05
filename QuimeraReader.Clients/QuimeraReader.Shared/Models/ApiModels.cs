@@ -7,6 +7,7 @@ public record Book
     public string Isbn { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
     public double? AverageRating { get; init; }
+    public int? RatingsCount { get; init; }
     
     public List<string> Authors { get; init; } = new();
     public List<string> Categories { get; init; } = new();
@@ -133,6 +134,7 @@ public class UpdateCoverRequest
     public string? Synopsis { get; set; }
     public List<string> Categories { get; set; } = new();
     public double? Rating { get; set; }
+    public int? RatingsCount { get; set; }
 }
 
 /// <summary>Una portada candidata del buscador del editor, con su tamaño real y los datos de su libro.</summary>

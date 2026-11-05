@@ -217,11 +217,12 @@
   "CoverSearch_Current": "Current",
   "CoverSearch_OtherAuthor": "Other author",
   "CoverSearch_Votes": "{0} votes",
-  "CoverSearch_FillMissing": "Fill in what the book is missing from this result (synopsis, rating, categories)",
+  "CoverSearch_FillMissing": "Fill in what the book is missing (synopsis, categories) and keep the most voted rating",
   "CoverSearch_ManualUrl": "Or paste an image URL",
   "CoverSearch_Error": "Could not search covers.",
   "CoverSearch_ApplyError": "Could not use that cover.",
   "Reader_ImmersiveEnter": "Immersive reading (full screen)",
   "Reader_ImmersiveExit": "Exit",
-  "Reader_ImmersiveShowControls": "Show controls"
+  "Reader_ImmersiveShowControls": "Show controls",
+  "CoverSearch_BestRating": "Rating: ★ {0} ({1} votes, {2}) — the most voted in the search, whatever the cover"
 }

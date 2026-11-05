@@ -67,6 +67,7 @@ public class CoverSearchService
         public string? Synopsis { get; set; }
         public List<string> Categories { get; set; } = new();
         public double? Rating { get; set; }
+        public int? RatingsCount { get; set; }
     }
 
     public async Task<List<CoverOption>> SearchAsync(Book book, string? title, string? author, string? provider, CancellationToken cancellationToken = default)
@@ -196,8 +197,9 @@ public class CoverSearchService
         {
             if (string.IsNullOrWhiteSpace(book.Description) && !string.IsNullOrWhiteSpace(request.Synopsis))
                 book.Description = request.Synopsis;
-            if (!book.AverageRating.HasValue && request.Rating is > 0)
-                book.AverageRating = Math.Round(request.Rating.Value, 2);
+            // La puntuación con más votos de toda la búsqueda (no la de la portada elegida); reemplaza a una con menos votos
+            if (request.Rating is double rating && request.RatingsCount is int votes)
+                RatingLookup.Apply(book, new RatingPolicy.Rating(rating, votes));
             await AddCategoriesIfMissingAsync(book, request.Categories, cancellationToken);
         }
         return true;

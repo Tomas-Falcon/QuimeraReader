@@ -312,8 +312,8 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
             if (string.IsNullOrWhiteSpace(book.Description) && !string.IsNullOrWhiteSpace(metadata.Synopsis))
                 book.Description = metadata.Synopsis;
 
-            if (!book.AverageRating.HasValue && metadata.AverageRating.HasValue)
-                book.AverageRating = metadata.AverageRating.Value;
+            // Puntuación: la que más gente votó (de este proveedor o de Hardcover), no la del primero que responde
+            RatingLookup.Apply(book, await RatingLookup.FindBestAsync(_providers, book.Title, authorHint, settingsDict, metadata));
 
             if (!book.Authors.Any() && metadata.Authors != null && metadata.Authors.Any())
             {
@@ -612,8 +612,8 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
             if (string.IsNullOrWhiteSpace(book.Description) && !string.IsNullOrWhiteSpace(metadata.Synopsis))
                 book.Description = metadata.Synopsis;
 
-            if (!book.AverageRating.HasValue && metadata.AverageRating.HasValue)
-                book.AverageRating = metadata.AverageRating.Value;
+            // Puntuación: la que más gente votó (de este proveedor o de Hardcover), no la del primero que responde
+            RatingLookup.Apply(book, await RatingLookup.FindBestAsync(_providers, book.Title, authorHint, settingsDict, metadata));
 
             if (!book.Authors.Any() && metadata.Authors != null && metadata.Authors.Any())
             {

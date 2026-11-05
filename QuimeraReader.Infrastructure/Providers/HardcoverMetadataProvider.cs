@@ -82,7 +82,9 @@ public class HardcoverMetadataProvider : IMetadataProvider
             CoverImageUri = bookNode.Image?.Url,
             Categories = TagsOf(bookNode),
             Synopsis = bookNode.Description,
-            AverageRating = bookNode.Rating
+            AverageRating = bookNode.Rating,
+            RatingsCount = bookNode.RatingsCount,
+            Source = ProviderName
         };
     }
 

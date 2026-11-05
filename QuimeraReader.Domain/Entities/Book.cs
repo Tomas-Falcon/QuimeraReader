@@ -9,6 +9,8 @@ public class Book
     public string? Isbn { get; set; }
     public string? Description { get; set; }
     public double? AverageRating { get; set; }
+    /// <summary>Votos de AverageRating: decide qué puntuación gana (la que más gente votó).</summary>
+    public int? RatingsCount { get; set; }
     public int? TotalPages { get; set; }
 
     // Local File Paths

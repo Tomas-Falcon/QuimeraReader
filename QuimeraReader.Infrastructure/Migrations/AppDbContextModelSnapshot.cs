@@ -94,6 +94,9 @@ namespace QuimeraReader.Infrastructure.Migrations
                     b.Property<string>("ProcessingStatus")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("RatingsCount")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ReadingStatus")
                         .HasColumnType("TEXT");
 

@@ -44,23 +44,34 @@ public static class CoverPolicy
     }
 
     /// <summary>
-    /// ¿Algún autor del resultado coincide con el que ya conocemos? Basta con una palabra significativa en común
-    /// (apellido), sin tildes ni mayúsculas. Sin autor conocido o sin autores en el resultado no se puede descartar.
+    /// ¿Algún autor del resultado coincide con el que ya conocemos? Tiene que aparecer el apellido (la última palabra
+    /// significativa), sin tildes ni mayúsculas: compartir solo el nombre ("James Q. Glenn" con "James S. A. Corey")
+    /// no basta. Sin autor conocido o sin autores en el resultado no se puede descartar.
     /// </summary>
     public static bool AuthorsMatch(string? knownAuthor, IEnumerable<string>? candidateAuthors)
     {
-        var known = Words(knownAuthor);
-        if (known.Count == 0) return true;
+        var surname = Surname(knownAuthor);
+        if (surname == null) return true;
         var candidates = candidateAuthors?.Where(a => !string.IsNullOrWhiteSpace(a)).ToList();
         if (candidates == null || candidates.Count == 0) return true;
-        return candidates.Any(c => Words(c).Overlaps(known));
+        return candidates.Any(c => Words(c).Contains(surname));
     }
 
-    private static HashSet<string> Words(string? name) =>
-        TextNormalizer.Fold(name)
-            .Split(new[] { ' ', '.', ',', '-', '\'' }, StringSplitOptions.RemoveEmptyEntries)
+    // "Corey, James S. A." también vale: se busca el apellido entre todas las palabras del candidato
+    private static string? Surname(string? name)
+    {
+        var folded = TextNormalizer.Fold(name);
+        var parts = folded.Split(',', 2);
+        var words = SplitWords(parts.Length == 2 ? parts[0] : folded);
+        return parts.Length == 2 ? words.FirstOrDefault() : words.LastOrDefault();
+    }
+
+    private static HashSet<string> Words(string? name) => SplitWords(TextNormalizer.Fold(name)).ToHashSet();
+
+    private static List<string> SplitWords(string folded) =>
+        folded.Split(new[] { ' ', '.', ',', '-', '\'' }, StringSplitOptions.RemoveEmptyEntries)
             .Where(w => w.Length >= 3)
-            .ToHashSet();
+            .ToList();
 
     /// <summary>Ancho y alto leyendo solo la cabecera (JPEG, PNG, GIF, WebP). null si no se reconoce.</summary>
     public static (int Width, int Height)? GetImageSize(byte[] data)

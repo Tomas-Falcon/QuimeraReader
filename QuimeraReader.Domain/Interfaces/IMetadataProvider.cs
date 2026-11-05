@@ -12,6 +12,9 @@ public class BookMetadata
     public List<string> Categories { get; set; } = new();
     public string? SeriesName { get; set; }
     public double? AverageRating { get; set; }
+    /// <summary>Votos de AverageRating: sin ellos no se sabe si la puntuación es fiable.</summary>
+    public int? RatingsCount { get; set; }
+    public string? Source { get; set; }
 }
 
 /// <summary>Un resultado de la búsqueda de portadas: la imagen y los datos del libro al que pertenece.</summary>

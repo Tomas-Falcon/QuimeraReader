@@ -115,7 +115,9 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
                 CoverImageUri = QuimeraReader.Application.Common.CoverPolicy.GoogleCoverUrl(firstItem.ImageLinks?.Thumbnail),
                 Categories = firstItem.Categories ?? new List<string>(),
                 Synopsis = firstItem.Description,
-                AverageRating = firstItem.AverageRating
+                AverageRating = firstItem.AverageRating,
+                RatingsCount = firstItem.RatingsCount,
+                Source = ProviderName
             };
         }
         catch (Exception ex)

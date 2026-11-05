@@ -104,6 +104,10 @@ else
                         {
                             <RadzenBadge BadgeStyle="BadgeStyle.Warning" class="text-dark fs-6" title='@Translation["BookDetails_AverageRating"]'>
                                 <i class="bi bi-star-fill"></i> @_book.AverageRating.Value.ToString("0.0")
+                                @if (_book.RatingsCount > 0)
+                                {
+                                    <span class="fw-normal"> · @string.Format(Translation["CoverSearch_Votes"], _book.RatingsCount.Value.ToString("N0"))</span>
+                                }
                             </RadzenBadge>
                         }
                         @if (_book.HasEpub)
