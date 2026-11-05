@@ -273,6 +273,27 @@ code {
         padding: 12px 4px;
     }
 
+    .book-series {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .book-rating {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        /* Alto fijo: con estrella o vacía, la línea mide lo mismo */
+        height: 1.5em;
+        line-height: 1.5em;
+        margin-bottom: 4px;
+    }
+
+    .book-rating i { margin: 0; }
+
+    /* Línea reservada sin contenido: mantiene la altura sin mostrar nada */
+    .book-line-empty { visibility: hidden; }
+
     .book-title {
         font-size: 1.05rem;
         font-weight: 600;
