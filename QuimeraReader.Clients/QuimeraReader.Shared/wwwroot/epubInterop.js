@@ -924,6 +924,9 @@ export function setAudioBookmark(cfiRange) {
             window.lastKaraokeCfi = cfiRange;
             try {
                 window.epubRendition.annotations.underline(cfiRange, {}, () => {
+                    // En el móvil un toque llega como touchstart y como click: un solo aviso
+                    if (Date.now() - (window._lastAudioMarkTap || 0) < 800) return;
+                    window._lastAudioMarkTap = Date.now();
                     window._lastMarkClickedTime = Date.now();
                     if (window.epubDotNetRef) {
                         window.epubDotNetRef.invokeMethodAsync("OnAudioBookmarkClicked").catch(e => {});

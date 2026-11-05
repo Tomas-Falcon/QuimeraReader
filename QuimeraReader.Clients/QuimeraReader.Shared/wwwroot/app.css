@@ -1189,6 +1189,7 @@ body .rz-body {
 .cover-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    align-items: start;
     gap: 10px;
     max-height: 52vh;
     overflow-y: auto;
@@ -1204,13 +1205,17 @@ body .rz-body {
 .cover-card:hover { transform: translateY(-2px); }
 .cover-card.selected { outline-color: var(--rz-primary); }
 .cover-card.other-author .cover-image { opacity: 0.5; }
+/* Alto por padding (2:3) y no con aspect-ratio: dentro de la grilla el WebView de Android calculaba mal la fila
+   y las tarjetas se solapaban */
 .cover-image {
-    aspect-ratio: 2 / 3;
+    position: relative;
+    height: 0;
+    padding-top: 150%;
     border-radius: 6px;
     overflow: hidden;
     background: rgba(127, 127, 127, 0.15);
 }
-.cover-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cover-image img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .cover-badge {
     position: absolute;
     top: 4px;
@@ -1228,6 +1233,13 @@ body .rz-body {
 .cover-muted { opacity: 0.7; }
 .cover-rating { color: #f5b301; }
 .cover-warning { color: #ff9800; }
+@media (max-width: 600px) {
+    .cover-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .cover-info { font-size: 0.7rem; }
+}
+
+/* Con un diálogo abierto, la barra de navegación inferior del móvil tapaba sus botones (Guardar, Cancelar) */
+body:has(.rz-dialog-wrapper) .mobile-bottom-nav { display: none !important; }
 
 /* ===== Modo inmersivo: barra flotante de controles (no recoloca el texto) ===== */
 .immersive-controls {
@@ -1251,6 +1263,7 @@ body .rz-body {
     animation: immersive-controls-in 0.18s ease-out;
 }
 .immersive-controls-title { flex: 1; min-width: 0; line-height: 1.2; }
+.immersive-controls .btn-link { color: #fff !important; }
 .immersive-controls-title small { opacity: 0.65; font-size: 0.75rem; }
 @keyframes immersive-controls-in {
     from { opacity: 0; transform: translate(-50%, -8px); }

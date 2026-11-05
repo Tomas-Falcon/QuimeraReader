@@ -1210,7 +1210,56 @@
         var visibleText = await _epubJsModule.InvokeAsync<string>("getVisiblePageText");
         if (string.IsNullOrWhiteSpace(visibleText)) return null;
         var pageStart = visibleText.Length > 160 ? visibleText.Substring(0, 160) : visibleText;
-        return FindBestMatchingSegment(pageStart, _displayPercentage);
+        var best = FindBestMatchingSegment(pageStart, _displayPercentage);
+        return best == null ? null : SegmentWithPageOpening(best, visibleText) ?? best;
+    }
+
+    // Cuántas frases de audio se recorren desde el inicio de la página buscando la selección (una página son ~10-30)
+    private const int SelectionSearchSegments = 60;
+
+    /// <summary>La primera frase desde el inicio de la página (misma pista) que contiene el texto seleccionado.</summary>
+    private SyncSegment? FindSelectionNear(string selectedText, SyncSegment pageAnchor)
+    {
+        var selection = NormalizeForMatch(selectedText);
+        if (selection.Length < 3) return null;
+        // Selecciones largas: basta con su principio (puede cruzar varias frases)
+        var probe = selection.Length > 24 ? selection.Substring(0, 24) : selection;
+
+        int start = Math.Max(0, _segments.IndexOf(pageAnchor) - 1);
+        for (int i = start; i < _segments.Count && i < start + SelectionSearchSegments; i++)
+        {
+            var seg = _segments[i];
+            if (seg.TrackNumber != pageAnchor.TrackNumber) break;
+            var text = NormalizeForMatch(seg.Text);
+            var withNext = i + 1 < _segments.Count && _segments[i + 1].TrackNumber == seg.TrackNumber
+                ? text + NormalizeForMatch(_segments[i + 1].Text)
+                : text;
+            if (text.Contains(probe)) return seg;
+            // Cruza al principio de la frase siguiente: empieza en esta
+            if (withNext.Contains(probe) && !NormalizeForMatch(_segments[i + 1].Text).Contains(probe)) return seg;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// La frase que más se parece al comienzo de la página suele ser la que empieza después (la página arranca a mitad
+    /// de una frase del audio), y se saltaban sus primeras palabras. Se retrocede a la frase que contiene las primeras
+    /// palabras de la página: el audio arranca así en el inicio de la página o un poco antes.
+    /// </summary>
+    private SyncSegment? SegmentWithPageOpening(SyncSegment best, string visibleText)
+    {
+        var words = visibleText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        var opening = NormalizeForMatch(string.Join(" ", words.Take(4)));
+        if (opening.Length < 6) return null;
+
+        int index = _segments.IndexOf(best);
+        for (int back = 0; back <= 2 && index - back >= 0; back++)
+        {
+            var candidate = _segments[index - back];
+            if (candidate.TrackNumber != best.TrackNumber) break;
+            if (NormalizeForMatch(candidate.Text).Contains(opening)) return candidate;
+        }
+        return null;
     }
 
     /// <summary>
@@ -1376,7 +1425,11 @@
 
         if (!string.IsNullOrEmpty(_selectedText) && _segments != null && _segments.Any())
         {
-            var match = FindBestMatchingSegment(_selectedText, _displayPercentage);
+            // Primero cerca de la página visible: una selección corta ("control") aparece muchas veces en el audio, y el
+            // porcentaje del texto no sirve para desempatar (el EPUB tiene páginas que no se narran)
+            var pageAnchor = await FindSegmentAtPageStartAsync();
+            var match = (pageAnchor != null ? FindSelectionNear(_selectedText, pageAnchor) : null)
+                        ?? FindBestMatchingSegment(_selectedText, _displayPercentage);
 
             if (match != null)
             {
@@ -1563,6 +1616,10 @@
     [JSInvokable]
     public async Task OnTimeUpdate(double time)
     {
+        // Al cambiar de pista el reproductor recarga y avisa con 0 antes de colocarse: no es una posición real.
+        // Sin este filtro, fijar una marca en otra pista llevaba la página al principio del libro.
+        if (!_isPlaying && time < 0.5 && _currentTime > 1) return;
+
         _currentTime = time;
         if (Book != null)
         {
@@ -1588,9 +1645,11 @@
             
             if (_epubJsModule != null)
             {
-                var karaokeCfi = await _epubJsModule.InvokeAsync<string?>("highlightKaraokePhrase", activeSegment.Text, !_showAudiobookMode);
+                // Solo el audio sonando mueve la página; en pausa manda la lectura (el audio la sigue a ella)
+                bool followAudio = !_showAudiobookMode && _isPlaying;
+                var karaokeCfi = await _epubJsModule.InvokeAsync<string?>("highlightKaraokePhrase", activeSegment.Text, followAudio);
                 // Si la frase no estaba en el capítulo actual del EPUB y el segmento conoce su capítulo, saltar automáticamente al nuevo capítulo
-                if (string.IsNullOrEmpty(karaokeCfi) && !_showAudiobookMode && (activeSegment.SpineIndex.HasValue || !string.IsNullOrEmpty(activeSegment.ChapterHref)))
+                if (string.IsNullOrEmpty(karaokeCfi) && followAudio && (activeSegment.SpineIndex.HasValue || !string.IsNullOrEmpty(activeSegment.ChapterHref)))
                 {
                     karaokeCfi = await _epubJsModule.InvokeAsync<string?>(
                         "navigateToSegmentText",
@@ -1600,7 +1659,7 @@
                         activeSegment.ChapterHref ?? "");
                 }
 
-                if (!string.IsNullOrEmpty(karaokeCfi) && Book != null)
+                if (followAudio && !string.IsNullOrEmpty(karaokeCfi) && Book != null)
                 {
                     Book.CurrentEpubCfi = karaokeCfi;
                     _pageMovedSinceAudioSync = false;
