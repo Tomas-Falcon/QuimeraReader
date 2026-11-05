@@ -436,7 +436,7 @@ else
     {
         var result = await DialogService.OpenAsync<BookEditModal>(Translation["EditBook_Title"], 
             new Dictionary<string, object?> { { "Book", _book } },
-            new Radzen.DialogOptions() { Width = "min(520px, 95vw)", Height = "auto", CloseDialogOnOverlayClick = true });
+            new Radzen.DialogOptions() { Width = "min(860px, 95vw)", Height = "auto", CloseDialogOnOverlayClick = true });
         
         if (result == true)
         {

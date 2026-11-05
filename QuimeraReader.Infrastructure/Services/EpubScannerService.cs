@@ -678,18 +678,10 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
                         : null;
                     if (CoverPolicy.ShouldReplace(currentCover, imageBytes))
                     {
-                        // Junto al libro (antes iba a Autor/Título aunque el libro estuviera en la carpeta de su saga)
-                        string? bookSubDir = Path.GetDirectoryName(!string.IsNullOrEmpty(book.CoverImagePath) ? book.CoverImagePath : book.EpubFilePath);
-                        if (string.IsNullOrEmpty(bookSubDir))
-                        {
-                            settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
-                            if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
-                            string mainAuthor = book.Authors.FirstOrDefault()?.Author.Name ?? "Unknown Author";
-                            bookSubDir = Path.Combine(libraryRoot, GetSafeFilename(mainAuthor), GetSafeFilename(book.Title));
-                        }
-
-                        Directory.CreateDirectory(bookSubDir);
-                        string coverPath = Path.Combine(bookSubDir, "cover.jpg");
+                        // Junto al libro dentro de la biblioteca; nunca en la carpeta del torrent (modo LeaveInPlace sin enlace)
+                        settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
+                        string coverPath = CoverRepairService.CoverPathFor(book, book.EpubFilePath, libraryRoot, CoverRepairService.ImageExtension(imageBytes) is { Length: > 0 } ext ? ext : ".jpg");
+                        Directory.CreateDirectory(Path.GetDirectoryName(coverPath)!);
                         await File.WriteAllBytesAsync(coverPath, imageBytes);
                         book.CoverImagePath = coverPath;
                     }

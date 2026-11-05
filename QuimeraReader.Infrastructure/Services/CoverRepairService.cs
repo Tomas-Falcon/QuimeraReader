@@ -111,7 +111,7 @@ public class CoverRepairService
         return Path.Combine(root, "_covers", (book.Id / 1000).ToString("D3"), book.Id + extension);
     }
 
-    private async Task<byte[]?> ReadEpubCoverAsync(string epubPath)
+    public async Task<byte[]?> ReadEpubCoverAsync(string epubPath)
     {
         try
         {
@@ -153,7 +153,7 @@ public class CoverRepairService
             try
             {
                 var found = await provider.SearchCoversAsync(book.Title, author, settings);
-                var bytes = await TryDownloadAnyAsync(client, found.Take(2), cancellationToken);
+                var bytes = await TryDownloadAnyAsync(client, found.Take(2).Select(c => c.ImageUrl), cancellationToken);
                 if (bytes != null) return bytes;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

@@ -226,5 +226,20 @@
   "Reader_PlayingFromSelection": "Reproduciendo desde el fragmento seleccionado.",
   "Reader_ListenMarkerSet": "Marcado: seguirás escuchando desde aquí.",
   "Reader_ListenMarkerTapped": "Marca «Seguir escuchando aquí»",
-  "Action_Remove": "Quitar"
+  "Action_Remove": "Quitar",
+  "CoverSearch_Title": "Título",
+  "CoverSearch_Author": "Autor",
+  "CoverSearch_Provider": "Origen",
+  "CoverSearch_All": "Todos",
+  "CoverSearch_Search": "Buscar",
+  "CoverSearch_Searching": "Buscando portadas…",
+  "CoverSearch_Count": "{0} portadas",
+  "CoverSearch_None": "No se encontraron portadas. Probá con menos palabras o sin autor.",
+  "CoverSearch_Current": "Actual",
+  "CoverSearch_OtherAuthor": "Otro autor",
+  "CoverSearch_Votes": "{0} votos",
+  "CoverSearch_FillMissing": "Completar con este resultado lo que le falte al libro (sinopsis, puntuación, categorías)",
+  "CoverSearch_ManualUrl": "O pegá la URL de una imagen",
+  "CoverSearch_Error": "No se pudieron buscar portadas.",
+  "CoverSearch_ApplyError": "No se pudo usar esa portada."
 }

@@ -124,15 +124,35 @@ public class UpdateMetadataRequest
     public List<string> Categories { get; set; } = new();
 }
 
+/// <summary>Portada elegida en el editor; con FillMissingMetadata el servidor completa lo que le falte al libro.</summary>
 public class UpdateCoverRequest
 {
-    public string ImageUrl { get; set; } = string.Empty;
+    public string? ImageUrl { get; set; }
+    public string? Provider { get; set; }
+    public bool FillMissingMetadata { get; set; }
+    public string? Synopsis { get; set; }
+    public List<string> Categories { get; set; } = new();
+    public double? Rating { get; set; }
 }
 
+/// <summary>Una portada candidata del buscador del editor, con su tamaño real y los datos de su libro.</summary>
 public class CoverSearchResult
 {
+    public const string EpubProvider = "EPUB";
+
     public string ImageUrl { get; set; } = string.Empty;
-    public string Source { get; set; } = string.Empty;
+    public string Provider { get; set; } = string.Empty;
+    public int? Width { get; set; }
+    public int? Height { get; set; }
+    public string? Title { get; set; }
+    public List<string> Authors { get; set; } = new();
+    public string? Synopsis { get; set; }
+    public List<string> Categories { get; set; } = new();
+    public double? Rating { get; set; }
+    public int? RatingsCount { get; set; }
+    public bool AuthorMatches { get; set; }
+
+    public bool HasExtraMetadata => !string.IsNullOrWhiteSpace(Synopsis) || Rating > 0 || Categories.Count > 0;
 }
 
 public class AnnotationDto
