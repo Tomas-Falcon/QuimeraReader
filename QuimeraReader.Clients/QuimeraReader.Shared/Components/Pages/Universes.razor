@@ -10,11 +10,26 @@
 <div class="library-container">
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
         <h2 class="mb-0"><span class="bi bi-globe2 text-primary me-2"></span> Universos</h2>
-        <div class="d-flex gap-2 w-100" style="max-width: 420px;">
-            <input class="form-control" placeholder="Nombre del nuevo universo" @bind="_newName" @bind:event="oninput" />
-            <button class="btn btn-primary text-nowrap" disabled="@string.IsNullOrWhiteSpace(_newName)" @onclick="@(() => CreateAsync(_newName, null))">
-                <i class="bi bi-plus-lg me-1"></i> Crear
-            </button>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            @if (_selectionMode)
+            {
+                <span class="text-primary fw-bold me-2">@_selectedIds.Count seleccionados</span>
+                <RadzenButton Text="Cancelar" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Size="ButtonSize.Small" />
+                <RadzenButton Text="Borrar seleccionados" Click="DeleteSelectedAsync" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Icon="delete" Disabled="@(_selectedIds.Count == 0)" />
+            }
+            else
+            {
+                @if (_universes?.Count > 0)
+                {
+                    <RadzenButton Text="Seleccionar" Click="ToggleSelectionMode" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Outlined" Icon="check_box" />
+                }
+                <div class="d-flex gap-2" style="flex: 1 1 280px; max-width: 420px;">
+                    <input class="form-control" placeholder="Nombre del nuevo universo" @bind="_newName" @bind:event="oninput" />
+                    <button class="btn btn-primary text-nowrap" disabled="@string.IsNullOrWhiteSpace(_newName)" @onclick="@(() => CreateAsync(_newName, null))">
+                        <i class="bi bi-plus-lg me-1"></i> Crear
+                    </button>
+                </div>
+            }
         </div>
     </div>
     <p class="collection-meta mb-4">
@@ -37,11 +52,14 @@
             <div class="collection-row mb-5">
                 @foreach (var u in _universes)
                 {
-                    <div class="collection-card position-relative" @key="u.Id" @onclick="@(() => NavManager.NavigateTo($"/universe/{u.Id}"))">
-                        @* Borrar desde la lista: antes solo se podía entrando en el universo, y no se encontraba *@
-                        <button class="btn btn-sm btn-dark universe-delete" title="Borrar universo" @onclick="@(() => DeleteAsync(u))" @onclick:stopPropagation="true">
-                            <i class="bi bi-trash"></i>
-                        </button>
+                    var isSelected = _selectedIds.Contains(u.Id);
+                    <div class="collection-card position-relative @(isSelected ? "collection-card-selected" : "")" @key="u.Id" @onclick="@(() => HandleCardClick(u))">
+                        @if (_selectionMode)
+                        {
+                            <div class="collection-select" @onclick:stopPropagation="true">
+                                <RadzenCheckBox TValue="bool" Value="isSelected" Change="@(v => ToggleSelection(u.Id, v))" />
+                            </div>
+                        }
                         <div class="collection-cover">
                             @if (!string.IsNullOrEmpty(u.SampleCoverUrl))
                             {
@@ -109,23 +127,48 @@
         }
     }
 
-    private async Task DeleteAsync(UniverseSummary universe)
+    // Selección múltiple, como en Autores: los universos se borran desde la lista (antes solo entrando en cada uno)
+    private bool _selectionMode = false;
+    private HashSet<int> _selectedIds = new();
+
+    private void ToggleSelectionMode()
     {
+        _selectionMode = !_selectionMode;
+        if (!_selectionMode) _selectedIds.Clear();
+    }
+
+    private void ToggleSelection(int id, bool selected)
+    {
+        if (selected) _selectedIds.Add(id);
+        else _selectedIds.Remove(id);
+    }
+
+    private void HandleCardClick(UniverseSummary universe)
+    {
+        if (_selectionMode) ToggleSelection(universe.Id, !_selectedIds.Contains(universe.Id));
+        else NavManager.NavigateTo($"/universe/{universe.Id}");
+    }
+
+    private async Task DeleteSelectedAsync()
+    {
+        if (_selectedIds.Count == 0) return;
+        var names = _universes!.Where(u => _selectedIds.Contains(u.Id)).Select(u => u.Name).ToList();
         var confirmed = await DialogService.Confirm(
-            "Se borra solo el universo: sus sagas y libros siguen en la biblioteca, simplemente sin universo.",
-            $"¿Borrar \"{universe.Name}\"?",
-            new Radzen.ConfirmOptions { OkButtonText = "Borrar universo", CancelButtonText = "Cancelar" });
+            $"{string.Join(", ", names)}. Se borran solo los universos: sus sagas y libros siguen en la biblioteca, simplemente sin universo.",
+            names.Count == 1 ? "¿Borrar 1 universo?" : $"¿Borrar {names.Count} universos?",
+            new Radzen.ConfirmOptions { OkButtonText = "Borrar", CancelButtonText = "Cancelar" });
         if (confirmed != true) return;
 
-        try
+        int failed = 0;
+        foreach (var id in _selectedIds.ToList())
         {
-            await Collections.DeleteUniverseAsync(universe.Id);
-            await LoadAsync();
+            try { await Collections.DeleteUniverseAsync(id); }
+            catch { failed++; }
         }
-        catch
-        {
-            ToastService.ShowError("No se pudo borrar el universo.");
-        }
+        if (failed > 0) ToastService.ShowError($"No se pudieron borrar {failed} universos.");
+        _selectionMode = false;
+        _selectedIds.Clear();
+        await LoadAsync();
     }
 
     private async Task CreateAsync(string name, IEnumerable<int>? seriesIds)

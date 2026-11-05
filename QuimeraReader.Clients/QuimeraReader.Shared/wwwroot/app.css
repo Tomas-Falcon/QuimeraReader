@@ -294,16 +294,14 @@ code {
     /* Línea reservada sin contenido: mantiene la altura sin mostrar nada */
     .book-line-empty { visibility: hidden; }
 
-/* Universes.razor: borrar desde la tarjeta */
-.universe-delete {
+/* Universes.razor: selección múltiple para borrar */
+.collection-select {
     position: absolute;
-    top: 6px;
-    right: 6px;
+    top: 8px;
+    right: 8px;
     z-index: 2;
-    opacity: 0.85;
-    padding: 2px 8px;
 }
-.universe-delete:hover { opacity: 1; color: #ff6b6b; }
+.collection-card-selected { box-shadow: 0 0 0 2px var(--rz-primary) !important; }
 
     .book-title {
         font-size: 1.05rem;
