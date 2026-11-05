@@ -198,7 +198,7 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         } catch (e) {}
     }
     // Tipo de letra elegido (setFontFamily): se aplica a cada capítulo al cargarse
-    rendition.hooks.content.register(function (contents) { applyFontFamily(contents); });
+    rendition.hooks.content.register(function (contents) { applyFontFamily(contents); applyImageFit(contents); });
 
     var hasValidInitialCfi = !!(lastCfi && typeof lastCfi === "string" && lastCfi.trim().length > 0);
     rendition.display(hasValidInitialCfi ? lastCfi : undefined);
@@ -647,6 +647,18 @@ const READER_FONTS = {
     serif: 'Georgia, "Noto Serif", "Droid Serif", "Times New Roman", serif',
     sans: 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif'
 };
+
+// epub.js limita cada imagen al ancho de la columna en píxeles (con !important), lo que pisa el max-width: 100%
+// del libro: una ilustración dentro de un párrafo flotante al 45 % se dibujaba más ancha que él y tapaba el texto.
+// Esta regla, más específica, vuelve a limitarla a su contenedor (el alto máximo de epub.js se mantiene).
+function applyImageFit(contents) {
+    var doc = contents && contents.document;
+    if (!doc || !doc.head || doc.getElementById("qr-image-fit")) return;
+    var style = doc.createElement("style");
+    style.id = "qr-image-fit";
+    style.textContent = "body img { max-width: 100% !important; }";
+    doc.head.appendChild(style);
+}
 
 // La hoja del libro suele fijar la fuente en párrafos y títulos, así que una fuente en <html> no basta:
 // se inyecta una regla con !important en cada capítulo (sin tocar el código, que debe seguir siendo monoespaciado)

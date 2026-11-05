@@ -220,12 +220,17 @@ else
 }
 
 <style>
+    /* El margen negativo anula el relleno de la página (p-2 en el móvil, p-md-4 desde md). Con -1.5rem fijo,
+       en el móvil sobresalía 16 px por cada lado y toda la ficha quedaba corrida y cortada. */
     .book-details-hero {
         position: relative;
         min-height: calc(100vh - 60px);
-        margin: -1.5rem;
+        margin: -0.5rem;
         overflow: hidden;
         background-color: #121212;
+    }
+    @@media (min-width: 768px) {
+        .book-details-hero { margin: -1.5rem; }
     }
     .hero-bg {
         position: absolute;

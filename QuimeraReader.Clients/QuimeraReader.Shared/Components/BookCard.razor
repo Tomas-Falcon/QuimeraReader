@@ -30,22 +30,22 @@
         {
             <p class="book-author text-muted mb-1" style="font-size: 0.85em;">@string.Join(", ", Book.Authors)</p>
         }
-        @if (Book != null && !string.IsNullOrEmpty(Book.Series))
-        {
-            <p class="book-series text-warning mb-1" style="font-size: 0.8em; font-weight: bold;">@Book.Series</p>
-        }
-        @if (Book != null && Book.AverageRating.HasValue && Book.AverageRating.Value > 0)
-        {
-            <div class="book-rating text-warning" style="font-size: 0.8em; margin-bottom: 4px;">
-                <i class="bi bi-star-fill"></i> @Book.AverageRating.Value.ToString("0.0")
-            </div>
-        }
-        @if (Book != null && Book.PercentageCompleted.HasValue && Book.PercentageCompleted.Value > 0)
-        {
-            <div class="progress mt-2" style="height: 4px;">
-                <div class="progress-bar bg-primary" role="progressbar" style="width: @(Book.PercentageCompleted.Value)%;" aria-valuenow="@(Book.PercentageCompleted.Value)" aria-valuemin="0" aria-valuemax="100"></div>
-            </div>
-        }
+        @* Saga, puntuación y progreso ocupan siempre su línea (vacía si no hay): así todas las tarjetas de una fila
+           miden lo mismo y las barras de progreso quedan alineadas *@
+        <p class="book-series text-warning mb-1 @(string.IsNullOrEmpty(Book?.Series) ? "book-line-empty" : "")" style="font-size: 0.8em; font-weight: bold;">@(string.IsNullOrEmpty(Book?.Series) ? " " : Book!.Series)</p>
+        <div class="book-rating text-warning @(Book?.AverageRating > 0 ? "" : "book-line-empty")" style="font-size: 0.8em;">
+            @if (Book?.AverageRating > 0)
+            {
+                <i class="bi bi-star-fill"></i><span>@Book.AverageRating.Value.ToString("0.0")</span>
+            }
+            else
+            {
+                <span>&nbsp;</span>
+            }
+        </div>
+        <div class="progress mt-2 @(Book?.PercentageCompleted > 0 ? "" : "book-line-empty")" style="height: 4px;">
+            <div class="progress-bar bg-primary" role="progressbar" style="width: @((Book?.PercentageCompleted ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture))%;" aria-valuenow="@(Book?.PercentageCompleted ?? 0)" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
     </div>
 </div>
 
