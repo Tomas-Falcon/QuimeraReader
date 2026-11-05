@@ -4,9 +4,13 @@
 
 <PageTitle>Lector - QuimeraReader</PageTitle>
 
-<ReaderPlayer BookId="@BookId" />
+<ReaderPlayer BookId="@BookId" FromStart="@FromStart" />
 
 @code {
     [Parameter]
     public int BookId { get; set; }
+
+    // /read/{id}?fromStart=true: "Volver a leer" abre desde la primera página
+    [SupplyParameterFromQuery]
+    public bool FromStart { get; set; }
 }

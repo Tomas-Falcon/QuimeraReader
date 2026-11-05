@@ -168,10 +168,14 @@ public class LibraryScanBackgroundService : BackgroundService
                             string newAudioPath = LibraryPathUtils.GetUniqueFilePath(bookDir, $"{safeTitle} track {nextTrack}.mp3");
                             string trackPath = file;
 
+                            // FFmpeg escribe en un temporal que solo se renombra al terminar: si el servidor se reinicia a mitad
+                            // de la conversión no queda una pista a medias con nombre definitivo ocupando espacio
+                            string partialPath = newAudioPath + ".partial.mp3";
                             try
                             {
-                                if (await mediaPackager.NormalizeAudioAsync(file, newAudioPath))
+                                if (await mediaPackager.NormalizeAudioAsync(file, partialPath))
                                 {
+                                    File.Move(partialPath, newAudioPath);
                                     trackPath = newAudioPath;
                                     if (!leaveInPlace)
                                     {
@@ -181,7 +185,7 @@ public class LibraryScanBackgroundService : BackgroundService
                                 else
                                 {
                                     // Sin conversión se conserva la extensión real (antes un .m4b acababa copiado con extensión .mp3)
-                                    if (File.Exists(newAudioPath)) File.Delete(newAudioPath); // posible salida parcial de FFmpeg
+                                    if (File.Exists(partialPath)) File.Delete(partialPath); // posible salida parcial de FFmpeg
                                     trackPath = LibraryPathUtils.GetUniqueFilePath(bookDir, $"{safeTitle} track {nextTrack}{Path.GetExtension(file)}");
                                     File.Copy(file, trackPath);
                                 }
@@ -194,6 +198,9 @@ public class LibraryScanBackgroundService : BackgroundService
 
                             book.AudioTracks.Add(new BookAudioTrack { FilePath = trackPath, TrackNumber = nextTrack, FileName = Path.GetFileName(file) });
                             await dbContext.SaveChangesAsync(stoppingToken);
+                            // La pista apunta a la copia en la biblioteca, no al original: sin este registro, en modo torrent
+                            // el original se volvía a importar (y copiar) tras cada reinicio del servidor
+                            await RecordScannedFileAsync(dbContext, file, null, book.Id, "Audio", stoppingToken);
                         }
                     }
                     else
@@ -218,10 +225,12 @@ public class LibraryScanBackgroundService : BackgroundService
                         { 
                             OriginalFileName = fileName, 
                             PhysicalPath = orphanPath, 
-                            FileSizeBytes = fileInfo.Length, 
-                            UploadedAt = DateTime.UtcNow 
+                            FileSizeBytes = fileInfo.Length,
+                            UploadedAt = DateTime.UtcNow
                         });
                         await dbContext.SaveChangesAsync(stoppingToken);
+                        // En modo torrent el original sigue en la carpeta de entrada: registrarlo para no copiarlo otra vez
+                        await RecordScannedFileAsync(dbContext, file, null, null, "AudioOrphan", stoppingToken);
                     }
                 }
             }

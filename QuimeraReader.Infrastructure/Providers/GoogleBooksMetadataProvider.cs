@@ -22,16 +22,17 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
         _logger = logger;
     }
 
-        public async Task<List<string>> SearchCoversAsync(string title, string? author, Dictionary<string, string>? settings = null)
+    public async Task<List<CoverCandidate>> SearchCoversAsync(string title, string? author, Dictionary<string, string>? settings = null)
     {
-        var covers = new List<string>();
+        var covers = new List<CoverCandidate>();
         string? apiKey = null;
         settings?.TryGetValue("GoogleBooksApiKey", out apiKey);
-        
-        string query = $"intitle:\"{title}\"";
-        if (!string.IsNullOrWhiteSpace(author)) query += $"+inauthor:\"{author}\"";
-        
-        string url = $"https://www.googleapis.com/books/v1/volumes?q={Uri.EscapeDataString(query)}&maxResults=10";
+
+        // Palabras sueltas (sin comillas): encuentra "El despertar del Leviatán" buscando "leviatan despertar"
+        string query = title;
+        if (!string.IsNullOrWhiteSpace(author)) query += $" inauthor:{author}";
+
+        string url = $"https://www.googleapis.com/books/v1/volumes?q={Uri.EscapeDataString(query)}&maxResults=20";
         if (!string.IsNullOrWhiteSpace(apiKey)) url += $"&key={apiKey}";
 
         try
@@ -41,11 +42,20 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
             {
                 foreach (var item in response.Items)
                 {
-                    var thumb = item.VolumeInfo?.ImageLinks?.Thumbnail;
-                    if (!string.IsNullOrWhiteSpace(thumb))
+                    var info = item.VolumeInfo;
+                    var cover = QuimeraReader.Application.Common.CoverPolicy.GoogleCoverUrl(info?.ImageLinks?.Thumbnail);
+                    if (cover == null || info == null) continue;
+                    covers.Add(new CoverCandidate
                     {
-                        covers.Add(thumb.Replace("http:", "https:"));
-                    }
+                        ImageUrl = cover,
+                        Provider = ProviderName,
+                        Title = info.Title,
+                        Authors = info.Authors ?? new List<string>(),
+                        Synopsis = info.Description,
+                        Categories = info.Categories ?? new List<string>(),
+                        Rating = info.AverageRating,
+                        RatingsCount = info.RatingsCount
+                    });
                 }
             }
         }
@@ -102,10 +112,12 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
             {
                 Title = firstItem.Title,
                 Authors = firstItem.Authors ?? new List<string>(),
-                CoverImageUri = firstItem.ImageLinks?.Thumbnail?.Replace("http:", "https:"),
+                CoverImageUri = QuimeraReader.Application.Common.CoverPolicy.GoogleCoverUrl(firstItem.ImageLinks?.Thumbnail),
                 Categories = firstItem.Categories ?? new List<string>(),
                 Synopsis = firstItem.Description,
-                AverageRating = firstItem.AverageRating
+                AverageRating = firstItem.AverageRating,
+                RatingsCount = firstItem.RatingsCount,
+                Source = ProviderName
             };
         }
         catch (Exception ex)
@@ -124,6 +136,7 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
         public List<string>? Categories { get; set; }
         public ImageLinks? ImageLinks { get; set; }
         public double? AverageRating { get; set; }
+        public int? RatingsCount { get; set; }
     }
     internal class ImageLinks { public string? Thumbnail { get; set; } }
 }

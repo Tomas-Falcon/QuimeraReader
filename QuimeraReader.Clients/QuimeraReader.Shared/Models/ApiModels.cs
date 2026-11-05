@@ -7,6 +7,7 @@ public record Book
     public string Isbn { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
     public double? AverageRating { get; init; }
+    public int? RatingsCount { get; init; }
     
     public List<string> Authors { get; init; } = new();
     public List<string> Categories { get; init; } = new();
@@ -124,15 +125,36 @@ public class UpdateMetadataRequest
     public List<string> Categories { get; set; } = new();
 }
 
+/// <summary>Portada elegida en el editor; con FillMissingMetadata el servidor completa lo que le falte al libro.</summary>
 public class UpdateCoverRequest
 {
-    public string ImageUrl { get; set; } = string.Empty;
+    public string? ImageUrl { get; set; }
+    public string? Provider { get; set; }
+    public bool FillMissingMetadata { get; set; }
+    public string? Synopsis { get; set; }
+    public List<string> Categories { get; set; } = new();
+    public double? Rating { get; set; }
+    public int? RatingsCount { get; set; }
 }
 
+/// <summary>Una portada candidata del buscador del editor, con su tamaño real y los datos de su libro.</summary>
 public class CoverSearchResult
 {
+    public const string EpubProvider = "EPUB";
+
     public string ImageUrl { get; set; } = string.Empty;
-    public string Source { get; set; } = string.Empty;
+    public string Provider { get; set; } = string.Empty;
+    public int? Width { get; set; }
+    public int? Height { get; set; }
+    public string? Title { get; set; }
+    public List<string> Authors { get; set; } = new();
+    public string? Synopsis { get; set; }
+    public List<string> Categories { get; set; } = new();
+    public double? Rating { get; set; }
+    public int? RatingsCount { get; set; }
+    public bool AuthorMatches { get; set; }
+
+    public bool HasExtraMetadata => !string.IsNullOrWhiteSpace(Synopsis) || Rating > 0 || Categories.Count > 0;
 }
 
 public class AnnotationDto
@@ -143,6 +165,13 @@ public class AnnotationDto
     public string? ColorHex { get; set; }
     public string? Note { get; set; }
     public DateTime CreatedAt { get; set; }
+    // "listen" = "Seguir escuchando aquí" (una por libro); null = marca normal
+    public string? Kind { get; set; }
+    public double? AudioPosition { get; set; }
+    public int? AudioTrackNumber { get; set; }
+
+    public const string ListenKind = "listen";
+    public bool IsListenMarker => Kind == ListenKind;
 }
 
 public class ManagedAudioDto

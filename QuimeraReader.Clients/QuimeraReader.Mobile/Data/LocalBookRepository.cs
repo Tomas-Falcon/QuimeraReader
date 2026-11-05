@@ -285,7 +285,8 @@ public class LocalBookRepository : ILocalBookRepository
             if (percentage.HasValue)
             {
                 book.PercentageCompleted = percentage.Value;
-                if (percentage.Value >= 99.5) book.ReadingStatus = "Read";
+                // Mismo umbral que el servidor (ReadingProgressPolicy.FinishedPercentage): el lector envía 100 en la última página
+                if (percentage.Value >= 99.9) book.ReadingStatus = "Read";
                 else if (book.ReadingStatus != "Read") book.ReadingStatus = "Reading";
             }
             if (audioPosition.HasValue) book.CurrentAudioPosition = audioPosition.Value;
@@ -342,7 +343,10 @@ public class LocalBookRepository : ILocalBookRepository
                 SelectedText = a.SelectedText,
                 Note = a.Note,
                 ColorHex = a.ColorHex,
-                CreatedAt = a.CreatedAt
+                CreatedAt = a.CreatedAt,
+                Kind = a.Kind,
+                AudioPosition = a.AudioPosition,
+                AudioTrackNumber = a.AudioTrackNumber
             })
             .ToListAsync();
 
@@ -383,7 +387,10 @@ public class LocalBookRepository : ILocalBookRepository
                 SelectedText = a.SelectedText,
                 Note = a.Note ?? "",
                 ColorHex = a.ColorHex ?? "",
-                CreatedAt = a.CreatedAt
+                CreatedAt = a.CreatedAt,
+                Kind = a.Kind,
+                AudioPosition = a.AudioPosition,
+                AudioTrackNumber = a.AudioTrackNumber
             }).ToList();
             await _dbContext.SaveChangesAsync();
         }

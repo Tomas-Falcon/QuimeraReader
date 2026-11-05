@@ -104,6 +104,10 @@ else
                         {
                             <RadzenBadge BadgeStyle="BadgeStyle.Warning" class="text-dark fs-6" title='@Translation["BookDetails_AverageRating"]'>
                                 <i class="bi bi-star-fill"></i> @_book.AverageRating.Value.ToString("0.0")
+                                @if (_book.RatingsCount > 0)
+                                {
+                                    <span class="fw-normal"> · @string.Format(Translation["CoverSearch_Votes"], _book.RatingsCount.Value.ToString("N0"))</span>
+                                }
                             </RadzenBadge>
                         }
                         @if (_book.HasEpub)
@@ -131,7 +135,17 @@ else
                         <p class="text-white-50 fst-italic mb-4">@Translation["BookDetails_NoDescription"]</p>
                     }
                     
-                    <div class="reading-progress-section mt-4 mb-2" style="max-width: 400px;">
+                    <div class="d-flex align-items-center gap-2 mt-4" style="max-width: 400px;">
+                        <label class="text-white-50 small fw-bold mb-0" for="book-status">@Translation["BookDetails_Status"]</label>
+                        <select id="book-status" class="form-select form-select-sm w-auto bg-dark text-light border-secondary" value="@(_book.ReadingStatus ?? "Unread")" @onchange="ChangeStatusAsync">
+                            @foreach (var status in ReadingStatuses)
+                            {
+                                <option value="@status">@StatusLabel(status)</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="reading-progress-section mt-3 mb-2" style="max-width: 400px;">
                         @if (_book.PercentageCompleted.HasValue && _book.PercentageCompleted.Value > 0)
                         {
                             <div class="d-flex justify-content-between align-items-center mb-1">
@@ -319,9 +333,40 @@ else
         }
     }
 
+    private bool IsRead => _book != null && (_book.ReadingStatus == "Read" || (_book.PercentageCompleted ?? 0) >= 100);
+
     private void GoToRead()
     {
-        NavManager.NavigateTo($"/read/{Id}");
+        // "Volver a leer" abre desde la primera página; el estado solo cambia si se pasa de página
+        NavManager.NavigateTo(IsRead ? $"/read/{Id}?fromStart=true" : $"/read/{Id}");
+    }
+
+    // Valores de ReadingStatus en el servidor
+    private static readonly string[] ReadingStatuses = { "Unread", "Reading", "NextToRead", "Read" };
+
+    private string StatusLabel(string status) => status switch
+    {
+        "Reading" => Translation["Status_CurrentlyReading"],
+        "NextToRead" => Translation["Status_NextToRead"],
+        "Read" => Translation["Status_Read"],
+        _ => Translation["Status_Unread"]
+    };
+
+    private async Task ChangeStatusAsync(ChangeEventArgs e)
+    {
+        var status = e.Value?.ToString();
+        if (_book == null || string.IsNullOrEmpty(status) || status == (_book.ReadingStatus ?? "Unread")) return;
+        var previous = _book.ReadingStatus;
+        _book.ReadingStatus = status;
+        try
+        {
+            await BookService.BulkUpdateStatusAsync(new List<int> { Id }, status);
+        }
+        catch (Exception ex)
+        {
+            _book.ReadingStatus = previous;
+            ToastService.ShowError(ex.Message);
+        }
     }
 
     private async Task DeleteEpubAsync()
@@ -395,7 +440,7 @@ else
     {
         var result = await DialogService.OpenAsync<BookEditModal>(Translation["EditBook_Title"], 
             new Dictionary<string, object?> { { "Book", _book } },
-            new Radzen.DialogOptions() { Width = "min(520px, 95vw)", Height = "auto", CloseDialogOnOverlayClick = true });
+            new Radzen.DialogOptions() { Width = "min(860px, 95vw)", Height = "auto", CloseDialogOnOverlayClick = true });
         
         if (result == true)
         {

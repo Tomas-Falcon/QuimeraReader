@@ -9,6 +9,19 @@ public class ReadingProgressPolicyTests
 {
     private static readonly DateTime Now = new(2026, 11, 3, 20, 30, 0, DateTimeKind.Utc);
 
+    [Theory]
+    [InlineData(null, 100.0, "Read")]          // última página
+    [InlineData("Reading", 99.95, "Read")]     // redondeo de coma flotante
+    [InlineData("Reading", 40.0, "Reading")]
+    [InlineData("Unread", 10.0, "Reading")]
+    [InlineData("NextToRead", 5.0, "Reading")]
+    [InlineData("Read", 3.0, "Read")]          // releer no lo cambia solo: lo pide el cliente al pasar de página
+    [InlineData("Read", null, "Read")]
+    public void StatusAfterProgress_FollowsTheReadingRules(string? current, double? percentage, string expected)
+    {
+        ReadingProgressPolicy.StatusAfterProgress(current, percentage).Should().Be(expected);
+    }
+
     [Fact]
     public void LateOfflineSync_OlderThanStoredProgress_IsStale()
     {

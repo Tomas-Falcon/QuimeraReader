@@ -94,6 +94,9 @@ namespace QuimeraReader.Infrastructure.Migrations
                     b.Property<string>("ProcessingStatus")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("RatingsCount")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ReadingStatus")
                         .HasColumnType("TEXT");
 
@@ -133,6 +136,12 @@ namespace QuimeraReader.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<double?>("AudioPosition")
+                        .HasColumnType("REAL");
+
+                    b.Property<int?>("AudioTrackNumber")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("BookId")
                         .HasColumnType("INTEGER");
 
@@ -144,6 +153,9 @@ namespace QuimeraReader.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Note")

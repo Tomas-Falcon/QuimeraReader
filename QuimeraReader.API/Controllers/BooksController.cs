@@ -202,6 +202,7 @@ public class BooksController : ControllerBase
             Isbn = book.Isbn,
             Description = book.Description,
             AverageRating = book.AverageRating,
+            RatingsCount = book.RatingsCount,
             ProcessingStatus = book.ProcessingStatus == "SYNCED" ? "ALIGNED" : book.ProcessingStatus,
             Authors = book.Authors.Where(a => a.Author != null).Select(a => a.Author!.Name).ToList(),
             Categories = book.Categories.Where(c => c.Category != null).Select(c => c.Category!.Name).ToList(),
@@ -649,10 +650,6 @@ public class BooksController : ControllerBase
         public List<string> Categories { get; set; } = new();
     }
 
-    public class UpdateCoverRequest
-    {
-        public string ImageUrl { get; set; } = string.Empty;
-    }
     public class UpdatePositionRequest
     {
         public string? CurrentEpubCfi { get; set; }
@@ -678,7 +675,7 @@ public class BooksController : ControllerBase
         }
 
         book.LastReadAt = readAt;
-        if (book.ReadingStatus != "Read") book.ReadingStatus = "Reading";
+        book.ReadingStatus = ReadingProgressPolicy.StatusAfterProgress(book.ReadingStatus, request.PercentageCompleted);
         if (request.CurrentEpubCfi != null) book.CurrentEpubCfi = request.CurrentEpubCfi;
         if (request.CurrentAudioPosition.HasValue) book.CurrentAudioPosition = request.CurrentAudioPosition;
         if (request.CurrentAudioTrackNumber.HasValue) book.CurrentAudioTrackNumber = request.CurrentAudioTrackNumber;
@@ -883,38 +880,33 @@ public class BooksController : ControllerBase
         return Ok();
     }
 
+    /// <summary>
+    /// Portadas candidatas: la del propio EPUB y las de todos los proveedores, con su tamaño real y los datos del libro
+    /// al que pertenecen. Título y autor son editables (búsqueda aproximada); <paramref name="provider"/> filtra por origen.
+    /// </summary>
     [HttpGet("{bookId}/cover/search")]
-    public async Task<IActionResult> SearchCovers(int bookId)
+    public async Task<IActionResult> SearchCovers(int bookId, [FromQuery] string? title, [FromQuery] string? author, [FromQuery] string? provider,
+        [FromServices] CoverSearchService coverSearch, CancellationToken cancellationToken)
     {
-        var book = await _dbContext.Books.Include(b => b.Authors).ThenInclude(ba => ba.Author).FirstOrDefaultAsync(b => b.Id == bookId);
+        var book = await _dbContext.Books.Include(b => b.Authors).ThenInclude(ba => ba.Author).FirstOrDefaultAsync(b => b.Id == bookId, cancellationToken);
         if (book == null) return NotFound();
-
-        var author = book.Authors.FirstOrDefault()?.Author?.Name;
-        
-        Dictionary<string, string>? settings = null; // No need for settings for Goodreads/Storygraph right now
-
-        var allCovers = new List<string>();
-        foreach (var provider in _metadataProviders)
-        {
-            var covers = await provider.SearchCoversAsync(book.Title, author, settings);
-            if (covers != null)
-            {
-                allCovers.AddRange(covers);
-            }
-        }
-
-        var uniqueCovers = allCovers.Where(c => !string.IsNullOrWhiteSpace(c)).Distinct().Take(20).ToList();
-        return Ok(uniqueCovers);
+        return Ok(await coverSearch.SearchAsync(book, title, author, provider, cancellationToken));
     }
 
+    /// <summary>
+    /// Aplica una portada: se descarga y se guarda junto al libro (antes se guardaba la URL tal cual y la portada
+    /// dependía de que el servicio externo siguiera ahí). Opcionalmente completa sinopsis, puntuación y categorías.
+    /// </summary>
     [HttpPut("{bookId}/cover")]
-    public async Task<IActionResult> UpdateCover(int bookId, [FromBody] UpdateCoverRequest request)
+    public async Task<IActionResult> UpdateCover(int bookId, [FromBody] CoverSearchService.ApplyRequest request,
+        [FromServices] CoverSearchService coverSearch, CancellationToken cancellationToken)
     {
-        var book = await _dbContext.Books.FindAsync(bookId);
+        var book = await _dbContext.Books.FindAsync(new object[] { bookId }, cancellationToken);
         if (book == null) return NotFound();
-        
-        book.CoverImagePath = request.ImageUrl; // For simplicity, using URL directly. In a real app we might download it to local storage.
-        await _dbContext.SaveChangesAsync();
+
+        if (!await coverSearch.ApplyAsync(book, request, cancellationToken))
+            return BadRequest("No se pudo obtener una imagen válida de esa portada.");
+        await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok();
     }
 
@@ -951,7 +943,16 @@ public class BooksController : ControllerBase
         annotation.BookId = id;
         annotation.CreatedAt = DateTime.UtcNow;
         annotation.UpdatedAt = DateTime.UtcNow;
-        
+
+        // "Seguir escuchando aquí": una por libro, la nueva sustituye a la anterior
+        if (annotation.Kind == QuimeraReader.Domain.Entities.BookAnnotation.ListenKind)
+        {
+            var previous = await _dbContext.BookAnnotations
+                .Where(a => a.BookId == id && a.Kind == QuimeraReader.Domain.Entities.BookAnnotation.ListenKind)
+                .ToListAsync();
+            _dbContext.BookAnnotations.RemoveRange(previous);
+        }
+
         _dbContext.BookAnnotations.Add(annotation);
         await _dbContext.SaveChangesAsync();
 
@@ -971,7 +972,10 @@ public class BooksController : ControllerBase
                 a.SelectedText,
                 a.ColorHex,
                 a.Note,
-                a.CreatedAt
+                a.CreatedAt,
+                a.Kind,
+                a.AudioPosition,
+                a.AudioTrackNumber
             })
             .ToListAsync();
 

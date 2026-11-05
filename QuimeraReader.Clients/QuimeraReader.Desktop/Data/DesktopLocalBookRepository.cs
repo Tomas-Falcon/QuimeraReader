@@ -252,7 +252,13 @@ public class DesktopLocalBookRepository : ILocalBookRepository
         if (book != null)
         {
             if (!string.IsNullOrEmpty(cfi)) book.CurrentEpubCfi = cfi;
-            if (percentage.HasValue) book.PercentageCompleted = percentage.Value;
+            if (percentage.HasValue)
+            {
+                book.PercentageCompleted = percentage.Value;
+                // Mismo umbral que el servidor (ReadingProgressPolicy.FinishedPercentage): el lector envía 100 en la última página
+                if (percentage.Value >= 99.9) book.ReadingStatus = "Read";
+                else if (book.ReadingStatus != "Read") book.ReadingStatus = "Reading";
+            }
             if (audioPosition.HasValue) book.CurrentAudioPosition = audioPosition.Value;
             if (audioTrackNumber.HasValue) book.CurrentAudioTrackNumber = audioTrackNumber.Value;
             book.LastReadAt = System.DateTime.UtcNow;
@@ -288,7 +294,7 @@ public class DesktopLocalBookRepository : ILocalBookRepository
     public async Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId)
     {
         var queued = await GetQueuedAnnotationsAsync();
-        var dbAnns = await _dbContext.Books.Where(b => b.Id == bookId).SelectMany(b => b.Annotations).Select(a => new AnnotationDto { Id = a.Id, CfiRange = a.CfiRange, SelectedText = a.SelectedText, Note = a.Note, ColorHex = a.ColorHex, CreatedAt = a.CreatedAt }).ToListAsync();
+        var dbAnns = await _dbContext.Books.Where(b => b.Id == bookId).SelectMany(b => b.Annotations).Select(a => new AnnotationDto { Id = a.Id, CfiRange = a.CfiRange, SelectedText = a.SelectedText, Note = a.Note, ColorHex = a.ColorHex, CreatedAt = a.CreatedAt, Kind = a.Kind, AudioPosition = a.AudioPosition, AudioTrackNumber = a.AudioTrackNumber }).ToListAsync();
         foreach(var q in queued.Where(x => x.BookId == bookId)) {
             dbAnns.Add(new AnnotationDto { CfiRange = q.CfiRange, SelectedText = q.SelectedText, Note = q.Note, ColorHex = q.ColorHex });
         }
@@ -300,7 +306,7 @@ public class DesktopLocalBookRepository : ILocalBookRepository
         var book = await _dbContext.Books.Include(b => b.Annotations).FirstOrDefaultAsync(b => b.Id == bookId);
         if (book != null) {
             _dbContext.RemoveRange(book.Annotations);
-            book.Annotations = annotations.Select(a => new QuimeraReader.Domain.Entities.BookAnnotation { BookId = bookId, CfiRange = a.CfiRange, SelectedText = a.SelectedText, Note = a.Note, ColorHex = a.ColorHex, CreatedAt = a.CreatedAt }).ToList();
+            book.Annotations = annotations.Select(a => new QuimeraReader.Domain.Entities.BookAnnotation { BookId = bookId, CfiRange = a.CfiRange, SelectedText = a.SelectedText, Note = a.Note, ColorHex = a.ColorHex, CreatedAt = a.CreatedAt, Kind = a.Kind, AudioPosition = a.AudioPosition, AudioTrackNumber = a.AudioTrackNumber }).ToList();
             await _dbContext.SaveChangesAsync();
         }
     }

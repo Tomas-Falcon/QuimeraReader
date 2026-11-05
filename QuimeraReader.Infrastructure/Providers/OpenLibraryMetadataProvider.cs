@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using QuimeraReader.Domain.Interfaces;
 
@@ -22,13 +23,13 @@ public class OpenLibraryMetadataProvider : IMetadataProvider
         _logger = logger;
     }
 
-        public async Task<List<string>> SearchCoversAsync(string title, string? author, Dictionary<string, string>? settings = null)
+    public async Task<List<CoverCandidate>> SearchCoversAsync(string title, string? author, Dictionary<string, string>? settings = null)
     {
-        var covers = new List<string>();
+        var covers = new List<CoverCandidate>();
         string query = $"title={Uri.EscapeDataString(title)}";
         if (!string.IsNullOrWhiteSpace(author)) query += $"&author={Uri.EscapeDataString(author)}";
-        
-        string url = $"https://openlibrary.org/search.json?{query}&limit=10";
+
+        string url = $"https://openlibrary.org/search.json?{query}&limit=15&fields={SearchFields}";
 
         try
         {
@@ -37,10 +38,17 @@ public class OpenLibraryMetadataProvider : IMetadataProvider
             {
                 foreach (var doc in response.Docs)
                 {
-                    if (doc.CoverI.HasValue)
+                    if (!doc.CoverI.HasValue) continue;
+                    covers.Add(new CoverCandidate
                     {
-                        covers.Add($"https://covers.openlibrary.org/b/id/{doc.CoverI.Value}-L.jpg");
-                    }
+                        ImageUrl = $"https://covers.openlibrary.org/b/id/{doc.CoverI.Value}-L.jpg",
+                        Provider = ProviderName,
+                        Title = doc.Title,
+                        Authors = doc.AuthorName ?? new List<string>(),
+                        Categories = doc.Subject?.Take(5).ToList() ?? new List<string>(),
+                        Rating = doc.RatingsAverage,
+                        RatingsCount = doc.RatingsCount
+                    });
                 }
             }
         }
@@ -74,7 +82,7 @@ public class OpenLibraryMetadataProvider : IMetadataProvider
 
     private async Task<BookMetadata?> FetchFromOpenLibrary(string queryParams)
     {
-        string url = $"https://openlibrary.org/search.json?{queryParams}&limit=1";
+        string url = $"https://openlibrary.org/search.json?{queryParams}&limit=1&fields={SearchFields}";
 
         try
         {
@@ -105,10 +113,15 @@ public class OpenLibraryMetadataProvider : IMetadataProvider
     }
 
     internal class OpenLibraryResponse { public List<OpenLibraryDoc>? Docs { get; set; } }
-    internal class OpenLibraryDoc { 
-        public string? Title { get; set; } 
-        public List<string>? AuthorName { get; set; }
-        public int? CoverI { get; set; }
+    private const string SearchFields = "title,author_name,cover_i,subject,ratings_average,ratings_count";
+
+    // OpenLibrary responde en snake_case: sin estos nombres AuthorName y CoverI llegaban siempre vacíos
+    internal class OpenLibraryDoc {
+        public string? Title { get; set; }
+        [JsonPropertyName("author_name")] public List<string>? AuthorName { get; set; }
+        [JsonPropertyName("cover_i")] public int? CoverI { get; set; }
         public List<string>? Subject { get; set; }
+        [JsonPropertyName("ratings_average")] public double? RatingsAverage { get; set; }
+        [JsonPropertyName("ratings_count")] public int? RatingsCount { get; set; }
     }
 }

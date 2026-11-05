@@ -69,6 +69,24 @@ public class MaintenanceController : ControllerBase
         return started ? Accepted(_runner.GetStatus(CoversJob)) : Conflict(_runner.GetStatus(CoversJob));
     }
 
+    private const string RatingsJob = "ratings";
+
+    /// <summary>Estado del recálculo de puntuaciones y su último informe.</summary>
+    [HttpGet("ratings")]
+    public IActionResult RatingsStatus() => Ok(_runner.GetStatus(RatingsJob));
+
+    /// <summary>
+    /// Recalcula las puntuaciones quedándose con la de más votos (Hardcover, por la obra original). Por defecto solo
+    /// los libros sin puntuación fiable; all=true revisa todos. Va despacio a propósito (límite de peticiones de Hardcover).
+    /// </summary>
+    [HttpPost("ratings/run")]
+    public IActionResult RunRatings([FromQuery] bool all = false)
+    {
+        var started = _runner.TryStart(RatingsJob, new { all }, async (services, progress, _, token) =>
+            await services.GetRequiredService<RatingRefreshService>().RunAsync(all, progress, token));
+        return started ? Accepted(_runner.GetStatus(RatingsJob)) : Conflict(_runner.GetStatus(RatingsJob));
+    }
+
     private const string ResetPlanJob = "reset-plan";
     private const string ResetJob = "reset";
     public const string ResetConfirmation = "VACIAR";

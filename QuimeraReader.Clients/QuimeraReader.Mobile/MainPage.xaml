@@ -5,11 +5,12 @@
              xmlns:components="clr-namespace:QuimeraReader.Mobile.Components"
              xmlns:ios="clr-namespace:Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;assembly=Microsoft.Maui.Controls"
              ios:Page.UseSafeArea="True"
-             BackgroundColor="#09090b"
+             BackgroundColor="#1a1a1a"
              x:Class="QuimeraReader.Mobile.MainPage">
 
-    <Grid BackgroundColor="#09090b">
-        <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html" Margin="0">
+    <!-- Mismo fondo que la pantalla de arranque nativa y la de carga del HTML: sin destello blanco al abrir -->
+    <Grid BackgroundColor="#1a1a1a">
+        <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html" Margin="0" BackgroundColor="#1a1a1a">
             <BlazorWebView.RootComponents>
                 <RootComponent Selector="#app" ComponentType="{x:Type components:Routes}" />
             </BlazorWebView.RootComponents>

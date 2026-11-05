@@ -1,7 +1,7 @@
 ﻿@using QuimeraReader.Shared.Models
 @using QuimeraReader.Shared.Services
 
-<RadzenTabs>
+<RadzenTabs Change="OnTabChanged">
     <Tabs>
         <RadzenTabsItem Text="Metadatos">
             <div class="mb-3">
@@ -18,33 +18,95 @@
             </div>
         </RadzenTabsItem>
         <RadzenTabsItem Text="Portada">
-            <div class="mb-3">
-                <RadzenLabel Text="URL de la Portada (reemplazar)" />
-                <RadzenTextBox @bind-Value="_coverUrl" class="w-100" />
+            @* Buscador al estilo Jellyfin: filtros editables y una grilla con todas las portadas candidatas *@
+            <form class="cover-search-filters" @onsubmit="SearchCoversAsync" @onsubmit:preventDefault>
+                <div class="cover-filter cover-filter-wide">
+                    <RadzenLabel Text="@TranslationService["CoverSearch_Title"]" Component="cover-title" />
+                    <RadzenTextBox Name="cover-title" @bind-Value="_searchTitle" class="w-100" />
+                </div>
+                <div class="cover-filter">
+                    <RadzenLabel Text="@TranslationService["CoverSearch_Author"]" Component="cover-author" />
+                    <RadzenTextBox Name="cover-author" @bind-Value="_searchAuthor" class="w-100" />
+                </div>
+                <div class="cover-filter">
+                    <RadzenLabel Text="@TranslationService["CoverSearch_Provider"]" />
+                    <RadzenDropDown @bind-Value="_searchProvider" Data="@_providers" TextProperty="Label" ValueProperty="Value" class="w-100" />
+                </div>
+                <RadzenButton ButtonType="ButtonType.Submit" Text="@TranslationService["CoverSearch_Search"]" Icon="search" ButtonStyle="ButtonStyle.Primary" IsBusy="@_isSearchingCovers" class="cover-filter-button" />
+            </form>
+
+            <div class="cover-search-status">
+                @if (_isSearchingCovers)
+                {
+                    @TranslationService["CoverSearch_Searching"]
+                }
+                else if (_searched && _suggestedCovers.Count == 0)
+                {
+                    @TranslationService["CoverSearch_None"]
+                }
+                else if (_searched)
+                {
+                    @string.Format(TranslationService["CoverSearch_Count"], _suggestedCovers.Count)
+                }
             </div>
-            @if (!string.IsNullOrEmpty(Book?.CoverUrl))
-            {
-                            <div class="mb-3 d-flex align-items-center justify-content-between">
-                <RadzenButton Text="Buscar portadas online" Icon="search" ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Small" Click="SearchCoversAsync" IsBusy="@_isSearchingCovers" />
+
+            <div class="cover-grid">
+                @if (!string.IsNullOrEmpty(Book?.CoverUrl))
+                {
+                    <div class="cover-card cover-card-current @(_selected == null && string.IsNullOrWhiteSpace(_manualUrl) ? "selected" : "")" @onclick="() => SelectCover(null)">
+                        <div class="cover-image"><img src="@BookService.GetMediaUrl(Book.CoverUrl)" alt="" loading="lazy" /></div>
+                        <span class="cover-badge">@TranslationService["CoverSearch_Current"]</span>
+                    </div>
+                }
+                @foreach (var cover in _suggestedCovers)
+                {
+                    <div class="cover-card @(cover == _selected ? "selected" : "") @(cover.AuthorMatches ? "" : "other-author")" @onclick="() => SelectCover(cover)" title="@cover.Title">
+                        <div class="cover-image"><img src="@BookService.GetMediaUrl(cover.ImageUrl)" alt="" loading="lazy" /></div>
+                        <span class="cover-badge">@ProviderLabel(cover.Provider)</span>
+                        <div class="cover-info">
+                            @if (cover.Width.HasValue)
+                            {
+                                <div class="cover-size">@cover.Width × @cover.Height</div>
+                            }
+                            @if (cover.Provider != CoverSearchResult.EpubProvider)
+                            {
+                                <div class="cover-text">@cover.Title</div>
+                                <div class="cover-text cover-muted">@string.Join(", ", cover.Authors)</div>
+                            }
+                            @if (cover.Rating > 0)
+                            {
+                                <div class="cover-rating">★ @cover.Rating.Value.ToString("0.0") @(cover.RatingsCount > 0 ? $"({string.Format(TranslationService["CoverSearch_Votes"], cover.RatingsCount)})" : "")</div>
+                            }
+                            @if (!cover.AuthorMatches)
+                            {
+                                <div class="cover-warning">@TranslationService["CoverSearch_OtherAuthor"]</div>
+                            }
+                        </div>
+                    </div>
+                }
             </div>
-            @if (_suggestedCovers.Any())
+
+            @if (CanFillMissing)
             {
-                <div class="d-flex flex-wrap gap-2 mb-3" style="max-height: 250px; overflow-y: auto; background: var(--rz-base-background-color); padding: 10px; border-radius: 8px;">
-                    @foreach (var cover in _suggestedCovers)
+                <div class="mt-3">
+                    <RadzenCheckBox @bind-Value="_fillMissing" Name="cover-fill" />
+                    <RadzenLabel Text="@TranslationService["CoverSearch_FillMissing"]" Component="cover-fill" class="ms-2" />
+                    @if (BestRated is { } best)
                     {
-                        <img src="@cover" alt="Cover Option" style="width: 90px; height: 130px; object-fit: cover; cursor: pointer; border: @(cover == _coverUrl ? "3px solid var(--rz-primary)" : "1px solid #ccc"); border-radius: 4px; transition: transform 0.2s;" @onclick="() => SelectCover(cover)" />
+                        <div class="cover-search-status mt-1">@string.Format(TranslationService["CoverSearch_BestRating"], best.Rating!.Value.ToString("0.0"), best.RatingsCount!.Value.ToString("N0"), ProviderLabel(best.Provider))</div>
                     }
                 </div>
             }
-                <div class="text-center mt-3">
-                    <img src="@BookService.GetMediaUrl(Book.CoverUrl)" alt="Cover" style="max-height: 200px; object-fit: contain;" />
-                </div>
-            }
+
+            <div class="mt-3">
+                <RadzenLabel Text="@TranslationService["CoverSearch_ManualUrl"]" Component="cover-url" />
+                <RadzenTextBox Name="cover-url" @bind-Value="_manualUrl" @oninput="OnManualUrlInput" class="w-100" Placeholder="https://…" />
+            </div>
         </RadzenTabsItem>
     </Tabs>
 </RadzenTabs>
 
 <div class="mt-4 d-flex justify-content-end gap-2">
     <RadzenButton Text="Cancelar" ButtonStyle="ButtonStyle.Light" Click="() => DialogService.Close(false)" />
-    <RadzenButton Text="Guardar" ButtonStyle="ButtonStyle.Primary" Click="SaveAsync" />
+    <RadzenButton Text="Guardar" ButtonStyle="ButtonStyle.Primary" Click="SaveAsync" IsBusy="@_isSaving" />
 </div>

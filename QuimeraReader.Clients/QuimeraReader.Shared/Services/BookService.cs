@@ -34,7 +34,10 @@ public interface IBookService
     Task UpdateAnnotationAsync(int bookId, int annotationId, string colorHex, string note);
     Task DeleteAnnotationAsync(int bookId, int annotationId);
     Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId);
-    Task UpdateCoverAsync(int bookId, string imageUrl);
+    /// <summary>Crea la marca "Seguir escuchando aquí" (sustituye a la anterior del libro). null si no hay conexión.</summary>
+    Task<AnnotationDto?> SetListenMarkerAsync(int bookId, string cfiRange, string selectedText, double audioPosition, int audioTrackNumber);
+    Task<List<CoverSearchResult>> SearchCoversAsync(int bookId, string? title, string? author, string? provider);
+    Task UpdateCoverAsync(int bookId, UpdateCoverRequest request);
     Task SaveEpubLocationsAsync(int bookId, string locationsJson);
     void InvalidateCache();
     string BaseAddress { get; }
@@ -618,6 +621,31 @@ public class BookService : IBookService
         }
     }
 
+    public async Task<AnnotationDto?> SetListenMarkerAsync(int bookId, string cfiRange, string selectedText, double audioPosition, int audioTrackNumber)
+    {
+        // Sin conexión no se crea: la posición de audio ya se guardó en local con UpdatePositionAsync
+        if (_networkState.IsOffline) return null;
+        try
+        {
+            var payload = new
+            {
+                CfiRange = cfiRange,
+                SelectedText = selectedText,
+                Kind = AnnotationDto.ListenKind,
+                AudioPosition = audioPosition,
+                AudioTrackNumber = audioTrackNumber
+            };
+            var response = await _httpClient.PostAsJsonAsync($"api/Books/{bookId}/annotations", payload);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<AnnotationDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[BookService] No se pudo crear la marca de audio del libro {BookId}", bookId);
+            return null;
+        }
+    }
+
     public async Task<List<AnnotationDto>> GetAnnotationsAsync(int bookId)
     {
         try
@@ -746,9 +774,15 @@ public class BookService : IBookService
         InvalidateCache();
     }
 
-    public async Task UpdateCoverAsync(int bookId, string imageUrl)
+    public async Task<List<CoverSearchResult>> SearchCoversAsync(int bookId, string? title, string? author, string? provider)
     {
-        var request = new UpdateCoverRequest { ImageUrl = imageUrl };
+        var url = $"api/Books/{bookId}/cover/search?title={Uri.EscapeDataString(title ?? "")}&author={Uri.EscapeDataString(author ?? "")}";
+        if (!string.IsNullOrEmpty(provider)) url += $"&provider={Uri.EscapeDataString(provider)}";
+        return await _httpClient.GetFromJsonAsync<List<CoverSearchResult>>(url) ?? new List<CoverSearchResult>();
+    }
+
+    public async Task UpdateCoverAsync(int bookId, UpdateCoverRequest request)
+    {
         var response = await _httpClient.PutAsJsonAsync($"api/Books/{bookId}/cover", request);
         response.EnsureSuccessStatusCode();
         InvalidateCache();

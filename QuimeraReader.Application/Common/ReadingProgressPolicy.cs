@@ -10,6 +10,22 @@ namespace QuimeraReader.Application.Common;
 public static class ReadingProgressPolicy
 {
     /// <summary>
+    /// Porcentaje a partir del cual un libro se da por terminado. El lector envía 100 en la última página;
+    /// el margen absorbe redondeos de coma flotante.
+    /// </summary>
+    public const double FinishedPercentage = 99.9;
+
+    /// <summary>
+    /// Estado de lectura tras guardar progreso: llegar al final lo marca "Read"; un libro ya leído sigue "Read"
+    /// (solo vuelve a "Reading" si el usuario lo relee, y eso lo pide el cliente aparte); cualquier otro pasa a "Reading".
+    /// </summary>
+    public static string StatusAfterProgress(string? currentStatus, double? percentage)
+    {
+        if (percentage >= FinishedPercentage) return "Read";
+        return currentStatus == "Read" ? "Read" : "Reading";
+    }
+
+    /// <summary>
     /// Momento de lectura efectivo en UTC. Sin valor del cliente (lectura en directo) es "ahora";
     /// un reloj de dispositivo adelantado nunca puede fechar una lectura en el futuro.
     /// </summary>

@@ -11,6 +11,8 @@
 @inject QuimeraReader.Shared.Services.IScanService ScanService
 @inject QuimeraReader.Shared.Services.ISettingsService SettingsService
 @inject QuimeraReader.Shared.Services.ToastService ToastService
+@using Microsoft.Extensions.Logging
+@inject ILogger<ReaderPlayer> Logger
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 @namespace QuimeraReader.Shared.Components
@@ -65,11 +67,33 @@
                             <i class="bi bi-music-note-list"></i>
                         </button>
                     }
-                    <button class="btn btn-sm btn-outline-light" @onclick="ToggleImmersiveModeAsync" title="Modo lectura inmersiva (pantalla completa)">
+                    <button class="btn btn-sm btn-outline-light" @onclick="ToggleImmersiveModeAsync" title="@TranslationService["Reader_ImmersiveEnter"]">
                         <i class="bi bi-arrows-fullscreen"></i>
                     </button>
                 </div>
             </div>
+            }
+
+            @if (_isImmersiveMode && _showImmersiveControls)
+            {
+                <div class="immersive-controls" @onclick:stopPropagation="true">
+                    <button class="btn btn-sm btn-link text-white text-decoration-none" @onclick="GoBack" title="@TranslationService["Common_Back"]">
+                        <i class="bi bi-arrow-left"></i>
+                    </button>
+                    <div class="immersive-controls-title">
+                        <div class="text-truncate">@Book.Title</div>
+                        <small>@PageLabel · @($"{Math.Round(_displayPercentage, 1)}%")</small>
+                    </div>
+                    @if (Book.HasAudio)
+                    {
+                        <button class="btn btn-sm btn-outline-light rounded-circle" @onclick="ToggleAudioPlayPauseAsync" title="@(_isPlaying ? "Pausar" : "Reproducir")">
+                            <i class="bi @(_isPlaying ? "bi-pause-fill" : "bi-play-fill")"></i>
+                        </button>
+                    }
+                    <button class="btn btn-sm btn-light" @onclick="() => SetImmersiveModeAsync(false)">
+                        <i class="bi bi-fullscreen-exit me-1"></i>@TranslationService["Reader_ImmersiveExit"]
+                    </button>
+                </div>
             }
 
             @if (_showAppearanceMenu)
@@ -176,7 +200,7 @@
                     }
                     else
                     {
-                    <div class="d-flex justify-content-between align-items-center px-3 py-1" style="background: transparent; font-size: 0.7rem; color: rgba(255,255,255,0.35); cursor: pointer;" @onclick="ToggleImmersiveModeAsync" title="Toca para mostrar controles">
+                    <div class="d-flex justify-content-between align-items-center px-3 py-1" style="background: transparent; font-size: 0.7rem; color: rgba(255,255,255,0.35); cursor: pointer;" @onclick="ShowImmersiveControls" title="@TranslationService["Reader_ImmersiveShowControls"]">
                         <span>@PageLabel</span>
                         <span>@($"{Math.Round(_displayPercentage, 1)}%")</span>
                     </div>
@@ -353,10 +377,20 @@
     [Parameter]
     public int BookId { get; set; }
 
+    // "Volver a leer": abrir desde la primera página sin tocar el estado ni la posición guardada
+    // (el libro solo pasa a "Leyendo" si se pasa de página)
+    [Parameter]
+    public bool FromStart { get; set; }
+
     [Inject]
     public NavigationManager NavManager { get; set; } = default!;
 
     public Book? Book { get; set; }
+
+    private string? StartCfi => FromStart ? null : Book?.CurrentEpubCfi;
+
+    // Posición guardada al abrir el lector, para poder deshacer una relectura iniciada sin querer
+    private (string? Cfi, double? Percentage, double? Audio, int? Track) _positionAtOpen;
 
     private void GoBack()
     {
@@ -369,20 +403,52 @@
     private bool _isImmersiveMode = false;
     private bool _pageMovedSinceAudioSync = false;
 
+    // Modo inmersivo: se entra solo con su botón. Dentro, tocar el centro muestra una barra flotante (Volver, página,
+    // audio, Salir) que se oculta sola y no recoloca el texto. Antes cualquier clic en el centro de la página
+    // entraba o salía del modo, y para salir había que volver a acertar al centro.
+    private bool _showImmersiveControls = false;
+    private System.Threading.CancellationTokenSource? _immersiveControlsHideCts;
+    private const int ImmersiveControlsSeconds = 4;
+
     [JSInvokable]
-    public async Task OnCenterTap()
+    public Task OnCenterTap()
     {
-        if (_showAnnotationDialog || _showQuickSelectionPill) return;
-        await ToggleImmersiveModeAsync();
+        if (!_isImmersiveMode || _showAnnotationDialog || _showQuickSelectionPill) return Task.CompletedTask;
+        if (_showImmersiveControls) HideImmersiveControls();
+        else ShowImmersiveControls();
+        return Task.CompletedTask;
     }
 
-    private async Task ToggleImmersiveModeAsync()
+    [JSInvokable]
+    public async Task OnEscapeKey()
     {
-        _isImmersiveMode = !_isImmersiveMode;
-        if (_isImmersiveMode)
+        if (_isImmersiveMode) await SetImmersiveModeAsync(false);
+    }
+
+    [JSInvokable]
+    public async Task OnFullscreenExited()
+    {
+        if (_isImmersiveMode) await SetImmersiveModeAsync(false, exitBrowserFullscreen: false);
+    }
+
+    private Task ToggleImmersiveModeAsync() => SetImmersiveModeAsync(!_isImmersiveMode);
+
+    private async Task SetImmersiveModeAsync(bool enabled, bool exitBrowserFullscreen = true)
+    {
+        if (_isImmersiveMode == enabled) return;
+        _isImmersiveMode = enabled;
+        if (enabled)
         {
             _showAppearanceMenu = false;
             _showPlaylist = false;
+            if (_epubJsModule != null) await _epubJsModule.InvokeVoidAsync("enterFullscreen");
+            // Al entrar se ve un momento la barra, para que quede claro cómo salir
+            ShowImmersiveControls();
+        }
+        else
+        {
+            HideImmersiveControls();
+            if (exitBrowserFullscreen && _epubJsModule != null) await _epubJsModule.InvokeVoidAsync("exitFullscreen");
         }
         StateHasChanged();
         await Task.Delay(50);
@@ -390,6 +456,26 @@
         {
             await _epubJsModule.InvokeVoidAsync("resizeEpub");
         }
+    }
+
+    private void ShowImmersiveControls()
+    {
+        _showImmersiveControls = true;
+        _immersiveControlsHideCts?.Cancel();
+        var cts = _immersiveControlsHideCts = new System.Threading.CancellationTokenSource();
+        _ = Task.Delay(TimeSpan.FromSeconds(ImmersiveControlsSeconds), cts.Token).ContinueWith(t =>
+        {
+            if (!t.IsCanceled) InvokeAsync(HideImmersiveControls);
+        }, TaskScheduler.Default);
+        StateHasChanged();
+    }
+
+    private void HideImmersiveControls()
+    {
+        _immersiveControlsHideCts?.Cancel();
+        if (!_showImmersiveControls) return;
+        _showImmersiveControls = false;
+        StateHasChanged();
     }
 
     private async Task ToggleNavigationLock()
@@ -668,6 +754,8 @@
     // Página dentro del capítulo actual: a diferencia de _currentPage (bloques de "locations"), cambia en cada pantalla
     private int _chapterPage = 0;
     private int _chapterPages = 0;
+    // Abrir no es leer: solo se guarda progreso cuando en esta sesión se pasó de página o sonó el audio
+    private bool _hasReadThisSession = false;
 
     private string PageLabel => _chapterPages > 0
         ? $"Pág. {Math.Max(1, _chapterPage)} de {_chapterPages} del capítulo"
@@ -785,6 +873,7 @@
 
     private async Task ChangeTrackAsync(int trackNumber)
     {
+        _hasReadThisSession = true; // elegir una pista para escucharla es lectura
         _currentTrackNumber = trackNumber;
         _currentTime = 0;
         _lastSavedTime = -1;
@@ -832,15 +921,16 @@
     protected override async Task OnInitializedAsync()
     {
         Book = await BookService.GetBookAsync(BookId);
-        
+
         if (Book != null)
         {
+            _positionAtOpen = (Book.CurrentEpubCfi, Book.PercentageCompleted, Book.CurrentAudioPosition, Book.CurrentAudioTrackNumber);
             // Inicializar el número de pista antes del primer renderizado para evitar cargar la Pista 1 por error
-            if (Book.CurrentAudioTrackNumber.HasValue && Book.CurrentAudioTrackNumber.Value > 0)
+            if (!FromStart && Book.CurrentAudioTrackNumber.HasValue && Book.CurrentAudioTrackNumber.Value > 0)
             {
                 _currentTrackNumber = Book.CurrentAudioTrackNumber.Value;
             }
-            if (Book.CurrentAudioPosition.HasValue && Book.CurrentAudioPosition.Value > 0)
+            if (!FromStart && Book.CurrentAudioPosition.HasValue && Book.CurrentAudioPosition.Value > 0)
             {
                 _currentTime = Book.CurrentAudioPosition.Value;
             }
@@ -916,7 +1006,7 @@
                 await _jsModule.InvokeVoidAsync("initializePlayer", _audioElement, _dotNetRef);
                 await _jsModule.InvokeVoidAsync("setPlaybackRate", _audioElement, _playbackRate);
 
-                if (Book.CurrentAudioPosition.HasValue && Book.CurrentAudioPosition.Value > 0)
+                if (!FromStart && Book.CurrentAudioPosition.HasValue && Book.CurrentAudioPosition.Value > 0)
                 {
                     await _jsModule.InvokeVoidAsync("seekAudio", _audioElement, Book.CurrentAudioPosition.Value);
                 }
@@ -928,8 +1018,8 @@
                 _epubJsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/QuimeraReader.Shared/epubInterop.js");
 
                 // Si no hay CFI guardado pero sí hay posición de audio y mapa de sincronización, calcular porcentaje inicial
-                double initialPct = Book.PercentageCompleted ?? 0;
-                if (string.IsNullOrWhiteSpace(Book.CurrentEpubCfi) && initialPct <= 0 && _currentTime > 0 && _segments.Any())
+                double initialPct = FromStart ? 0 : (Book.PercentageCompleted ?? 0);
+                if (string.IsNullOrWhiteSpace(StartCfi) && initialPct <= 0 && _currentTime > 0 && _segments.Any())
                 {
                     var approx = GetApproximateAudioPercentage(_currentTime, _currentTrackNumber);
                     if (approx > 0) initialPct = approx * 100.0;
@@ -944,7 +1034,7 @@
                 {
                     if (epubFileUrl.StartsWith("blob:")) 
                     {
-                        await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubFileUrl, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
+                        await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubFileUrl, _dotNetRef, StartCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
                     }
                     else
                     {
@@ -952,7 +1042,7 @@
                         {
                             using var fileStream = System.IO.File.OpenRead(epubFileUrl);
                             using var streamRef = new DotNetStreamReference(stream: fileStream);
-                            await _epubJsModule.InvokeVoidAsync("initializeEpubFromStream", "epub-viewer", streamRef, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
+                            await _epubJsModule.InvokeVoidAsync("initializeEpubFromStream", "epub-viewer", streamRef, _dotNetRef, StartCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
                         }
                         catch (Exception ex)
                         {
@@ -966,7 +1056,7 @@
                     {
                         using var fileStream = System.IO.File.OpenRead(Book.LocalEpubPath);
                         using var streamRef = new DotNetStreamReference(stream: fileStream);
-                        await _epubJsModule.InvokeVoidAsync("initializeEpubFromStream", "epub-viewer", streamRef, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
+                        await _epubJsModule.InvokeVoidAsync("initializeEpubFromStream", "epub-viewer", streamRef, _dotNetRef, StartCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
                     }
                     catch (Exception ex)
                     {
@@ -976,13 +1066,14 @@
                 else
                 {
                     var epubApiUrl = BookService.GetMediaUrl(Book.EpubUrl);
-                    await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubApiUrl, _dotNetRef, Book.CurrentEpubCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
+                    await _epubJsModule.InvokeVoidAsync("initializeEpub", "epub-viewer", epubApiUrl, _dotNetRef, StartCfi, Book.EpubLocationsCache, initialPct, _currentTheme, _fontSize);
                 }
 
                 // Cargar y pintar anotaciones guardadas en el hilo de UI una vez inicializado el visor
                 try
                 {
                     _bookAnnotations = await BookService.GetAnnotationsAsync(BookId);
+                    ExtractListenMarker();
                     if (_bookAnnotations.Any() && _epubJsModule != null)
                     {
                         var json = System.Text.Json.JsonSerializer.Serialize(_bookAnnotations);
@@ -991,8 +1082,25 @@
                 }
                 catch { }
 
+                // "Seguir escuchando aquí" manda sobre la posición automática: el audio arranca en la marca
+                if (_listenMarker != null && !FromStart && _epubJsModule != null)
+                {
+                    await _epubJsModule.InvokeVoidAsync("setAudioBookmark", _listenMarker.CfiRange);
+                    if (_listenMarker.AudioPosition.HasValue)
+                    {
+                        int markerTrack = _listenMarker.AudioTrackNumber ?? 1;
+                        if (markerTrack != _currentTrackNumber && Book.AudioTracks != null && Book.AudioTracks.Any(t => t.TrackNumber == markerTrack))
+                        {
+                            _currentTrackNumber = markerTrack;
+                            StateHasChanged();
+                            await Task.Delay(80);
+                        }
+                        _currentTime = _listenMarker.AudioPosition.Value;
+                        if (_jsModule != null) await _jsModule.InvokeVoidAsync("seekAudio", _audioElement, _currentTime);
+                    }
+                }
                 // Si el usuario tenía posición de audio activa, resaltar o situar la marca de audio inicial
-                if (_currentTime > 0 && _segments.Any())
+                else if (_currentTime > 0 && _segments.Any())
                 {
                     var currentSeg = FindSegmentAtTime(_currentTime, _currentTrackNumber);
                     if (currentSeg != null && _epubJsModule != null)
@@ -1019,8 +1127,13 @@
     }
 
     [JSInvokable]
-    public void OnEpubLocationChanged(string cfi, double percentage, int currentPage = 0, int totalPages = 0, int chapterPage = 0, int chapterPages = 0)
+    public void OnEpubLocationChanged(string cfi, double percentage, int currentPage = 0, int totalPages = 0, int chapterPage = 0, int chapterPages = 0, bool userNavigated = false)
     {
+        if (userNavigated && !_hasReadThisSession)
+        {
+            _hasReadThisSession = true;
+            _ = StartRereadingIfReadAsync();
+        }
         _chapterPage = chapterPage;
         _chapterPages = chapterPages;
         double? scaledPercentage = percentage >= 0 ? (percentage * 100.0) : null;
@@ -1054,10 +1167,132 @@
             StateHasChanged();
         }
 
-        _ = System.Threading.Tasks.Task.Run(async () => {
-            try {
-                await BookService.UpdatePositionAsync(BookId, epubCfi: cfi, percentage: scaledPercentage, audioTrackNumber: Book?.HasAudio == true ? _currentTrackNumber : null);
-            } catch { }
+        // Abrir no es leer: el posicionamiento inicial no se guarda (no debe pisar lo leído en otro dispositivo)
+        if (!_hasReadThisSession) return;
+
+        _ = SavePagePositionAsync(cfi, scaledPercentage);
+    }
+
+    /// <summary>
+    /// Guarda la página leída. En libros sincronizados con audio (SyncMap) y con el audio parado, guarda también la
+    /// posición de audio del principio de esa página: libro y audio comparten posición, así cualquier dispositivo
+    /// reanuda el audio donde se llegó leyendo. Si el audio suena, la posición la marca el propio audio.
+    /// </summary>
+    private async Task SavePagePositionAsync(string cfi, double? percentage)
+    {
+        try
+        {
+            double? audioPosition = null;
+            int? audioTrack = Book?.HasAudio == true ? _currentTrackNumber : null;
+            if (Book?.HasAudio == true && !_isPlaying && _listenMarker == null && _segments.Any())
+            {
+                var segment = await FindSegmentAtPageStartAsync();
+                if (segment != null)
+                {
+                    audioPosition = segment.Start;
+                    audioTrack = segment.TrackNumber > 0 ? segment.TrackNumber : 1;
+                    Book.CurrentAudioPosition = audioPosition;
+                    Book.CurrentAudioTrackNumber = audioTrack;
+                }
+            }
+            await BookService.UpdatePositionAsync(BookId, epubCfi: cfi, audioPosition: audioPosition, percentage: percentage, audioTrackNumber: audioTrack);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "[Reader] No se pudo guardar la posición del libro {BookId}", BookId);
+        }
+    }
+
+    // Frase de audio con la que empieza la página visible (el principio del texto, no la mejor coincidencia de toda la página)
+    private async Task<SyncSegment?> FindSegmentAtPageStartAsync()
+    {
+        if (_epubJsModule == null) return null;
+        var visibleText = await _epubJsModule.InvokeAsync<string>("getVisiblePageText");
+        if (string.IsNullOrWhiteSpace(visibleText)) return null;
+        var pageStart = visibleText.Length > 160 ? visibleText.Substring(0, 160) : visibleText;
+        var best = FindBestMatchingSegment(pageStart, _displayPercentage);
+        return best == null ? null : SegmentWithPageOpening(best, visibleText) ?? best;
+    }
+
+    // Cuántas frases de audio se recorren desde el inicio de la página buscando la selección (una página son ~10-30)
+    private const int SelectionSearchSegments = 60;
+
+    /// <summary>La primera frase desde el inicio de la página (misma pista) que contiene el texto seleccionado.</summary>
+    private SyncSegment? FindSelectionNear(string selectedText, SyncSegment pageAnchor)
+    {
+        var selection = NormalizeForMatch(selectedText);
+        if (selection.Length < 3) return null;
+        // Selecciones largas: basta con su principio (puede cruzar varias frases)
+        var probe = selection.Length > 24 ? selection.Substring(0, 24) : selection;
+
+        int start = Math.Max(0, _segments.IndexOf(pageAnchor) - 1);
+        for (int i = start; i < _segments.Count && i < start + SelectionSearchSegments; i++)
+        {
+            var seg = _segments[i];
+            if (seg.TrackNumber != pageAnchor.TrackNumber) break;
+            var text = NormalizeForMatch(seg.Text);
+            var withNext = i + 1 < _segments.Count && _segments[i + 1].TrackNumber == seg.TrackNumber
+                ? text + NormalizeForMatch(_segments[i + 1].Text)
+                : text;
+            if (text.Contains(probe)) return seg;
+            // Cruza al principio de la frase siguiente: empieza en esta
+            if (withNext.Contains(probe) && !NormalizeForMatch(_segments[i + 1].Text).Contains(probe)) return seg;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// La frase que más se parece al comienzo de la página suele ser la que empieza después (la página arranca a mitad
+    /// de una frase del audio), y se saltaban sus primeras palabras. Se retrocede a la frase que contiene las primeras
+    /// palabras de la página: el audio arranca así en el inicio de la página o un poco antes.
+    /// </summary>
+    private SyncSegment? SegmentWithPageOpening(SyncSegment best, string visibleText)
+    {
+        var words = visibleText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        var opening = NormalizeForMatch(string.Join(" ", words.Take(4)));
+        if (opening.Length < 6) return null;
+
+        int index = _segments.IndexOf(best);
+        for (int back = 0; back <= 2 && index - back >= 0; back++)
+        {
+            var candidate = _segments[index - back];
+            if (candidate.TrackNumber != best.TrackNumber) break;
+            if (NormalizeForMatch(candidate.Text).Contains(opening)) return candidate;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Un libro "Leído" que se vuelve a leer (se pasa de página) pasa a "Leyendo", con la opción de deshacerlo
+    /// por si fue sin querer: Deshacer devuelve el estado y la posición anteriores y sale del lector.
+    /// </summary>
+    private async Task StartRereadingIfReadAsync()
+    {
+        if (Book == null || Book.ReadingStatus != "Read") return;
+
+        // La posición guardada al abrir: la de ahora ya la movió el posicionamiento inicial (p. ej. al principio)
+        var (previousCfi, previousPercentage, previousAudio, previousTrack) = _positionAtOpen;
+        Book.ReadingStatus = "Reading";
+        try
+        {
+            await BookService.BulkUpdateStatusAsync(new List<int> { BookId }, "Reading");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "[Reader] No se pudo marcar como Leyendo el libro {BookId}", BookId);
+        }
+
+        ToastService.ShowWithAction(string.Format(TranslationService["Reader_Rereading"], Book.Title), TranslationService["Action_Undo"], async () =>
+        {
+            _hasReadThisSession = false; // lo que se haya pasado de página no cuenta
+            Book.ReadingStatus = "Read";
+            Book.CurrentEpubCfi = previousCfi;
+            Book.PercentageCompleted = previousPercentage;
+            Book.CurrentAudioPosition = previousAudio;
+            Book.CurrentAudioTrackNumber = previousTrack;
+            await BookService.UpdatePositionAsync(BookId, previousCfi, previousAudio, previousPercentage, previousTrack);
+            await BookService.BulkUpdateStatusAsync(new List<int> { BookId }, "Read");
+            await InvokeAsync(GoBack);
         });
     }
 
@@ -1068,6 +1303,49 @@
     }
 
     private List<QuimeraReader.Shared.Models.AnnotationDto>? _bookAnnotations;
+    // "Seguir escuchando aquí" (una por libro); va aparte de las marcas normales, que se pintan con applyAllAnnotations
+    private QuimeraReader.Shared.Models.AnnotationDto? _listenMarker;
+
+    private void ExtractListenMarker()
+    {
+        if (_bookAnnotations == null) return;
+        _listenMarker = _bookAnnotations.FirstOrDefault(a => a.IsListenMarker);
+        _bookAnnotations.RemoveAll(a => a.IsListenMarker);
+    }
+
+    // Tocar la marca naranja: si es "Seguir escuchando aquí", ofrecer quitarla
+    [JSInvokable]
+    public Task OnAudioBookmarkClicked()
+    {
+        if (_listenMarker == null) return Task.CompletedTask;
+        ToastService.ShowWithAction(TranslationService["Reader_ListenMarkerTapped"], TranslationService["Action_Remove"], RemoveListenMarkerAsync);
+        return Task.CompletedTask;
+    }
+
+    private async Task RemoveListenMarkerAsync()
+    {
+        var marker = _listenMarker;
+        if (marker == null) return;
+        _listenMarker = null;
+        if (_epubJsModule != null) await _epubJsModule.InvokeVoidAsync("clearAudioBookmark");
+        try { await BookService.DeleteAnnotationAsync(BookId, marker.Id); }
+        catch (Exception ex) { Logger.LogWarning(ex, "[Reader] No se pudo quitar la marca de escucha del libro {BookId}", BookId); }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // La marca se consume cuando el audio ya pasó por ella
+    private async Task ConsumeListenMarkerIfPassedAsync()
+    {
+        var marker = _listenMarker;
+        if (marker == null || !_isPlaying || !marker.AudioPosition.HasValue) return;
+        int markerTrack = marker.AudioTrackNumber ?? 1;
+        bool passed = _currentTrackNumber > markerTrack || (_currentTrackNumber == markerTrack && _currentTime > marker.AudioPosition.Value + 5);
+        if (!passed) return;
+
+        _listenMarker = null;
+        if (_epubJsModule != null) await _epubJsModule.InvokeVoidAsync("clearAudioBookmark");
+        try { await BookService.DeleteAnnotationAsync(BookId, marker.Id); } catch { }
+    }
     private bool _showQuickSelectionPill = false;
     private bool _showAnnotationDialog = false;
     private int? _editingAnnotationId = null;
@@ -1147,7 +1425,11 @@
 
         if (!string.IsNullOrEmpty(_selectedText) && _segments != null && _segments.Any())
         {
-            var match = FindBestMatchingSegment(_selectedText, _displayPercentage);
+            // Primero cerca de la página visible: una selección corta ("control") aparece muchas veces en el audio, y el
+            // porcentaje del texto no sirve para desempatar (el EPUB tiene páginas que no se narran)
+            var pageAnchor = await FindSegmentAtPageStartAsync();
+            var match = (pageAnchor != null ? FindSelectionNear(_selectedText, pageAnchor) : null)
+                        ?? FindBestMatchingSegment(_selectedText, _displayPercentage);
 
             if (match != null)
             {
@@ -1170,12 +1452,20 @@
                     await _epubJsModule.InvokeVoidAsync("setAudioBookmark", _selectedCfi);
                 }
 
+                _hasReadThisSession = true; // fijar dónde seguir escuchando es una decisión de lectura
                 await BookService.UpdatePositionAsync(BookId, epubCfi: _selectedCfi, audioPosition: startOffset, percentage: _displayPercentage, audioTrackNumber: _currentTrackNumber);
+
+                // Sin reproducir: queda como marca "Seguir escuchando aquí", que sobrevive al cierre y viaja a otros dispositivos.
+                // Reproduciendo ya desde aquí no hace falta marca (el audio avanza desde ese punto).
+                if (!autoPlay && !string.IsNullOrEmpty(_selectedCfi))
+                {
+                    _listenMarker = await BookService.SetListenMarkerAsync(BookId, _selectedCfi, _selectedText ?? "", startOffset, _currentTrackNumber) ?? _listenMarker;
+                }
 
                 if (autoPlay)
                 {
                     await SeekToSegmentAsync(match, startOffset);
-                    ToastService.ShowSuccess("Reproduciendo desde el fragmento seleccionado.");
+                    ToastService.ShowSuccess(TranslationService["Reader_PlayingFromSelection"]);
                 }
                 else
                 {
@@ -1183,7 +1473,7 @@
                     {
                         await _jsModule.InvokeVoidAsync("seekAudio", _audioElement, startOffset);
                     }
-                    ToastService.ShowSuccess("Marca de audiolibro establecida y guardada.");
+                    ToastService.ShowSuccess(TranslationService["Reader_ListenMarkerSet"]);
                 }
             }
             else
@@ -1255,6 +1545,7 @@
                 {
                     await BookService.CreateAnnotationAsync(BookId, _selectedCfi, _selectedText, color, _annotationNote);
                     _bookAnnotations = await BookService.GetAnnotationsAsync(BookId);
+                    ExtractListenMarker();
                     ToastService.ShowSuccess("Anotación guardada.");
                 }
 
@@ -1325,6 +1616,10 @@
     [JSInvokable]
     public async Task OnTimeUpdate(double time)
     {
+        // Al cambiar de pista el reproductor recarga y avisa con 0 antes de colocarse: no es una posición real.
+        // Sin este filtro, fijar una marca en otra pista llevaba la página al principio del libro.
+        if (!_isPlaying && time < 0.5 && _currentTime > 1) return;
+
         _currentTime = time;
         if (Book != null)
         {
@@ -1350,9 +1645,11 @@
             
             if (_epubJsModule != null)
             {
-                var karaokeCfi = await _epubJsModule.InvokeAsync<string?>("highlightKaraokePhrase", activeSegment.Text, !_showAudiobookMode);
+                // Solo el audio sonando mueve la página; en pausa manda la lectura (el audio la sigue a ella)
+                bool followAudio = !_showAudiobookMode && _isPlaying;
+                var karaokeCfi = await _epubJsModule.InvokeAsync<string?>("highlightKaraokePhrase", activeSegment.Text, followAudio);
                 // Si la frase no estaba en el capítulo actual del EPUB y el segmento conoce su capítulo, saltar automáticamente al nuevo capítulo
-                if (string.IsNullOrEmpty(karaokeCfi) && !_showAudiobookMode && (activeSegment.SpineIndex.HasValue || !string.IsNullOrEmpty(activeSegment.ChapterHref)))
+                if (string.IsNullOrEmpty(karaokeCfi) && followAudio && (activeSegment.SpineIndex.HasValue || !string.IsNullOrEmpty(activeSegment.ChapterHref)))
                 {
                     karaokeCfi = await _epubJsModule.InvokeAsync<string?>(
                         "navigateToSegmentText",
@@ -1362,7 +1659,7 @@
                         activeSegment.ChapterHref ?? "");
                 }
 
-                if (!string.IsNullOrEmpty(karaokeCfi) && Book != null)
+                if (followAudio && !string.IsNullOrEmpty(karaokeCfi) && Book != null)
                 {
                     Book.CurrentEpubCfi = karaokeCfi;
                     _pageMovedSinceAudioSync = false;
@@ -1374,8 +1671,12 @@
             }
         }
 
+        // Reproducir es leer; colocar el audio en la posición guardada al abrir el libro no lo es
+        if (_isPlaying) _hasReadThisSession = true;
+        _ = ConsumeListenMarkerIfPassedAsync();
+
         // Guardar progreso cada 5 segundos incluyendo tanto audio como CFI y porcentaje calculado
-        if (_lastSavedTime == -1 || Math.Abs(time - _lastSavedTime) > 5)
+        if (_hasReadThisSession && (_lastSavedTime == -1 || Math.Abs(time - _lastSavedTime) > 5))
         {
             _lastSavedTime = time;
             double? pctToSave = Book?.PercentageCompleted;
@@ -1410,8 +1711,15 @@
     public async Task OnPlayStateChanged(bool isPlaying)
     {
         _isPlaying = isPlaying;
+        if (_isPlaying) _hasReadThisSession = true;
         if (!_isPlaying)
         {
+            // Pausa sin haber reproducido en esta sesión (p. ej. al cargar): no hay nada que guardar
+            if (!_hasReadThisSession)
+            {
+                StateHasChanged();
+                return;
+            }
             if (_epubJsModule != null)
             {
                 var pausedCfi = await _epubJsModule.InvokeAsync<string?>("convertKaraokeToHardMark");
@@ -1469,7 +1777,8 @@
 
     public async ValueTask DisposeAsync()
     {
-        if (Book != null && (!string.IsNullOrEmpty(Book.CurrentEpubCfi) || _currentTime > 0 || Book.PercentageCompleted.HasValue))
+        _immersiveControlsHideCts?.Cancel();
+        if (_hasReadThisSession && Book != null && (!string.IsNullOrEmpty(Book.CurrentEpubCfi) || _currentTime > 0 || Book.PercentageCompleted.HasValue))
         {
             try
             {

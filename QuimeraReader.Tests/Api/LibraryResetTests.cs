@@ -34,7 +34,7 @@ public class LibraryResetTests : IAsyncLifetime
             Calls++;
             return Task.FromResult<BookMetadata?>(null);
         }
-        public Task<List<string>> SearchCoversAsync(string title, string? author, Dictionary<string, string>? settings = null) => Task.FromResult(new List<string>());
+        public Task<List<CoverCandidate>> SearchCoversAsync(string title, string? author, Dictionary<string, string>? settings = null) => Task.FromResult(new List<CoverCandidate>());
     }
 
     private readonly CountingProvider _provider = new();

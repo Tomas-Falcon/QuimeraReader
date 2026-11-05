@@ -27,7 +27,7 @@ public class GoodreadsScraperProvider : IMetadataProvider
         return null;
     }
 
-    public async Task<List<string>> SearchCoversAsync(string title, string? author, Dictionary<string, string>? settings = null)
+    public async Task<List<CoverCandidate>> SearchCoversAsync(string title, string? author, Dictionary<string, string>? settings = null)
     {
         var covers = new List<string>();
         try
@@ -74,6 +74,6 @@ public class GoodreadsScraperProvider : IMetadataProvider
         {
             _logger.LogWarning(ex, "GoodreadsScraper: error buscando covers para '{Title}'", title);
         }
-        return covers.Distinct().ToList();
+        return covers.Distinct().Select(u => new CoverCandidate { ImageUrl = u, Provider = ProviderName }).ToList();
     }
 }

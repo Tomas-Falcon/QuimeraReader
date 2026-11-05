@@ -51,6 +51,19 @@ public class MediaController : ControllerBase
     private Task<string?> GetLibraryRootAsync() =>
         _dbContext.SystemSettings.Where(s => s.Key == "LibraryRootPath").Select(s => s.Value).FirstOrDefaultAsync();
 
+    /// <summary>La portada que trae el propio EPUB, para ofrecerla en el editor aunque se haya reemplazado.</summary>
+    [HttpGet("books/{id}/epub-cover")]
+    public async Task<IActionResult> GetEpubCover(int id, [FromServices] CoverSearchService coverSearch)
+    {
+        var book = await _dbContext.Books.FindAsync(id);
+        if (book == null) return NotFound();
+
+        var bytes = await coverSearch.ReadEpubCoverAsync(book);
+        if (!CoverRepairService.IsImage(bytes)) return NotFound();
+        var mime = CoverRepairService.ImageExtension(bytes!) switch { ".png" => "image/png", ".gif" => "image/gif", ".webp" => "image/webp", _ => "image/jpeg" };
+        return File(bytes!, mime);
+    }
+
     [HttpGet("books/{id}/cover")]
     [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Client)]
     public async Task<IActionResult> GetCover(int id, [FromServices] CoverRepairService coverRepair)

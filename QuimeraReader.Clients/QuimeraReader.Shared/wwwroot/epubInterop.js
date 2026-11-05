@@ -168,6 +168,9 @@ function applyReaderTheme(rendition, themeName) {
 
 function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocationsCache, initialPercentage, initialTheme, initialFontSize) {
     window._epubLocationsReady = false;
+    // Abrir no es leer: hasta que el usuario pase de página (o el karaoke lo haga al sonar el audio) las
+    // reubicaciones son solo de posicionamiento y no deben guardarse como progreso
+    window._epubUserNavigated = false;
     window._epubCurrentTheme = initialTheme || "dark";
     window._epubAnnotationsList = [];
     window._lastMarkClickedTime = 0;
@@ -281,7 +284,7 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
                     chapterPages = location.start.displayed.total || 0;
                 }
             } catch (e) {}
-            dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage, currentPage, totalPages, chapterPage, chapterPages).catch(e => { console.error("Interop Error OnEpubLocationChanged:", e); });
+            dotNetRef.invokeMethodAsync("OnEpubLocationChanged", location.start.cfi, percentage, currentPage, totalPages, chapterPage, chapterPages, !!window._epubUserNavigated).catch(e => { console.error("Interop Error OnEpubLocationChanged:", e); });
         }
     }
 
@@ -346,6 +349,25 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         return clientY;
     }
 
+    // ¿El punto del evento (coordenadas del iframe) cae sobre una marca? Las marcas se dibujan en un SVG fuera del iframe
+    function isPointOnMark(event) {
+        try {
+            var point = event.changedTouches && event.changedTouches.length > 0 ? event.changedTouches[0] : event;
+            var frame = event.view && event.view.frameElement;
+            var offset = frame ? frame.getBoundingClientRect() : { left: 0, top: 0 };
+            var x = point.clientX + offset.left;
+            var y = point.clientY + offset.top;
+            var host = document.getElementById(elementId);
+            var shapes = host ? host.querySelectorAll("svg g[data-epubcfi] rect, svg g[data-epubcfi] line") : [];
+            for (var i = 0; i < shapes.length; i++) {
+                var r = shapes[i].getBoundingClientRect();
+                // Margen vertical: el subrayado es una línea de 2-4 px
+                if (r.width > 0 && x >= r.left && x <= r.right && y >= r.top - 6 && y <= r.bottom + 6) return true;
+            }
+        } catch (e) {}
+        return false;
+    }
+
     // Ancho del visor visible (nunca el del iframe, que mide todo el capítulo)
     function getContainerWidth() {
         var viewerEl = document.getElementById(elementId);
@@ -398,6 +420,10 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         if (window.navigationLocked) return;
         if (Date.now() - (window._lastMarkClickedTime || 0) < 400) return;
 
+        // Toque sobre una marca: la abre su propio manejador. Sin esto el toque central mostraba u ocultaba la barra,
+        // el lector se desplazaba antes del click y epub.js ya no lo encontraba sobre la marca (no se podía quitar)
+        if (isPointOnMark(event)) return;
+
         // Ignorar clics sobre enlaces o marcas interactivas
         if (event && event.target) {
             var tag = (event.target.tagName || "").toUpperCase();
@@ -444,18 +470,32 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         }
     }
 
+    // Esc sale del modo inmersivo (también con el foco dentro del iframe del libro)
+    const notifyEscape = () => {
+        if (dotNetRef) dotNetRef.invokeMethodAsync("OnEscapeKey").catch(e => {});
+    };
+
     rendition.on("keyup", event => {
         if (event.key === "ArrowLeft") rendition.prev();
         if (event.key === "ArrowRight") rendition.next();
+        if (event.key === "Escape") notifyEscape();
     });
 
     const globalKeyHandler = event => {
         if (event.target && (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA")) return;
         if (event.key === "ArrowLeft") { try { rendition.prev(); } catch (e) {} }
         if (event.key === "ArrowRight") { try { rendition.next(); } catch (e) {} }
+        if (event.key === "Escape") notifyEscape();
     };
     document.addEventListener("keyup", globalKeyHandler);
     window._epubGlobalKeyHandler = globalKeyHandler;
+
+    // Si el navegador sale de pantalla completa (Esc, F11, gesto), se sale también del modo inmersivo
+    const fullscreenHandler = () => {
+        if (!document.fullscreenElement && dotNetRef) dotNetRef.invokeMethodAsync("OnFullscreenExited").catch(e => {});
+    };
+    document.addEventListener("fullscreenchange", fullscreenHandler);
+    window._epubFullscreenHandler = fullscreenHandler;
 
     rendition.on("markClicked", function (cfiRange, data) {
         window._lastMarkClickedTime = Date.now();
@@ -463,6 +503,13 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
             dotNetRef.invokeMethodAsync("OnAnnotationClicked", cfiRange).catch(e => {});
         }
     });
+
+    // Toda navegación de página (toques, deslizar, teclas, botones y el karaoke) pasa por next/prev:
+    // a partir de la primera, lo que se reubica ya es lectura y se guarda
+    var originalNext = rendition.next.bind(rendition);
+    var originalPrev = rendition.prev.bind(rendition);
+    rendition.next = function () { window._epubUserNavigated = true; return originalNext(); };
+    rendition.prev = function () { window._epubUserNavigated = true; return originalPrev(); };
 
     window.epubBook = book;
     window.epubRendition = rendition;
@@ -486,6 +533,22 @@ export function clearTextSelection() {
         if (window.getSelection) {
             window.getSelection().removeAllRanges();
         }
+    } catch (e) {}
+}
+
+// Pantalla completa real donde el navegador lo permite (web y escritorio). En el WebView de Android no existe:
+// ahí el modo inmersivo solo oculta los controles.
+export async function enterFullscreen() {
+    try {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+        }
+    } catch (e) {}
+}
+
+export async function exitFullscreen() {
+    try {
+        if (document.fullscreenElement) await document.exitFullscreen();
     } catch (e) {}
 }
 
@@ -670,6 +733,13 @@ export function destroyEpub() {
             document.removeEventListener("keyup", window._epubGlobalKeyHandler);
             window._epubGlobalKeyHandler = null;
         }
+        if (window._epubFullscreenHandler) {
+            document.removeEventListener("fullscreenchange", window._epubFullscreenHandler);
+            window._epubFullscreenHandler = null;
+        }
+        if (document.fullscreenElement) {
+            try { document.exitFullscreen(); } catch (e) {}
+        }
         if (window._epubGlobalMouseUpHandler) {
             window.removeEventListener("mouseup", window._epubGlobalMouseUpHandler);
             window._epubGlobalMouseUpHandler = null;
@@ -695,6 +765,8 @@ export function goToPercentage(pct) {
     if (window.epubBook && window.epubBook.locations && window.epubBook.locations.total > 0) {
         var cfi = window.epubBook.locations.cfiFromPercentage(Math.min(1.0, Math.max(0.0, pct / 100.0)));
         if (cfi && window.epubRendition) {
+            // Mover la barra de progreso es una decisión del usuario: cuenta como lectura
+            window._epubUserNavigated = true;
             window.epubRendition.display(cfi);
             return true;
         }
@@ -851,7 +923,15 @@ export function setAudioBookmark(cfiRange) {
             window.currentAudioBookmarkCfi = cfiRange;
             window.lastKaraokeCfi = cfiRange;
             try {
-                window.epubRendition.annotations.underline(cfiRange, {}, () => {}, "", {
+                window.epubRendition.annotations.underline(cfiRange, {}, () => {
+                    // En el móvil un toque llega como touchstart y como click: un solo aviso
+                    if (Date.now() - (window._lastAudioMarkTap || 0) < 800) return;
+                    window._lastAudioMarkTap = Date.now();
+                    window._lastMarkClickedTime = Date.now();
+                    if (window.epubDotNetRef) {
+                        window.epubDotNetRef.invokeMethodAsync("OnAudioBookmarkClicked").catch(e => {});
+                    }
+                }, "", {
                     "stroke": "#ff9800",
                     "stroke-width": "4px",
                     "stroke-opacity": "1.0",
