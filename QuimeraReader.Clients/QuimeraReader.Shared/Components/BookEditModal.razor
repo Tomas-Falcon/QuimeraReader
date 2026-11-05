@@ -53,33 +53,33 @@
             <div class="cover-grid">
                 @if (!string.IsNullOrEmpty(Book?.CoverUrl))
                 {
-                    <div class="cover-card cover-card-current @(_selected == null && string.IsNullOrWhiteSpace(_manualUrl) ? "selected" : "")" @onclick="() => SelectCover(null)">
-                        <div class="cover-image"><img src="@BookService.GetMediaUrl(Book.CoverUrl)" alt="" loading="lazy" /></div>
-                        <span class="cover-badge">@TranslationService["CoverSearch_Current"]</span>
+                    <div class="cover-option cover-option-current @(_selected == null && string.IsNullOrWhiteSpace(_manualUrl) ? "selected" : "")" @onclick="() => SelectCover(null)">
+                        <div class="cover-option-image"><img src="@BookService.GetMediaUrl(Book.CoverUrl)" alt="" loading="lazy" /></div>
+                        <span class="cover-option-badge">@TranslationService["CoverSearch_Current"]</span>
                     </div>
                 }
                 @foreach (var cover in _suggestedCovers)
                 {
-                    <div class="cover-card @(cover == _selected ? "selected" : "") @(cover.AuthorMatches ? "" : "other-author")" @onclick="() => SelectCover(cover)" title="@cover.Title">
-                        <div class="cover-image"><img src="@BookService.GetMediaUrl(cover.ImageUrl)" alt="" loading="lazy" /></div>
-                        <span class="cover-badge">@ProviderLabel(cover.Provider)</span>
-                        <div class="cover-info">
+                    <div class="cover-option @(cover == _selected ? "selected" : "") @(cover.AuthorMatches ? "" : "other-author")" @onclick="() => SelectCover(cover)" title="@cover.Title">
+                        <div class="cover-option-image"><img src="@BookService.GetMediaUrl(cover.ImageUrl)" alt="" loading="lazy" /></div>
+                        <span class="cover-option-badge">@ProviderLabel(cover.Provider)</span>
+                        <div class="cover-option-info">
                             @if (cover.Width.HasValue)
                             {
-                                <div class="cover-size">@cover.Width × @cover.Height</div>
+                                <div class="cover-option-size">@cover.Width × @cover.Height</div>
                             }
                             @if (cover.Provider != CoverSearchResult.EpubProvider)
                             {
-                                <div class="cover-text">@cover.Title</div>
-                                <div class="cover-text cover-muted">@string.Join(", ", cover.Authors)</div>
+                                <div class="cover-option-text">@cover.Title</div>
+                                <div class="cover-option-text cover-option-muted">@string.Join(", ", cover.Authors)</div>
                             }
                             @if (cover.Rating > 0)
                             {
-                                <div class="cover-rating">★ @cover.Rating.Value.ToString("0.0") @(cover.RatingsCount > 0 ? $"({string.Format(TranslationService["CoverSearch_Votes"], cover.RatingsCount)})" : "")</div>
+                                <div class="cover-option-rating">★ @cover.Rating.Value.ToString("0.0") @(cover.RatingsCount > 0 ? $"({string.Format(TranslationService["CoverSearch_Votes"], cover.RatingsCount)})" : "")</div>
                             }
                             @if (!cover.AuthorMatches)
                             {
-                                <div class="cover-warning">@TranslationService["CoverSearch_OtherAuthor"]</div>
+                                <div class="cover-option-warning">@TranslationService["CoverSearch_OtherAuthor"]</div>
                             }
                         </div>
                     </div>
