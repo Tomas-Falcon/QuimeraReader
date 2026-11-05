@@ -282,7 +282,8 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
                 provider.ProviderName, query, authorHint ?? "N/A", extractedIsbns.Any() ? string.Join(",", extractedIsbns) : "Ninguno");
                 
             metadata = await provider.GetMetadataAsync(query, isbns: extractedIsbns, settings: settingsDict, authorHint: authorHint);
-            
+            metadata = RejectIfOtherAuthor(metadata, authorHint, provider.ProviderName, query);
+
             if (metadata != null)
             {
                 _logger.LogInformation("Metadatos obtenidos de {ProviderName} para '{Title}' (Rating: {HasRating})", 
@@ -513,8 +514,8 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
             book.ProcessingStatus = "NONE"; // No hay audio
         }
 
-        // Guardar Carátula (priorizando la de la API si se obtuvo)
-        byte[]? finalCoverBytes = apiCoverBytes ?? epubBook.CoverImage;
+        // Carátula: la del EPUB salvo que no haya o la de internet sea claramente más grande
+        byte[]? finalCoverBytes = CoverPolicy.Choose(epubBook.CoverImage, apiCoverBytes);
         if (finalCoverBytes != null)
         {
             string coverPath = Path.Combine(bookSubDir, "cover.jpg");
@@ -560,6 +561,16 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
         return book;
     }
 
+    // Un resultado de otro autor es otro libro: sus datos y su portada no sirven (p. ej. "Drive" de Corey recibía la
+    // portada de un libro de hacking). Así se pasa al siguiente proveedor.
+    private BookMetadata? RejectIfOtherAuthor(BookMetadata? metadata, string? authorHint, string providerName, string query)
+    {
+        if (metadata == null || CoverPolicy.AuthorsMatch(authorHint, metadata.Authors)) return metadata;
+        _logger.LogInformation("{Provider} devolvió '{FoundTitle}' de {FoundAuthors} para '{Title}' (autor {Author}): descartado por autor distinto",
+            providerName, metadata.Title, string.Join(", ", metadata.Authors), query, authorHint);
+        return null;
+    }
+
     public async Task EnrichMetadataAsync(Book book, string preferredProviderName)
     {
         var settingsDict = await _dbContext.SystemSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
@@ -578,7 +589,8 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
                 provider.ProviderName, query, authorHint ?? "N/A", book.Isbn ?? "Ninguno");
                 
             metadata = await provider.GetMetadataAsync(query, isbns: isbnsList, settings: settingsDict, authorHint: authorHint);
-            
+            metadata = RejectIfOtherAuthor(metadata, authorHint, provider.ProviderName, query);
+
             if (metadata != null)
             {
                 _logger.LogInformation("Metadatos obtenidos de {ProviderName} para '{Title}' (Rating: {HasRating})", 
@@ -659,19 +671,28 @@ public class EpubScannerService : QuimeraReader.Application.Interfaces.IEpubScan
                 try
                 {
                     var imageBytes = await _httpClient.GetByteArrayAsync(metadata.CoverImageUri);
-                    
-                    settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
-                    if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
-                    
-                    string mainAuthor = book.Authors.FirstOrDefault()?.Author.Name ?? "Unknown Author";
-                    string safeAuthor = GetSafeFilename(mainAuthor);
-                    string safeTitle = GetSafeFilename(book.Title);
-                    string bookSubDir = Path.Combine(libraryRoot, safeAuthor, safeTitle);
-                    
-                    Directory.CreateDirectory(bookSubDir);
-                    string coverPath = Path.Combine(bookSubDir, "cover.jpg");
-                    await File.WriteAllBytesAsync(coverPath, imageBytes);
-                    book.CoverImagePath = coverPath;
+
+                    // Solo si no tiene portada o la nueva es claramente más grande (antes pisaba portadas buenas del EPUB)
+                    byte[]? currentCover = !string.IsNullOrEmpty(book.CoverImagePath) && File.Exists(book.CoverImagePath)
+                        ? await File.ReadAllBytesAsync(book.CoverImagePath)
+                        : null;
+                    if (CoverPolicy.ShouldReplace(currentCover, imageBytes))
+                    {
+                        // Junto al libro (antes iba a Autor/Título aunque el libro estuviera en la carpeta de su saga)
+                        string? bookSubDir = Path.GetDirectoryName(!string.IsNullOrEmpty(book.CoverImagePath) ? book.CoverImagePath : book.EpubFilePath);
+                        if (string.IsNullOrEmpty(bookSubDir))
+                        {
+                            settingsDict.TryGetValue("LibraryRootPath", out var libraryRoot);
+                            if (string.IsNullOrWhiteSpace(libraryRoot)) libraryRoot = QuimeraReader.Application.Common.LibraryPathUtils.DefaultLibraryRoot;
+                            string mainAuthor = book.Authors.FirstOrDefault()?.Author.Name ?? "Unknown Author";
+                            bookSubDir = Path.Combine(libraryRoot, GetSafeFilename(mainAuthor), GetSafeFilename(book.Title));
+                        }
+
+                        Directory.CreateDirectory(bookSubDir);
+                        string coverPath = Path.Combine(bookSubDir, "cover.jpg");
+                        await File.WriteAllBytesAsync(coverPath, imageBytes);
+                        book.CoverImagePath = coverPath;
+                    }
                 }
                 catch (Exception ex)
                 {

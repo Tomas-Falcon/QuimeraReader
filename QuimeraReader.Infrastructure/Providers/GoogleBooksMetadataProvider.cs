@@ -41,10 +41,10 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
             {
                 foreach (var item in response.Items)
                 {
-                    var thumb = item.VolumeInfo?.ImageLinks?.Thumbnail;
-                    if (!string.IsNullOrWhiteSpace(thumb))
+                    var cover = QuimeraReader.Application.Common.CoverPolicy.GoogleCoverUrl(item.VolumeInfo?.ImageLinks?.Thumbnail);
+                    if (cover != null)
                     {
-                        covers.Add(thumb.Replace("http:", "https:"));
+                        covers.Add(cover);
                     }
                 }
             }
@@ -102,7 +102,7 @@ public class GoogleBooksMetadataProvider : IMetadataProvider
             {
                 Title = firstItem.Title,
                 Authors = firstItem.Authors ?? new List<string>(),
-                CoverImageUri = firstItem.ImageLinks?.Thumbnail?.Replace("http:", "https:"),
+                CoverImageUri = QuimeraReader.Application.Common.CoverPolicy.GoogleCoverUrl(firstItem.ImageLinks?.Thumbnail),
                 Categories = firstItem.Categories ?? new List<string>(),
                 Synopsis = firstItem.Description,
                 AverageRating = firstItem.AverageRating
