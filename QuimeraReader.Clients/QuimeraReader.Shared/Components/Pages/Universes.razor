@@ -3,6 +3,7 @@
 @inject IBookService BookService
 @inject NavigationManager NavManager
 @inject ToastService ToastService
+@inject Radzen.DialogService DialogService
 
 <PageTitle>Universos</PageTitle>
 
@@ -36,7 +37,11 @@
             <div class="collection-row mb-5">
                 @foreach (var u in _universes)
                 {
-                    <div class="collection-card" @key="u.Id" @onclick="@(() => NavManager.NavigateTo($"/universe/{u.Id}"))">
+                    <div class="collection-card position-relative" @key="u.Id" @onclick="@(() => NavManager.NavigateTo($"/universe/{u.Id}"))">
+                        @* Borrar desde la lista: antes solo se podía entrando en el universo, y no se encontraba *@
+                        <button class="btn btn-sm btn-dark universe-delete" title="Borrar universo" @onclick="@(() => DeleteAsync(u))" @onclick:stopPropagation="true">
+                            <i class="bi bi-trash"></i>
+                        </button>
                         <div class="collection-cover">
                             @if (!string.IsNullOrEmpty(u.SampleCoverUrl))
                             {
@@ -101,6 +106,25 @@
         {
             _universes ??= new();
             ToastService.ShowError("No se pudieron cargar los universos.");
+        }
+    }
+
+    private async Task DeleteAsync(UniverseSummary universe)
+    {
+        var confirmed = await DialogService.Confirm(
+            "Se borra solo el universo: sus sagas y libros siguen en la biblioteca, simplemente sin universo.",
+            $"¿Borrar \"{universe.Name}\"?",
+            new Radzen.ConfirmOptions { OkButtonText = "Borrar universo", CancelButtonText = "Cancelar" });
+        if (confirmed != true) return;
+
+        try
+        {
+            await Collections.DeleteUniverseAsync(universe.Id);
+            await LoadAsync();
+        }
+        catch
+        {
+            ToastService.ShowError("No se pudo borrar el universo.");
         }
     }
 
