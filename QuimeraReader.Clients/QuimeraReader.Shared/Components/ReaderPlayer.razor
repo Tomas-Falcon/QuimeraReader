@@ -67,11 +67,33 @@
                             <i class="bi bi-music-note-list"></i>
                         </button>
                     }
-                    <button class="btn btn-sm btn-outline-light" @onclick="ToggleImmersiveModeAsync" title="Modo lectura inmersiva (pantalla completa)">
+                    <button class="btn btn-sm btn-outline-light" @onclick="ToggleImmersiveModeAsync" title="@TranslationService["Reader_ImmersiveEnter"]">
                         <i class="bi bi-arrows-fullscreen"></i>
                     </button>
                 </div>
             </div>
+            }
+
+            @if (_isImmersiveMode && _showImmersiveControls)
+            {
+                <div class="immersive-controls" @onclick:stopPropagation="true">
+                    <button class="btn btn-sm btn-link text-white text-decoration-none" @onclick="GoBack" title="@TranslationService["Common_Back"]">
+                        <i class="bi bi-arrow-left"></i>
+                    </button>
+                    <div class="immersive-controls-title">
+                        <div class="text-truncate">@Book.Title</div>
+                        <small>@PageLabel · @($"{Math.Round(_displayPercentage, 1)}%")</small>
+                    </div>
+                    @if (Book.HasAudio)
+                    {
+                        <button class="btn btn-sm btn-outline-light rounded-circle" @onclick="ToggleAudioPlayPauseAsync" title="@(_isPlaying ? "Pausar" : "Reproducir")">
+                            <i class="bi @(_isPlaying ? "bi-pause-fill" : "bi-play-fill")"></i>
+                        </button>
+                    }
+                    <button class="btn btn-sm btn-light" @onclick="() => SetImmersiveModeAsync(false)">
+                        <i class="bi bi-fullscreen-exit me-1"></i>@TranslationService["Reader_ImmersiveExit"]
+                    </button>
+                </div>
             }
 
             @if (_showAppearanceMenu)
@@ -178,7 +200,7 @@
                     }
                     else
                     {
-                    <div class="d-flex justify-content-between align-items-center px-3 py-1" style="background: transparent; font-size: 0.7rem; color: rgba(255,255,255,0.35); cursor: pointer;" @onclick="ToggleImmersiveModeAsync" title="Toca para mostrar controles">
+                    <div class="d-flex justify-content-between align-items-center px-3 py-1" style="background: transparent; font-size: 0.7rem; color: rgba(255,255,255,0.35); cursor: pointer;" @onclick="ShowImmersiveControls" title="@TranslationService["Reader_ImmersiveShowControls"]">
                         <span>@PageLabel</span>
                         <span>@($"{Math.Round(_displayPercentage, 1)}%")</span>
                     </div>
@@ -381,20 +403,52 @@
     private bool _isImmersiveMode = false;
     private bool _pageMovedSinceAudioSync = false;
 
+    // Modo inmersivo: se entra solo con su botón. Dentro, tocar el centro muestra una barra flotante (Volver, página,
+    // audio, Salir) que se oculta sola y no recoloca el texto. Antes cualquier clic en el centro de la página
+    // entraba o salía del modo, y para salir había que volver a acertar al centro.
+    private bool _showImmersiveControls = false;
+    private System.Threading.CancellationTokenSource? _immersiveControlsHideCts;
+    private const int ImmersiveControlsSeconds = 4;
+
     [JSInvokable]
-    public async Task OnCenterTap()
+    public Task OnCenterTap()
     {
-        if (_showAnnotationDialog || _showQuickSelectionPill) return;
-        await ToggleImmersiveModeAsync();
+        if (!_isImmersiveMode || _showAnnotationDialog || _showQuickSelectionPill) return Task.CompletedTask;
+        if (_showImmersiveControls) HideImmersiveControls();
+        else ShowImmersiveControls();
+        return Task.CompletedTask;
     }
 
-    private async Task ToggleImmersiveModeAsync()
+    [JSInvokable]
+    public async Task OnEscapeKey()
     {
-        _isImmersiveMode = !_isImmersiveMode;
-        if (_isImmersiveMode)
+        if (_isImmersiveMode) await SetImmersiveModeAsync(false);
+    }
+
+    [JSInvokable]
+    public async Task OnFullscreenExited()
+    {
+        if (_isImmersiveMode) await SetImmersiveModeAsync(false, exitBrowserFullscreen: false);
+    }
+
+    private Task ToggleImmersiveModeAsync() => SetImmersiveModeAsync(!_isImmersiveMode);
+
+    private async Task SetImmersiveModeAsync(bool enabled, bool exitBrowserFullscreen = true)
+    {
+        if (_isImmersiveMode == enabled) return;
+        _isImmersiveMode = enabled;
+        if (enabled)
         {
             _showAppearanceMenu = false;
             _showPlaylist = false;
+            if (_epubJsModule != null) await _epubJsModule.InvokeVoidAsync("enterFullscreen");
+            // Al entrar se ve un momento la barra, para que quede claro cómo salir
+            ShowImmersiveControls();
+        }
+        else
+        {
+            HideImmersiveControls();
+            if (exitBrowserFullscreen && _epubJsModule != null) await _epubJsModule.InvokeVoidAsync("exitFullscreen");
         }
         StateHasChanged();
         await Task.Delay(50);
@@ -402,6 +456,26 @@
         {
             await _epubJsModule.InvokeVoidAsync("resizeEpub");
         }
+    }
+
+    private void ShowImmersiveControls()
+    {
+        _showImmersiveControls = true;
+        _immersiveControlsHideCts?.Cancel();
+        var cts = _immersiveControlsHideCts = new System.Threading.CancellationTokenSource();
+        _ = Task.Delay(TimeSpan.FromSeconds(ImmersiveControlsSeconds), cts.Token).ContinueWith(t =>
+        {
+            if (!t.IsCanceled) InvokeAsync(HideImmersiveControls);
+        }, TaskScheduler.Default);
+        StateHasChanged();
+    }
+
+    private void HideImmersiveControls()
+    {
+        _immersiveControlsHideCts?.Cancel();
+        if (!_showImmersiveControls) return;
+        _showImmersiveControls = false;
+        StateHasChanged();
     }
 
     private async Task ToggleNavigationLock()
@@ -1644,6 +1718,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        _immersiveControlsHideCts?.Cancel();
         if (_hasReadThisSession && Book != null && (!string.IsNullOrEmpty(Book.CurrentEpubCfi) || _currentTime > 0 || Book.PercentageCompleted.HasValue))
         {
             try

@@ -1228,3 +1228,31 @@ body .rz-body {
 .cover-muted { opacity: 0.7; }
 .cover-rating { color: #f5b301; }
 .cover-warning { color: #ff9800; }
+
+/* ===== Modo inmersivo: barra flotante de controles (no recoloca el texto) ===== */
+.immersive-controls {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: min(640px, calc(100vw - 20px));
+    padding: 8px 12px;
+    border-radius: 14px;
+    background: rgba(24, 24, 27, 0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    color: #fff;
+    animation: immersive-controls-in 0.18s ease-out;
+}
+.immersive-controls-title { flex: 1; min-width: 0; line-height: 1.2; }
+.immersive-controls-title small { opacity: 0.65; font-size: 0.75rem; }
+@keyframes immersive-controls-in {
+    from { opacity: 0; transform: translate(-50%, -8px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}

@@ -470,18 +470,32 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         }
     }
 
+    // Esc sale del modo inmersivo (también con el foco dentro del iframe del libro)
+    const notifyEscape = () => {
+        if (dotNetRef) dotNetRef.invokeMethodAsync("OnEscapeKey").catch(e => {});
+    };
+
     rendition.on("keyup", event => {
         if (event.key === "ArrowLeft") rendition.prev();
         if (event.key === "ArrowRight") rendition.next();
+        if (event.key === "Escape") notifyEscape();
     });
 
     const globalKeyHandler = event => {
         if (event.target && (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA")) return;
         if (event.key === "ArrowLeft") { try { rendition.prev(); } catch (e) {} }
         if (event.key === "ArrowRight") { try { rendition.next(); } catch (e) {} }
+        if (event.key === "Escape") notifyEscape();
     };
     document.addEventListener("keyup", globalKeyHandler);
     window._epubGlobalKeyHandler = globalKeyHandler;
+
+    // Si el navegador sale de pantalla completa (Esc, F11, gesto), se sale también del modo inmersivo
+    const fullscreenHandler = () => {
+        if (!document.fullscreenElement && dotNetRef) dotNetRef.invokeMethodAsync("OnFullscreenExited").catch(e => {});
+    };
+    document.addEventListener("fullscreenchange", fullscreenHandler);
+    window._epubFullscreenHandler = fullscreenHandler;
 
     rendition.on("markClicked", function (cfiRange, data) {
         window._lastMarkClickedTime = Date.now();
@@ -519,6 +533,22 @@ export function clearTextSelection() {
         if (window.getSelection) {
             window.getSelection().removeAllRanges();
         }
+    } catch (e) {}
+}
+
+// Pantalla completa real donde el navegador lo permite (web y escritorio). En el WebView de Android no existe:
+// ahí el modo inmersivo solo oculta los controles.
+export async function enterFullscreen() {
+    try {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+        }
+    } catch (e) {}
+}
+
+export async function exitFullscreen() {
+    try {
+        if (document.fullscreenElement) await document.exitFullscreen();
     } catch (e) {}
 }
 
@@ -702,6 +732,13 @@ export function destroyEpub() {
         if (window._epubGlobalKeyHandler) {
             document.removeEventListener("keyup", window._epubGlobalKeyHandler);
             window._epubGlobalKeyHandler = null;
+        }
+        if (window._epubFullscreenHandler) {
+            document.removeEventListener("fullscreenchange", window._epubFullscreenHandler);
+            window._epubFullscreenHandler = null;
+        }
+        if (document.fullscreenElement) {
+            try { document.exitFullscreen(); } catch (e) {}
         }
         if (window._epubGlobalMouseUpHandler) {
             window.removeEventListener("mouseup", window._epubGlobalMouseUpHandler);

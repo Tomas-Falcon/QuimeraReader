@@ -220,5 +220,8 @@
   "CoverSearch_FillMissing": "Fill in what the book is missing from this result (synopsis, rating, categories)",
   "CoverSearch_ManualUrl": "Or paste an image URL",
   "CoverSearch_Error": "Could not search covers.",
-  "CoverSearch_ApplyError": "Could not use that cover."
+  "CoverSearch_ApplyError": "Could not use that cover.",
+  "Reader_ImmersiveEnter": "Immersive reading (full screen)",
+  "Reader_ImmersiveExit": "Exit",
+  "Reader_ImmersiveShowControls": "Show controls"
 }

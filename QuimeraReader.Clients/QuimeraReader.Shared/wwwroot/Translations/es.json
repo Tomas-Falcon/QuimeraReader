@@ -241,5 +241,8 @@
   "CoverSearch_FillMissing": "Completar con este resultado lo que le falte al libro (sinopsis, puntuación, categorías)",
   "CoverSearch_ManualUrl": "O pegá la URL de una imagen",
   "CoverSearch_Error": "No se pudieron buscar portadas.",
-  "CoverSearch_ApplyError": "No se pudo usar esa portada."
+  "CoverSearch_ApplyError": "No se pudo usar esa portada.",
+  "Reader_ImmersiveEnter": "Lectura inmersiva (pantalla completa)",
+  "Reader_ImmersiveExit": "Salir",
+  "Reader_ImmersiveShowControls": "Mostrar controles"
 }
