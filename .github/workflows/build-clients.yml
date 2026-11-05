@@ -223,6 +223,25 @@ jobs:
             echo "PRERELEASE=false" >> $GITHUB_OUTPUT
           fi
 
+      # Los archivos llevan la versión en el nombre (QuimeraReader-v1.0.21-Android.apk): las builds de dev usan
+      # dev-<commit> y las manuales build-<commit>, para distinguir qué se instaló
+      - name: Add version to asset names
+        shell: bash
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            VERSION="dev-${GITHUB_SHA::7}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="build-${GITHUB_SHA::7}"
+          fi
+          cd ./release-assets
+          for f in QuimeraReader-*; do
+            [ -e "$f" ] || continue
+            mv "$f" "QuimeraReader-${VERSION}-${f#QuimeraReader-}"
+          done
+          ls -la
+
       # dev-latest es una pre-release "rodante": se borra (con su tag) para recrearla apuntando al commit actual
       - name: Remove previous dev-latest pre-release
         if: github.ref == 'refs/heads/dev'
