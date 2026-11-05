@@ -349,6 +349,25 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         return clientY;
     }
 
+    // ¿El punto del evento (coordenadas del iframe) cae sobre una marca? Las marcas se dibujan en un SVG fuera del iframe
+    function isPointOnMark(event) {
+        try {
+            var point = event.changedTouches && event.changedTouches.length > 0 ? event.changedTouches[0] : event;
+            var frame = event.view && event.view.frameElement;
+            var offset = frame ? frame.getBoundingClientRect() : { left: 0, top: 0 };
+            var x = point.clientX + offset.left;
+            var y = point.clientY + offset.top;
+            var host = document.getElementById(elementId);
+            var shapes = host ? host.querySelectorAll("svg g[data-epubcfi] rect, svg g[data-epubcfi] line") : [];
+            for (var i = 0; i < shapes.length; i++) {
+                var r = shapes[i].getBoundingClientRect();
+                // Margen vertical: el subrayado es una línea de 2-4 px
+                if (r.width > 0 && x >= r.left && x <= r.right && y >= r.top - 6 && y <= r.bottom + 6) return true;
+            }
+        } catch (e) {}
+        return false;
+    }
+
     // Ancho del visor visible (nunca el del iframe, que mide todo el capítulo)
     function getContainerWidth() {
         var viewerEl = document.getElementById(elementId);
@@ -400,6 +419,10 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         // 1. Si la navegación está bloqueada o se acaba de pulsar una anotación, no pasar de página
         if (window.navigationLocked) return;
         if (Date.now() - (window._lastMarkClickedTime || 0) < 400) return;
+
+        // Toque sobre una marca: la abre su propio manejador. Sin esto el toque central mostraba u ocultaba la barra,
+        // el lector se desplazaba antes del click y epub.js ya no lo encontraba sobre la marca (no se podía quitar)
+        if (isPointOnMark(event)) return;
 
         // Ignorar clics sobre enlaces o marcas interactivas
         if (event && event.target) {
@@ -863,7 +886,12 @@ export function setAudioBookmark(cfiRange) {
             window.currentAudioBookmarkCfi = cfiRange;
             window.lastKaraokeCfi = cfiRange;
             try {
-                window.epubRendition.annotations.underline(cfiRange, {}, () => {}, "", {
+                window.epubRendition.annotations.underline(cfiRange, {}, () => {
+                    window._lastMarkClickedTime = Date.now();
+                    if (window.epubDotNetRef) {
+                        window.epubDotNetRef.invokeMethodAsync("OnAudioBookmarkClicked").catch(e => {});
+                    }
+                }, "", {
                     "stroke": "#ff9800",
                     "stroke-width": "4px",
                     "stroke-opacity": "1.0",

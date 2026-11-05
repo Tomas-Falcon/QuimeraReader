@@ -224,5 +224,7 @@
   "Action_Undo": "Deshacer",
   "BookDetails_Status": "Estado",
   "Reader_PlayingFromSelection": "Reproduciendo desde el fragmento seleccionado.",
-  "Reader_ListenMarkerSet": "Marcado: seguirás escuchando desde aquí."
+  "Reader_ListenMarkerSet": "Marcado: seguirás escuchando desde aquí.",
+  "Reader_ListenMarkerTapped": "Marca «Seguir escuchando aquí»",
+  "Action_Remove": "Quitar"
 }

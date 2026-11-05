@@ -1190,6 +1190,26 @@
         _bookAnnotations.RemoveAll(a => a.IsListenMarker);
     }
 
+    // Tocar la marca naranja: si es "Seguir escuchando aquí", ofrecer quitarla
+    [JSInvokable]
+    public Task OnAudioBookmarkClicked()
+    {
+        if (_listenMarker == null) return Task.CompletedTask;
+        ToastService.ShowWithAction(TranslationService["Reader_ListenMarkerTapped"], TranslationService["Action_Remove"], RemoveListenMarkerAsync);
+        return Task.CompletedTask;
+    }
+
+    private async Task RemoveListenMarkerAsync()
+    {
+        var marker = _listenMarker;
+        if (marker == null) return;
+        _listenMarker = null;
+        if (_epubJsModule != null) await _epubJsModule.InvokeVoidAsync("clearAudioBookmark");
+        try { await BookService.DeleteAnnotationAsync(BookId, marker.Id); }
+        catch (Exception ex) { Logger.LogWarning(ex, "[Reader] No se pudo quitar la marca de escucha del libro {BookId}", BookId); }
+        await InvokeAsync(StateHasChanged);
+    }
+
     // La marca se consume cuando el audio ya pasó por ella
     private async Task ConsumeListenMarkerIfPassedAsync()
     {
