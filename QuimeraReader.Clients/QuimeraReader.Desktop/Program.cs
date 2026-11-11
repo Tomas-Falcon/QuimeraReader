@@ -71,6 +71,14 @@ public class Program
             .SetUseOsDefaultSize(false)
             .Center();
 
+        // Icono de la ventana (X11 y Windows). En Wayland el icono sale del archivo .desktop: ver linux/install.sh
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "wwwroot", "favicon.png");
+        if (File.Exists(iconPath))
+        {
+            try { app.MainWindow.SetIconFile(iconPath); }
+            catch (Exception ex) { Console.WriteLine($"[Icon] {ex.Message}"); }
+        }
+
         AppDomain.CurrentDomain.UnhandledException += (sender, error) =>
         {
             Console.WriteLine($"[FATAL ERROR] {error.ExceptionObject}");

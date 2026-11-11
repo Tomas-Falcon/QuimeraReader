@@ -12,6 +12,15 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
     <PackageReference Include="Radzen.Blazor" Version="11.4.1" />
     <PackageReference Include="Blazor.Radzen.Theming" Version="10.4.7" />
+    <PackageReference Include="MinVer" Version="8.0.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Instalador del acceso directo y el icono en Linux (va en la raíz del paquete) -->
+    <None Include="linux\install.sh" Link="install.sh" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

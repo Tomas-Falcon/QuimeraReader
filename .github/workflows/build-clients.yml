@@ -178,7 +178,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p ./dist
-          chmod +x ./publish/linux/QuimeraReader.Desktop
+          chmod +x ./publish/linux/QuimeraReader.Desktop ./publish/linux/install.sh
           tar -czvf ./dist/QuimeraReader-Linux-x64.tar.gz -C ./publish/linux .
           echo "Paquete Linux comprimido en ./dist/QuimeraReader-Linux-x64.tar.gz"
 
