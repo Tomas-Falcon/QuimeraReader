@@ -198,7 +198,7 @@ function initializeEpubCommon(elementId, book, dotNetRef, lastCfi, epubLocations
         } catch (e) {}
     }
     // Tipo de letra elegido (setFontFamily): se aplica a cada capítulo al cargarse
-    rendition.hooks.content.register(function (contents) { applyFontFamily(contents); applyImageFit(contents); });
+    rendition.hooks.content.register(function (contents) { applyFontFamily(contents); applyImageFit(contents); applyHyphenation(contents, book); });
 
     var hasValidInitialCfi = !!(lastCfi && typeof lastCfi === "string" && lastCfi.trim().length > 0);
     rendition.display(hasValidInitialCfi ? lastCfi : undefined);
@@ -657,6 +657,25 @@ function applyImageFit(contents) {
     var style = doc.createElement("style");
     style.id = "qr-image-fit";
     style.textContent = "body img { max-width: 100% !important; }";
+    doc.head.appendChild(style);
+}
+
+// Texto justificado en una columna estrecha (móvil, letra grande): sin guiones, una palabra larga deja huecos enormes
+// entre las demás. Se activa la partición de palabras, que necesita el idioma del capítulo (si el libro no lo marca se
+// toma el de sus metadatos), y se permite partir las palabras que aun así no caben.
+function applyHyphenation(contents, book) {
+    var doc = contents && contents.document;
+    if (!doc || !doc.head || doc.getElementById("qr-hyphens")) return;
+    var root = doc.documentElement;
+    if (root && !root.getAttribute("lang") && !root.getAttribute("xml:lang")) {
+        try {
+            var lang = book && book.packaging && book.packaging.metadata && book.packaging.metadata.language;
+            if (lang) root.setAttribute("lang", lang);
+        } catch (e) {}
+    }
+    var style = doc.createElement("style");
+    style.id = "qr-hyphens";
+    style.textContent = "body, body p { hyphens: auto !important; -webkit-hyphens: auto !important; overflow-wrap: break-word; }";
     doc.head.appendChild(style);
 }
 

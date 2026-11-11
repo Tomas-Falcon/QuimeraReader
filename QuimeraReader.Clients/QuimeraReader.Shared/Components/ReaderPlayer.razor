@@ -200,7 +200,7 @@
                     }
                     else
                     {
-                    <div class="d-flex justify-content-between align-items-center px-3 py-1" style="background: transparent; font-size: 0.7rem; color: rgba(255,255,255,0.35); cursor: pointer;" @onclick="ShowImmersiveControls" title="@TranslationService["Reader_ImmersiveShowControls"]">
+                    <div class="d-flex justify-content-between align-items-center px-3 py-1" style="background: transparent; font-size: 0.7rem; color: var(--text-main); opacity: 0.55; cursor: pointer;" @onclick="ShowImmersiveControls" title="@TranslationService["Reader_ImmersiveShowControls"]">
                         <span>@PageLabel</span>
                         <span>@($"{Math.Round(_displayPercentage, 1)}%")</span>
                     </div>
